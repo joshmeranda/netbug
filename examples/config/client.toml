@@ -1,0 +1,9 @@
+script_dir = "examples/scripts"
+
+pcap_dir = "/etc/nbug.d/pcap"
+
+interfaces = [ "lo" ]
+
+srv_addr = "127.0.0.1"
+
+srv_port = 8080

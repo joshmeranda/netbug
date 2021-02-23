@@ -1,8 +1,21 @@
+extern crate config;
+
 use pcap::Device;
 use std::sync::{Mutex, Arc};
 use std::thread::Builder;
+use toml;
+
+use config::client::ClientConfig;
 
 fn main() {
+    let client_cfg = match ClientConfig::from_path("examples/config/client.toml") {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            eprintln!("{}", err.to_string());
+            return
+        }
+    };
+
     let capture_flag = Arc::new(Mutex::new(true));
     let devices = vec![Device::lookup().unwrap()];
 
@@ -19,6 +32,7 @@ fn main() {
                     .name(device_name);
 
                 // todo: check that the thread was started successfully
+                // todo: add timestamp to end pf pcap name
                 builder.spawn( move || {
                     loop {
                         let packet = capture.next();

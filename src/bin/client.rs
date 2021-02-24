@@ -1,7 +1,7 @@
 extern crate config;
 
 use pcap::Device;
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, Mutex};
 use std::thread::Builder;
 use toml;
 
@@ -13,15 +13,13 @@ fn main() {
         Ok(cfg) => cfg,
         Err(ConfigError::Io(err)) => {
             eprintln!("Error opening config file: {}", err.to_string());
-            return
-        },
-        Err(ConfigError::Toml (err)) => {
+            return;
+        }
+        Err(ConfigError::Toml(err)) => {
             eprintln!("Error parsing config: {}", err.to_string());
-            return
+            return;
         }
     };
-
-    client_cfg.run_scripts();
 
     let capture_flag = Arc::new(Mutex::new(true));
     let devices = vec![Device::lookup().unwrap()];
@@ -35,32 +33,33 @@ fn main() {
             Ok(mut capture) => {
                 let mut save_file = capture.savefile(format!("{}.pcap", &device_name)).unwrap();
 
-                let builder = Builder::new()
-                    .name(device_name);
+                let builder = Builder::new().name(device_name);
 
                 // todo: check that the thread was started successfully
                 // todo: add timestamp to end pf pcap name
-                builder.spawn( move || {
-                    loop {
-                        let packet = capture.next();
+                builder.spawn(move || loop {
+                    let packet = capture.next();
 
-                        if packet.is_ok() {
-                            save_file.write(&packet.unwrap());
-                        }
+                    if packet.is_ok() {
+                        save_file.write(&packet.unwrap());
+                    }
 
-                        if ! *flag.lock().unwrap() {
-                            break;
-                        }
+                    if !*flag.lock().unwrap() {
+                        break;
                     }
                 });
             }
             Err(err) => {
-                eprintln!("Unable to create a capture for device '{}'\n{}", device_name, err.to_string()    )
+                eprintln!(
+                    "Unable to create a capture for device '{}'\n{}",
+                    device_name,
+                    err.to_string()
+                )
             }
         }
     }
 
-    *capture_flag.lock().unwrap() = false;
+    client_cfg.run_scripts();
 
-    std::thread::sleep(std::time::Duration::new(10, 0));
+    *capture_flag.lock().unwrap() = false;
 }

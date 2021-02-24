@@ -2,7 +2,7 @@ script_dir = "examples/scripts"
 
 pcap_dir = "/etc/nbug.d/pcap"
 
-interfaces = [ "lo" ]
+interfaces = [ "lo", "wlp1s0" ]
 
 srv_addr = "127.0.0.1"
 

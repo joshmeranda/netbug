@@ -6,7 +6,7 @@ use toml::de;
 #[derive(Debug)]
 pub enum ConfigError {
     Io(io::Error),
-    Toml(de::Error)
+    Toml(de::Error),
 }
 
 // todo: implement macro for simpler new types

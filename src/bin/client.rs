@@ -6,15 +6,22 @@ use std::thread::Builder;
 use toml;
 
 use config::client::ClientConfig;
+use config::error::ConfigError;
 
 fn main() {
     let client_cfg = match ClientConfig::from_path("examples/config/client.toml") {
         Ok(cfg) => cfg,
-        Err(err) => {
-            eprintln!("{}", err.to_string());
+        Err(ConfigError::Io(err)) => {
+            eprintln!("Error opening config file: {}", err.to_string());
+            return
+        },
+        Err(ConfigError::Toml (err)) => {
+            eprintln!("Error parsing config: {}", err.to_string());
             return
         }
     };
+
+    client_cfg.run_scripts();
 
     let capture_flag = Arc::new(Mutex::new(true));
     let devices = vec![Device::lookup().unwrap()];

@@ -29,6 +29,8 @@ mod defaults {
 
 /// Represents basic client configuration
 /// todo: specify pcap backup
+/// todo: allow configure the pcap filter
+/// todo: configure capture buffer size
 #[derive(Deserialize)]
 pub struct ClientConfig {
     /// the path to the directory which holds the client test scripts, these scripts should expect

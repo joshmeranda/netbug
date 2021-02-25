@@ -1,6 +1,7 @@
 extern crate config;
 
-use pcap::Device;
+use pcap::{Capture, Device};
+
 use std::sync::{Arc, Mutex};
 use std::thread::Builder;
 use toml;
@@ -42,25 +43,28 @@ fn main() {
 
         match capture_result {
             Ok(mut capture) => {
-                let mut save_file = capture.savefile(format!("{}.pcap", &device_name)).unwrap();
 
-                let builder = Builder::new().name(device_name);
+                let mut save_file = capture
+                    .savefile(format!("{}.pcap", &device_name)).unwrap();
+
+                let builder = Builder::new().name(device_name.clone());
 
                 // todo: check that the thread was started successfully
                 // todo: add timestamp to end pf pcap name
-                builder.spawn(move || loop {
+                let handle = builder.spawn(move || while *flag.lock().unwrap() {
                     let packet = capture.next();
 
                     if packet.is_ok() {
                         save_file.write(&packet.unwrap());
                     }
-
-                    if !*flag.lock().unwrap() {
-                        break;
-                    }
                 });
 
-                capture_started = true;
+                match handle {
+                    Ok(_) => println!("Started capture for device '{}'", device_name),
+                    Err(err) => println!("Err: {}", err.to_string())
+                }
+
+                capture_started = true;;
             }
             Err(err) => {
                 eprintln!(
@@ -74,6 +78,10 @@ fn main() {
 
     if capture_started {
         client_cfg.run_scripts();
+
+        // give the captures some time to read all packets from buffer
+        // todo: make configurable
+        std::thread::sleep(std::time::Duration::new(10, 0));
     }
 
     *capture_flag.lock().unwrap() = false;

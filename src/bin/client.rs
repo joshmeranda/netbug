@@ -24,10 +24,15 @@ fn main() {
     let capture_flag = Arc::new(Mutex::new(true));
     let devices = vec![Device::lookup().unwrap()];
 
+    // keeps track that at least one interface has started a packet capture
+    let mut capture_started = false;
+
     for device in devices {
         let flag = Arc::clone(&capture_flag);
         let device_name = String::from(device.name.clone());
         let capture_result = device.open();
+
+        println!("=== 000 {} ===", device_name);
 
         match capture_result {
             Ok(mut capture) => {
@@ -48,6 +53,8 @@ fn main() {
                         break;
                     }
                 });
+
+                capture_started = true;
             }
             Err(err) => {
                 eprintln!(
@@ -59,7 +66,9 @@ fn main() {
         }
     }
 
-    client_cfg.run_scripts();
+    if capture_started {
+        client_cfg.run_scripts();
+    }
 
     *capture_flag.lock().unwrap() = false;
 }

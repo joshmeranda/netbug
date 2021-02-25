@@ -45,7 +45,7 @@ pub struct ClientConfig {
     allow_concurrent: bool,
 
     /// the list of interfaces to listen on for the packet captures
-    interfaces: Vec<String>,
+    pub interfaces: Vec<String>,
 
     /// the ip or hostname of the end server to send the resulting pcap
     srv_addr: String,

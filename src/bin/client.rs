@@ -12,13 +12,9 @@ use config::error::ConfigError;
 fn main() {
     let client_cfg = match ClientConfig::from_path("examples/config/client.toml") {
         Ok(cfg) => cfg,
-        Err(ConfigError::Io(err)) => {
-            eprintln!("Error opening config file: {}", err.to_string());
-            return;
-        }
-        Err(ConfigError::Toml(err)) => {
-            eprintln!("Error parsing config: {}", err.to_string());
-            return;
+        Err(err) => {
+            eprintln!("{}", err.to_string());
+            return
         }
     };
 

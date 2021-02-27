@@ -1,4 +1,4 @@
-extern crate config;
+extern crate netbug;
 
 use pcap::{Capture, Device};
 
@@ -6,8 +6,9 @@ use std::sync::{Arc, Mutex};
 use std::thread::Builder;
 use toml;
 
-use config::client::ClientConfig;
-use config::error::ConfigError;
+use netbug::config::client::ClientConfig;
+use netbug::config::error::ConfigError;
+use netbug::client::Client;
 
 fn main() {
     let client_cfg = match ClientConfig::from_path("examples/config/client.toml") {
@@ -17,6 +18,8 @@ fn main() {
             return
         }
     };
+
+    let client = Client::from_config(client_cfg);
 
     let capture_flag = Arc::new(Mutex::new(true));
 
@@ -73,7 +76,7 @@ fn main() {
     }
 
     if capture_started {
-        client_cfg.run_scripts();
+        // client_cfg.run_scripts();
 
         // give the captures some time to read all packets from buffer
         // todo: make configurable

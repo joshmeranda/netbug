@@ -1,13 +1,12 @@
-use std::process::{Child, Command};
-use std::path::{PathBuf, Path};
-use std::io;
 use std::default::Default;
+use std::io;
+use std::path::PathBuf;
+use std::process::{Child, Command};
+use std::thread::Builder;
+
+use pcap::Device;
 
 use crate::config::client::ClientConfig;
-use crate::config::defaults;
-use pcap::Device;
-use std::thread::{Builder, JoinHandle};
-use std::sync::{Arc, Mutex};
 use crate::error::ClientError;
 
 #[derive(Default)]
@@ -17,8 +16,6 @@ pub struct Client {
     allow_concurrent: bool,
 
     devices: Vec<Device>,
-
-    capture_handles: Vec<JoinHandle<()>>
 }
 
 impl Client {
@@ -32,16 +29,14 @@ impl Client {
         let devices = Device::list().unwrap();
         let devices: Vec<Device> = devices
             .into_iter()
-            .filter(|device| {
-                cfg.interfaces.contains(&device.name)
-            })
+            .filter(|device| cfg.interfaces.contains(&device.name))
             .collect();
 
         Client {
             script_dir: cfg.script_dir,
             allow_concurrent: cfg.allow_concurrent,
             devices,
-            .. Client::default()
+            ..Client::default()
         }
     }
 
@@ -91,21 +86,19 @@ impl Client {
             let device_name = String::from(device.name.clone());
             let mut capture = device.clone().open()?;
 
-            let mut save_file = capture
-                .savefile(format!("{}.pcap", &device_name)).unwrap();
+            let mut save_file = capture.savefile(format!("{}.pcap", &device_name)).unwrap();
 
             let builder = Builder::new().name(device_name.clone());
 
             // todo: check that the thread was started successfully
             // todo: add timestamp to end pf pcap name
-            let handle = builder
-                .spawn(move || loop {
-                    let packet = capture.next();
+            builder.spawn(move || loop {
+                let packet = capture.next();
 
-                    if packet.is_ok() {
-                        save_file.write(&packet.unwrap());
-                    }
-                })?;
+                if packet.is_ok() {
+                    save_file.write(&packet.unwrap());
+                }
+            })?;
 
             println!("Started capture for device '{}'", device_name)
         }

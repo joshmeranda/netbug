@@ -1,12 +1,8 @@
+use std::fs;
+use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
-use std::fs;
-use std::io::Error as IoError;
-use std::process::{Child, Command};
-
 use super::{defaults, error::ConfigError};
-use std::net::Ipv4Addr;
 
 /// Represents basic client configuration
 /// todo: specify pcap backup
@@ -34,7 +30,7 @@ pub struct ClientConfig {
     pub srv_addr: Ipv4Addr,
 
     /// the port to send the pcap to
-    pub srv_port: usize
+    pub srv_port: usize,
 }
 
 impl ClientConfig {

@@ -1,8 +1,8 @@
 use std::error::Error;
 
+use std::fmt::{self, Display, Formatter};
 use std::io;
 use toml::de;
-use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -13,8 +13,10 @@ pub enum ConfigError {
 impl Display for ConfigError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ConfigError::Io(err) => write!(f, "Error reading configuration file: {}", err.to_string()),
-            ConfigError::Toml(err) => write!(f, "Error parsing configuration: {}", err.to_string())
+            ConfigError::Io(err) => {
+                write!(f, "Error reading configuration file: {}", err.to_string())
+            }
+            ConfigError::Toml(err) => write!(f, "Error parsing configuration: {}", err.to_string()),
         }
     }
 }
@@ -23,7 +25,7 @@ impl Error for ConfigError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             ConfigError::Io(err) => Some(err),
-            ConfigError::Toml(err) => Some(err)
+            ConfigError::Toml(err) => Some(err),
         }
     }
 }

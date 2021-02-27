@@ -1,7 +1,7 @@
 /// Provides default values used to generate default configurations
 use std::path::PathBuf;
 
-const NETBUG_BASE_DIR: &str ="/etc/nbug.d";
+const NETBUG_BASE_DIR: &str = "/etc/nbug.d";
 
 const NETBUG_CONFIG_FILE_NAME: &str = "conf.toml";
 

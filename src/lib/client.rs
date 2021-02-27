@@ -1,5 +1,4 @@
 use std::default::Default;
-use std::io;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::thread::Builder;
@@ -42,7 +41,7 @@ impl Client {
 
     /// Run all scripts found in the configured scrip directory and block until all are complete
     /// todo: consider replacing with Runner struct
-    pub fn run_scripts(&self) -> Result<(), io::Error> {
+    pub fn run_scripts(&self) -> Result<(), ClientError> {
         let mut children: Vec<Child> = vec![]; // will not always be used
 
         for entry in self.script_dir.read_dir()? {
@@ -61,16 +60,18 @@ impl Client {
 
             let mut child = child.unwrap();
 
+            // if scripts are allowed to run concurrently add to child Vec, else wait to finish before next iteration
             if self.allow_concurrent {
-                child.wait();
-            } else {
                 children.push(child);
+            } else {
+                // no need to kill other children since all scripts are run concurrently
+                child.wait()?;
             }
         }
 
         if !children.is_empty() {
             for mut child in children {
-                child.wait();
+                child.wait()?;
             }
         }
 

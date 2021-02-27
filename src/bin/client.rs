@@ -14,9 +14,13 @@ fn main() {
 
     let mut client = Client::from_config(client_cfg);
 
-    client.start_capture();
+    if let Err(err) = client.start_capture() {
+        eprintln!("{}", err.to_string());
+    }
 
-    client.run_scripts();
+    if let Err(err) = client.run_scripts() {
+        eprintln!("{}", err.to_string());
+    }
 
     std::thread::sleep(std::time::Duration::from_secs(5));
 }

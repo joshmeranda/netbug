@@ -7,7 +7,7 @@ use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use pcap::Device;
 use std::thread::{Builder, JoinHandle};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 pub struct Client {
@@ -25,7 +25,7 @@ impl Client {
         Client::default()
     }
 
-    /// Construct a client from the client configuration
+    /// Construct a client from a [ClientConfig] which is consumed.
     pub fn from_config(cfg: ClientConfig) -> Client {
         // find the list of valid devices on which to start a packet capture
         let devices = Device::list().unwrap();
@@ -81,6 +81,9 @@ impl Client {
         Ok(())
     }
 
+    /// Begin capturing packets on the configured network devices. Note that there is currently no
+    /// way to stop the capture once it begins, so take care to ensure that you start it as late as
+    /// possible to avoid needlessly capturing  packets..
     pub fn start_capture(&mut self) -> Result<(), ()> {
         // todo: fix Error types
         for device in &self.devices {
@@ -107,10 +110,7 @@ impl Client {
                         });
 
                     match handle {
-                        Ok(handle) => {
-                            self.capture_handles.push(handle);
-                            println!("Started capture for device '{}'", device_name)
-                        },
+                        Ok(_) => println!("Started capture for device '{}'", device_name),
                         Err(err) => println!("Err: {}", err.to_string())
                     }
                 }

@@ -22,4 +22,8 @@ fn main() {
     let mut client = Client::from_config(client_cfg);
 
     client.start_capture();
+
+    client.run_scripts();
+
+    std::thread::sleep(std::time::Duration::from_secs(5));
 }

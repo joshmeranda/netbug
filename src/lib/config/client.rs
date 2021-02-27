@@ -34,7 +34,7 @@ pub struct ClientConfig {
     pub srv_addr: Ipv4Addr,
 
     /// the port to send the pcap to
-    srv_port: usize
+    pub srv_port: usize
 }
 
 impl ClientConfig {
@@ -55,8 +55,4 @@ impl ClientConfig {
             Err(err) => Err(ConfigError::from(err)),
         }
     }
-
-    // pub fn srv_addr() -> Result<Ipv4Addr, ConfigError> {
-    //     Ipv4Addr::
-    // }
 }

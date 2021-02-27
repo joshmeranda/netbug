@@ -8,6 +8,7 @@ use crate::config::defaults;
 use pcap::Device;
 use std::thread::{Builder, JoinHandle};
 use std::sync::{Arc, Mutex};
+use crate::error::ClientError;
 
 #[derive(Default)]
 pub struct Client {
@@ -84,44 +85,29 @@ impl Client {
     /// Begin capturing packets on the configured network devices. Note that there is currently no
     /// way to stop the capture once it begins, so take care to ensure that you start it as late as
     /// possible to avoid needlessly capturing  packets..
-    pub fn start_capture(&mut self) -> Result<(), ()> {
+    pub fn start_capture(&mut self) -> Result<(), ClientError> {
         // todo: fix Error types
         for device in &self.devices {
             let device_name = String::from(device.name.clone());
-            let capture_result = device.clone().open();
+            let mut capture = device.clone().open()?;
 
-            match capture_result {
-                Ok(mut capture) => {
+            let mut save_file = capture
+                .savefile(format!("{}.pcap", &device_name)).unwrap();
 
-                    let mut save_file = capture
-                        .savefile(format!("{}.pcap", &device_name)).unwrap();
+            let builder = Builder::new().name(device_name.clone());
 
-                    let builder = Builder::new().name(device_name.clone());
+            // todo: check that the thread was started successfully
+            // todo: add timestamp to end pf pcap name
+            let handle = builder
+                .spawn(move || loop {
+                    let packet = capture.next();
 
-                    // todo: check that the thread was started successfully
-                    // todo: add timestamp to end pf pcap name
-                    let handle = builder
-                        .spawn(move || loop {
-                            let packet = capture.next();
-
-                            if packet.is_ok() {
-                                save_file.write(&packet.unwrap());
-                            }
-                        });
-
-                    match handle {
-                        Ok(_) => println!("Started capture for device '{}'", device_name),
-                        Err(err) => println!("Err: {}", err.to_string())
+                    if packet.is_ok() {
+                        save_file.write(&packet.unwrap());
                     }
-                }
-                Err(err) => {
-                    eprintln!(
-                        "Unable to create a capture for device '{}'\n{}",
-                        device_name,
-                        err.to_string()
-                    )
-                }
-            }
+                })?;
+
+            println!("Started capture for device '{}'", device_name)
         }
 
         Ok(())

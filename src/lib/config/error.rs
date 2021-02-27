@@ -2,7 +2,7 @@ use std::error::Error;
 
 use std::io;
 use toml::de;
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -11,7 +11,7 @@ pub enum ConfigError {
 }
 
 impl Display for ConfigError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ConfigError::Io(err) => write!(f, "Error reading configuration file: {}", err.to_string()),
             ConfigError::Toml(err) => write!(f, "Error parsing configuration: {}", err.to_string())
@@ -28,7 +28,6 @@ impl Error for ConfigError {
     }
 }
 
-// todo: implement macro for simpler new types
 impl From<io::Error> for ConfigError {
     fn from(err: io::Error) -> Self {
         ConfigError::Io(err)

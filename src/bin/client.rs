@@ -12,15 +12,19 @@ fn main() {
         }
     };
 
-    let mut client = Client::from_config(client_cfg);
+    {
+        let delay = client_cfg.delay;
 
-    if let Err(err) = client.start_capture() {
-        eprintln!("{}", err.to_string());
+        // explicit scope to drop any active captures from the
+        let mut client = Client::from_config(client_cfg);
+
+        if let Err(err) = client.start_capture() {
+            eprintln!("{}", err.to_string());
+        } else if let Err(err) = client.run_scripts() {
+            eprintln!("{}", err.to_string());
+        } else {
+            // small delay  to ensure all relevant packets are dumped
+            std::thread::sleep(std::time::Duration::from_secs(delay as u64));
+        }
     }
-
-    if let Err(err) = client.run_scripts() {
-        eprintln!("{}", err.to_string());
-    }
-
-    std::thread::sleep(std::time::Duration::from_secs(5));
 }

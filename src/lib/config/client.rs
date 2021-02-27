@@ -1,8 +1,11 @@
 use std::fs;
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
+use std::result;
 
-use super::{defaults, error::ConfigError};
+use super::{defaults, error::Error};
+
+pub type Result = result::Result<ClientConfig, Error>;
 
 /// Represents basic client configuration
 /// todo: specify pcap backup
@@ -23,7 +26,11 @@ pub struct ClientConfig {
     #[serde(default = "defaults::default_concurrent_run")]
     pub allow_concurrent: bool,
 
-    /// the list of interfaces to listen on for the packet captures
+    /// the amount of delay between scripts and actions are completed and the capture ends [0 - 255],
+    /// giving pcap some more time to pull in any lingering network packets.
+    #[serde(default = "defaults::default_delay")]
+    pub delay: u8,
+
     pub interfaces: Vec<String>,
 
     /// the ip or hostname of the end server to send the resulting pcap
@@ -34,13 +41,13 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    pub fn new() -> Result<ClientConfig, ConfigError> {
+    pub fn new() -> Result {
         let default_path = defaults::default_config_file_path();
 
         ClientConfig::from_path(default_path)
     }
 
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<ClientConfig, ConfigError> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result {
         // todo: handle toml parsing error
         // todo: handle config errors
         //   script_dir | pcap_dir is not a dir, etc
@@ -48,7 +55,7 @@ impl ClientConfig {
 
         match toml::from_str(content.as_str()) {
             Ok(cfg) => Ok(cfg),
-            Err(err) => Err(ConfigError::from(err)),
+            Err(err) => Err(Error::from(err)),
         }
     }
 }

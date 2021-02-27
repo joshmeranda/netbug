@@ -38,4 +38,8 @@ pub fn default_concurrent_run() -> bool {
     false
 }
 
+pub fn default_delay() -> u8 {
+    1
+}
+
 // Server Specific Values

@@ -1,6 +1,6 @@
 script_dir = "examples/scripts"
 
-pcap_dir = "/etc/nbug.d/pcap"
+pcap_dir = "pcap"
 
 interfaces = [ "lo", "wlp1s0" ]
 

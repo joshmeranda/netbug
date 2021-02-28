@@ -5,6 +5,7 @@ use std::io;
 
 #[derive(Debug)]
 pub enum ClientError {
+    Client(String),
     Io(io::Error),
     Pcap(pcap::Error),
 }
@@ -12,6 +13,7 @@ pub enum ClientError {
 impl Display for ClientError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            ClientError::Client(msg) => write!(f, "Client error: {}", msg),
             ClientError::Io(err) => write!(f, "System io error: {}", err.to_string()),
             ClientError::Pcap(err) => write!(f, "Pcap Error: {}", err.to_string()),
         }
@@ -21,6 +23,7 @@ impl Display for ClientError {
 impl Error for ClientError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
+            ClientError::Client(_) => None,
             ClientError::Io(err) => Some(err),
             ClientError::Pcap(err) => Some(err),
         }

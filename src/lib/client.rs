@@ -11,9 +11,11 @@ use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::config::defaults::default_concurrent_run;
 use crate::error::ClientError;
+use std::sync::{Arc, Mutex};
 
 type Result = result::Result<(), ClientError>;
 
+/// The main Netbug client to capture network and dump network traffic to pcap files.
 #[derive(Default)]
 pub struct Client {
     script_dir: PathBuf,
@@ -23,13 +25,15 @@ pub struct Client {
     allow_concurrent: bool,
 
     devices: Vec<Device>,
+
+    capturing: Arc<Mutex<bool>>,
 }
 
 impl Client {
     pub fn new() -> Client {
         Client {
             script_dir: defaults::default_script_dir(),
-            pcap_dir: defaults::default_pcaps_dir(),
+            pcap_dir: defaults::default_pcap_dir(),
             allow_concurrent: default_concurrent_run(),
             ..Client::default()
         }
@@ -96,12 +100,21 @@ impl Client {
     /// explicit way to end capture and flush its output, be mindful of your client's scoping to
     /// prevent capturing unnecessary packets.
     pub fn start_capture(&mut self) -> Result {
+        if self.is_capturing() {
+            return Err(ClientError::Client(String::from("capture is already running")))
+        } else if self.devices.is_empty() {
+            return Err(ClientError::Client(String::from("no configured network devices")))
+        }
+
         // ensure that the packet capture directory exists
         if !self.pcap_dir.exists() {
             fs::create_dir(self.pcap_dir.clone())?;
         }
 
+        *self.capturing.lock().unwrap() = true;
+
         for device in &self.devices {
+            let capture_flag = Arc::clone(&self.capturing);
             let device_name = String::from(device.name.clone());
 
             let mut capture = Capture::from_device(device.clone())?
@@ -114,16 +127,13 @@ impl Client {
 
             let mut save_file = capture.savefile(pcap_path).unwrap();
 
-            // todo: check that the thread was started successfully
             // todo: add timestamp to end of pcap name
             let builder = Builder::new().name(device_name.clone());
-            builder.spawn(move || loop {
+            builder.spawn(move || while *capture_flag.lock().unwrap() {
                 match capture.next() {
                     Ok(packet) => save_file.write(&packet),
                     Err(_) => {} // todo: these errors should be handled
                 }
-
-                println!("=== 000 ===");
             })?;
 
             println!("Started capture for device '{}'", device_name)
@@ -132,7 +142,24 @@ impl Client {
         Ok(())
     }
 
-    pub fn transfer_pcaps(&self) {
+    /// Signal the client to stop capturing network packets. Note that this simply signals the
+    /// capturing thread loops to discontinue iteration rather than immediately stopping them.
+    /// Therefore, it is possible for extra packets to be captured and written to the resulting pcap
+    /// if the current thread iterations are still in progress.
+    pub fn stop_capture(&mut self) -> Result {
+        if ! self.is_capturing() {
+            return Err(ClientError::Client(String::from("no capture is running")));
+        }
+
+        *self.capturing.lock().unwrap() = false;
+        Ok(())
+    }
+
+    pub fn is_capturing(&self) -> bool {
+        *self.capturing.lock().unwrap()
+    }
+
+    pub fn transfer_pcap(&self) {
         todo!("transfer all pcap files in self.pcap_dir to the remote (or local) analysis server")
     }
 }

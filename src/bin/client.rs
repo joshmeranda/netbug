@@ -25,6 +25,10 @@ fn main() {
         } else {
             // small delay  to ensure all relevant packets are dumped
             std::thread::sleep(std::time::Duration::from_secs(delay as u64));
+
+            if let Err(err) = client.stop_capture() {
+                eprintln!("Could not stop packet capture: {}", err.to_string());
+            }
         }
     }
 }

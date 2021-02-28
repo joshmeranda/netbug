@@ -5,7 +5,7 @@ const NETBUG_BASE_DIR: &str = "/etc/nbug.d";
 
 const NETBUG_CONFIG_FILE_NAME: &str = "conf.toml";
 
-const NETBUG_PCAPS_SUB_DIR_NAME: &str = "pcaps";
+const NETBUG_PCAP_SUB_DIR_NAME: &str = "pcap";
 
 const NETBUG_SCRIPTS_SUB_DIR_NAME: &str = "scripts";
 
@@ -25,9 +25,9 @@ pub fn default_script_dir() -> PathBuf {
     path
 }
 
-pub fn default_pcaps_dir() -> PathBuf {
+pub fn default_pcap_dir() -> PathBuf {
     let mut path = PathBuf::from(NETBUG_BASE_DIR);
-    path.push(NETBUG_PCAPS_SUB_DIR_NAME);
+    path.push(NETBUG_PCAP_SUB_DIR_NAME);
 
     path
 }

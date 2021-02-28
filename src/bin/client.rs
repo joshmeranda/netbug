@@ -29,6 +29,11 @@ fn main() {
             if let Err(err) = client.stop_capture() {
                 eprintln!("Could not stop packet capture: {}", err.to_string());
             }
+
+            match client.transfer_pcap() {
+                Ok(_) => { }
+                Err(err) => eprintln!("{}", err.to_string())
+            };
         }
     }
 }

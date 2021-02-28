@@ -1,11 +1,11 @@
 use std::fs;
-use std::net::Ipv4Addr;
+use std::net::SocketAddr ;
 use std::path::{Path, PathBuf};
 use std::result;
 
-use super::{defaults, error::Error};
+use super::{defaults, error};
 
-pub type Result = result::Result<ClientConfig, Error>;
+pub type Result = result::Result<ClientConfig, error::Error>;
 
 /// Represents basic client configuration
 /// todo: specify pcap backup
@@ -33,11 +33,8 @@ pub struct ClientConfig {
 
     pub interfaces: Vec<String>,
 
-    /// the ip or hostname of the end server to send the resulting pcap
-    pub srv_addr: Ipv4Addr,
-
-    /// the port to send the pcap to
-    pub srv_port: usize,
+    /// the host / ip and port pair of the target socket
+    pub srv_addr: SocketAddr,
 }
 
 impl ClientConfig {
@@ -55,7 +52,7 @@ impl ClientConfig {
 
         match toml::from_str(content.as_str()) {
             Ok(cfg) => Ok(cfg),
-            Err(err) => Err(Error::from(err)),
+            Err(err) => Err(error::Error::from(err)),
         }
     }
 }

@@ -32,6 +32,10 @@ pub fn default_pcap_dir() -> PathBuf {
     path
 }
 
+pub fn default_server_port() -> u16 {
+    8081
+}
+
 // Client Specific Values
 
 pub fn default_concurrent_run() -> bool {

@@ -4,19 +4,18 @@ use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::result;
 use std::thread::Builder;
+use std::sync::{Arc, Mutex};
+use std::net::{TcpStream, IpAddr, Ipv4Addr, Shutdown, SocketAddr};
 
 use pcap::{Capture, Device};
 
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
-use crate::config::defaults::default_concurrent_run;
 use crate::error::ClientError;
-use std::sync::{Arc, Mutex};
 
 type Result = result::Result<(), ClientError>;
 
 /// The main Netbug client to capture network and dump network traffic to pcap files.
-#[derive(Default)]
 pub struct Client {
     script_dir: PathBuf,
 
@@ -27,16 +26,26 @@ pub struct Client {
     devices: Vec<Device>,
 
     capturing: Arc<Mutex<bool>>,
+
+    srv_addr: SocketAddr,
+}
+
+impl Default for Client {
+    fn default() -> Client {
+        Client {
+            script_dir: defaults::default_script_dir(),
+            pcap_dir: defaults::default_pcap_dir(),
+            allow_concurrent: defaults::default_concurrent_run(),
+            devices: vec![],
+            capturing: Arc::new(Mutex::new(false)),
+            srv_addr: SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port())
+        }
+    }
 }
 
 impl Client {
     pub fn new() -> Client {
-        Client {
-            script_dir: defaults::default_script_dir(),
-            pcap_dir: defaults::default_pcap_dir(),
-            allow_concurrent: default_concurrent_run(),
-            ..Client::default()
-        }
+        Client::default()
     }
 
     /// Construct a client from a [ClientConfig] which is consumed.
@@ -52,6 +61,7 @@ impl Client {
             script_dir: cfg.script_dir,
             pcap_dir: cfg.pcap_dir,
             allow_concurrent: cfg.allow_concurrent,
+            srv_addr: cfg.srv_addr,
             devices,
             ..Client::default()
         }
@@ -159,7 +169,15 @@ impl Client {
         *self.capturing.lock().unwrap()
     }
 
-    pub fn transfer_pcap(&self) {
-        todo!("transfer all pcap files in self.pcap_dir to the remote (or local) analysis server")
+    pub fn transfer_pcap(&self) -> Result {
+        let tcp = TcpStream::connect(self.srv_addr)?;
+
+        std::thread::sleep(std::time::Duration::from_secs(5));
+
+        if let Err(err) = tcp.shutdown(Shutdown::Both) {
+            eprintln!("Error shutting down server connection: {}", err);
+        }
+
+        Ok(())
     }
 }

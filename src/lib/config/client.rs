@@ -23,12 +23,12 @@ pub struct ClientConfig {
     pub pcap_dir: PathBuf,
 
     /// allow all scripts to be executed at once rather then one at a time
-    #[serde(default = "defaults::default_concurrent_run")]
+    #[serde(default = "defaults::client::default_concurrent_run")]
     pub allow_concurrent: bool,
 
     /// the amount of delay between scripts and actions are completed and the capture ends [0 - 255],
     /// giving pcap some more time to pull in any lingering network packets.
-    #[serde(default = "defaults::default_delay")]
+    #[serde(default = "defaults::client::default_delay")]
     pub delay: u8,
 
     pub interfaces: Vec<String>,

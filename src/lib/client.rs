@@ -35,7 +35,7 @@ impl Default for Client {
         Client {
             script_dir: defaults::default_script_dir(),
             pcap_dir: defaults::default_pcap_dir(),
-            allow_concurrent: defaults::default_concurrent_run(),
+            allow_concurrent: defaults::client::default_concurrent_run(),
             devices: vec![],
             capturing: Arc::new(Mutex::new(false)),
             srv_addr: SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port())

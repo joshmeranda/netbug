@@ -1,19 +1,19 @@
 use std::default::Default;
 use std::fs;
+use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::result;
-use std::thread::Builder;
 use std::sync::{Arc, Mutex};
-use std::net::{TcpStream, IpAddr, Ipv4Addr, Shutdown, SocketAddr};
+use std::thread::Builder;
 
 use pcap::{Capture, Device};
 
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
-use crate::error::ClientError;
+use crate::error::NbugError;
 
-type Result = result::Result<(), ClientError>;
+type Result = result::Result<(), NbugError>;
 
 /// The main Netbug client to capture network and dump network traffic to pcap files.
 pub struct Client {
@@ -38,7 +38,10 @@ impl Default for Client {
             allow_concurrent: defaults::client::default_concurrent_run(),
             devices: vec![],
             capturing: Arc::new(Mutex::new(false)),
-            srv_addr: SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port())
+            srv_addr: SocketAddr::new(
+                IpAddr::from(Ipv4Addr::LOCALHOST),
+                defaults::default_server_port(),
+            ),
         }
     }
 }
@@ -111,9 +114,13 @@ impl Client {
     /// prevent capturing unnecessary packets.
     pub fn start_capture(&mut self) -> Result {
         if self.is_capturing() {
-            return Err(ClientError::Client(String::from("capture is already running")))
+            return Err(NbugError::Client(String::from(
+                "capture is already running",
+            )));
         } else if self.devices.is_empty() {
-            return Err(ClientError::Client(String::from("no configured network devices")))
+            return Err(NbugError::Client(String::from(
+                "no configured network devices",
+            )));
         }
 
         // ensure that the packet capture directory exists
@@ -139,10 +146,12 @@ impl Client {
 
             // todo: add timestamp to end of pcap name
             let builder = Builder::new().name(device_name.clone());
-            builder.spawn(move || while *capture_flag.lock().unwrap() {
-                match capture.next() {
-                    Ok(packet) => save_file.write(&packet),
-                    Err(_) => {} // todo: these errors should be handled
+            builder.spawn(move || {
+                while *capture_flag.lock().unwrap() {
+                    match capture.next() {
+                        Ok(packet) => save_file.write(&packet),
+                        Err(_) => {} // todo: these errors should be handled
+                    }
                 }
             })?;
 
@@ -157,8 +166,8 @@ impl Client {
     /// Therefore, it is possible for extra packets to be captured and written to the resulting pcap
     /// if the current thread iterations are still in progress.
     pub fn stop_capture(&mut self) -> Result {
-        if ! self.is_capturing() {
-            return Err(ClientError::Client(String::from("no capture is running")));
+        if !self.is_capturing() {
+            return Err(NbugError::Client(String::from("no capture is running")));
         }
 
         *self.capturing.lock().unwrap() = false;

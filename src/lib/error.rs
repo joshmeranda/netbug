@@ -4,40 +4,43 @@ use std::fmt::{self, Display, Formatter};
 use std::io;
 
 #[derive(Debug)]
-pub enum ClientError {
+pub enum NbugError {
     Client(String),
     Io(io::Error),
     Pcap(pcap::Error),
+    Packet(String),
 }
 
-impl Display for ClientError {
+impl Display for NbugError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ClientError::Client(msg) => write!(f, "Client error: {}", msg),
-            ClientError::Io(err) => write!(f, "System io error: {}", err.to_string()),
-            ClientError::Pcap(err) => write!(f, "Pcap Error: {}", err.to_string()),
+            NbugError::Client(msg) => write!(f, "Client error: {}", msg),
+            NbugError::Io(err) => write!(f, "System io error: {}", err.to_string()),
+            NbugError::Pcap(err) => write!(f, "Pcap Error: {}", err.to_string()),
+            NbugError::Packet(msg) => write!(f, "Client error: {}", msg),
         }
     }
 }
 
-impl Error for ClientError {
+impl Error for NbugError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            ClientError::Client(_) => None,
-            ClientError::Io(err) => Some(err),
-            ClientError::Pcap(err) => Some(err),
+            NbugError::Client(_) => None,
+            NbugError::Io(err) => Some(err),
+            NbugError::Pcap(err) => Some(err),
+            NbugError::Packet(_) => None,
         }
     }
 }
 
-impl From<io::Error> for ClientError {
+impl From<io::Error> for NbugError {
     fn from(err: io::Error) -> Self {
-        ClientError::Io(err)
+        NbugError::Io(err)
     }
 }
 
-impl From<pcap::Error> for ClientError {
+impl From<pcap::Error> for NbugError {
     fn from(err: pcap::Error) -> Self {
-        ClientError::Pcap(err)
+        NbugError::Pcap(err)
     }
 }

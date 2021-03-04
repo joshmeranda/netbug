@@ -1,22 +1,23 @@
+use std::convert::Into;
 use std::convert::TryFrom;
 use std::fs;
 use std::path::Path;
 use std::result;
 use std::str;
 
-use crypto::sha3::Sha3;
 use crypto::digest::Digest;
+use crypto::sha3::Sha3;
 
 use crate::error::NbugError;
 
-type Result<'a> = result::Result<PcapMessage<'a>, NbugError>;
+type Result = result::Result<PcapMessage, NbugError>;
 
 /// Struct representing network packet containing all or part of a client generated pcap file. Note
 /// the actual packet sent over the wire will likely have extra fields not defined here explicitly
 /// such as the checksum.
 ///
 /// todo: implement a better checksum / hashing method
-pub struct PcapMessage<'a> {
+pub struct PcapMessage {
     /// The version of the message. This will allow for providing backwards compatibility when using
     /// an older client with a newer server which may have an updated message structure.
     version: u8,
@@ -26,21 +27,24 @@ pub struct PcapMessage<'a> {
 
     /// The capture data.
     data: Vec<u8>,
-
-    _casper: std::marker::PhantomData<&'a bool>,
 }
 
-impl PcapMessage<'_> {
-    pub fn from_pcap<'a, P: AsRef<Path>>(path: P) -> Result<'a> {
+impl PcapMessage {
+    const MESSAGE_VERSION: u8 = 0;
+
+    pub fn from_pcap<P: AsRef<Path>>(path: P) -> Result {
         let name: String = String::from(path.as_ref().file_name().unwrap().to_str().unwrap());
         let data: Vec<u8> = fs::read(path).unwrap();
 
         Ok(PcapMessage {
-            version: 0,
+            version: PcapMessage::MESSAGE_VERSION,
             name,
             data,
-            _casper: std::marker::PhantomData,
         })
+    }
+
+    pub fn dump_pcap(&self) {
+        todo!("Dump pcap data to local file");
     }
 
     fn _generate_checksum(data: &[u8]) -> Vec<u8> {
@@ -61,40 +65,40 @@ impl PcapMessage<'_> {
 ///
 /// todo: use cleaner indexing of data
 /// todo: implement checksum / data verification
-impl<'a> TryFrom<&'a [u8]> for PcapMessage<'a> {
+impl TryFrom<Vec<u8>> for PcapMessage {
     type Error = NbugError;
 
-    fn try_from(bytes: &[u8]) -> result::Result<Self, Self::Error> {
-        let version = bytes[0];
-
+    fn try_from(bytes: Vec<u8>) -> result::Result<Self, Self::Error> {
         let name_len: usize = bytes[1] as usize;
-        let name = str::from_utf8(&bytes[2..name_len + 2]).unwrap();
+        let data_len: usize = bytes[2] as usize;
 
-        let data_len: usize = bytes[name_len + 2] as usize;
+        let name = str::from_utf8(&bytes[3..name_len + 3]).unwrap();
+
         let data = &bytes[name_len + 3..name_len + data_len + 3];
 
         Ok(PcapMessage {
-            version,
+            version: PcapMessage::MESSAGE_VERSION,
             name: String::from(name),
             data: Vec::from(data),
-            _casper: std::marker::PhantomData,
+            // _casper: std::marker::PhantomData,
         })
     }
 }
 
 /// Create the raw packet data from the PcapMessage.
-impl Into<Vec<u8>> for PcapMessage<'_> {
+impl Into<Vec<u8>> for PcapMessage {
     fn into(mut self) -> Vec<u8> {
         let mut bytes: Vec<u8> = vec![];
 
+        // message "headerr"
         bytes.push(self.version);
-
         bytes.push(self.name.len() as u8);
+        bytes.push(self.data.len() as u8);
+
+        // message body
         unsafe {
             bytes.append(self.name.as_mut_vec());
         }
-
-        bytes.push(self.data.len() as u8);
         bytes.append(&mut self.data);
 
         bytes

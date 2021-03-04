@@ -12,6 +12,8 @@ use pcap::{Capture, Device};
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::error::NbugError;
+use crate::message::PcapMessage;
+use std::io::Write;
 
 type Result = result::Result<(), NbugError>;
 
@@ -153,6 +155,9 @@ impl Client {
                         Err(_) => {} // todo: these errors should be handled
                     }
                 }
+
+                // force immediate pcap dump
+                std::mem::drop(save_file);
             })?;
 
             println!("Started capture for device '{}'", device_name)
@@ -179,13 +184,14 @@ impl Client {
     }
 
     pub fn transfer_pcap(&self) -> Result {
-        let tcp = TcpStream::connect(self.srv_addr)?;
+        let mut tcp = TcpStream::connect(self.srv_addr)?;
 
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        let msg = PcapMessage::from_pcap("pcap/lo.pcap")?;
+        let data: Vec<u8> = msg.into();
 
-        if let Err(err) = tcp.shutdown(Shutdown::Both) {
-            eprintln!("Error shutting down server connection: {}", err);
-        }
+        tcp.write(data.as_slice())?;
+
+        tcp.shutdown(Shutdown::Both)?;
 
         Ok(())
     }

@@ -12,5 +12,9 @@ fn main() {
 
     let server = Server::from_config(server_cfg);
 
-    server.start();
+    if let Err(err) = server.start() {
+        eprintln!("Could not start the server: {}", err.to_string());
+    }
+
+    loop {}
 }

@@ -30,7 +30,7 @@ fn main() {
                 eprintln!("Could not stop packet capture: {}", err.to_string());
             }
 
-            if let Err(err) = client.transfer_pcap() {
+            if let Err(err) = client.transfer_all() {
                 eprintln!("Transfer error: {}", err.to_string());
             }
         }

@@ -1,13 +1,15 @@
+use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::result;
 
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
 use crate::error::NbugError;
 use crate::message::PcapMessage;
-use std::convert::TryFrom;
+use crate::{BUFFER_SIZE, HEADER_LENGTH};
+use std::convert::{TryFrom, TryInto};
 
 type Result = result::Result<(), NbugError>;
 
@@ -30,7 +32,6 @@ impl Default for Server {
 }
 
 impl Server {
-    const BUFFER_SIZE: usize = 5;
 
     pub fn new() -> Server {
         Server::default()
@@ -47,34 +48,44 @@ impl Server {
 
     /// Start the netbug server and begin listening for tcp connections.
     pub fn start(&self) -> Result {
-        let listener = TcpListener::bind(self.srv_addr)?;
+        // make sure the target pcap directory exists
+        if !self.pcap_dir.exists() {
+            fs::create_dir_all(&self.pcap_dir)?;
+        }
 
-        println!("Server is listening...");
+        let listener = TcpListener::bind(self.srv_addr)?;
+        let mut handles = vec![];
 
         for stream in listener.incoming() {
-            let _clone = self.pcap_dir.clone();
+            // todo: create subdirectory for each new host (use TcpListener::accept in loop)
+            //   will need to ensure each host directory exists before continuing to receiving the
+            //   pcap
+            let mut pcap_dir = self.pcap_dir.clone();
 
-            std::thread::spawn(|| match Server::receive_pcap(stream.unwrap()) {
-                Ok(pcap) => pcap.dump_pcap(),
-                Err(err) => eprintln!("Server Error: {}", err.to_string()),
-            });
+            handles.push(std::thread::spawn(|| {
+                match Server::receive_pcap(stream.unwrap(), pcap_dir) {
+                    Ok(pcap) => println!("Received pcaps"),
+                    Err(err) => eprintln!("Server Error: {}", err.to_string()),
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.join();
         }
 
         Ok(())
     }
 
-    /// Handler for a tcp connection which will receive and dump a pcap file from a client.
-    fn receive_pcap(mut stream: TcpStream) -> result::Result<PcapMessage, NbugError> {
+    /// Handler for a tcp connection which will receive and dump a pcap file from a client. This
+    /// method assumes that pcap_dir is valid directory, and will throw an error if it is not.
+    fn receive_pcap<P: AsRef<Path>>(mut stream: TcpStream, pcap_dir: P) -> Result {
         // todo: receive and create pcap file to local server
-        // let mut buffer = Vec::<u8>::with_capacity(Server::BUFFER_SIZE);
-        let mut buffer = [0; Server::BUFFER_SIZE];
-        let mut raw_message = Vec::<u8>::new();
+        let mut buffer = [0; BUFFER_SIZE];
+        let mut byte_count: usize = stream.peek(&mut buffer)?;
 
-        let mut byte_count: usize = 0;
-
-        // block until at least the message header is retrieved
-        while byte_count < 3 {
-            // check that at least the message header has been received
+        // wait until a full message header has been read
+        while byte_count < HEADER_LENGTH {
             byte_count = stream.peek(&mut buffer)?;
 
             if byte_count == 0 {
@@ -89,21 +100,46 @@ impl Server {
         // pull out header values
         let _version: u8 = buffer[0]; // for now version can be safely ignored
         let name_len: u8 = buffer[1];
-        let data_len: u8 = buffer[2];
 
-        // the amount of byte left to be added to the raw_message Vec
-        let mut remaining_bytes: usize = (name_len + data_len + 3) as usize;
+        // pull out the  message data length from the raw bytes
+        let data_len: u64 = u64::from_be_bytes(buffer[2..HEADER_LENGTH].try_into().unwrap());
 
-        // pull out the data
+        let name =
+            match std::str::from_utf8(&buffer[HEADER_LENGTH..HEADER_LENGTH + name_len as usize]) {
+                Ok(n) => n,
+                Err(_) => {
+                    return Err(NbugError::Packet(String::from(
+                        "Packet name is not valid utf8",
+                    )))
+                }
+            };
+
+        let mut pcap_path = pcap_dir.as_ref().to_path_buf();
+        pcap_path.push(format!("{}.pcap", name));
+        let mut pcap_file = File::create(pcap_path)?;
+
+        // the amount of byte left to be added to the raw_message Vec after the initial chunk
+        let mut remaining_bytes: usize = data_len as usize;
+
+        // read data data after header to file
+        remaining_bytes -=
+            pcap_file.write(&buffer[HEADER_LENGTH + name_len as usize..byte_count])?;
+
+        // pull out the remaining data
         while remaining_bytes > 0 {
-            if byte_count <= remaining_bytes {
-                remaining_bytes -= raw_message.write(&buffer[0..byte_count])?;
-                byte_count = stream.read(&mut buffer)?;
-            } else {
-                // todo: client is sending two messages one after another
+            byte_count = stream.read(&mut buffer)?;
+
+            if byte_count == 0 {
+                return Err(NbugError::Server(String::from(
+                    "Client unexpectedly closed connection",
+                )));
             }
+
+            remaining_bytes -= byte_count;
+
+            pcap_file.write(&buffer[0..byte_count]);
         }
-        // todo: handle a closed stream
-        Ok(PcapMessage::try_from(raw_message).unwrap())
+
+        Ok(())
     }
 }

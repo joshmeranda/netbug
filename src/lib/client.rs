@@ -1,7 +1,7 @@
 use std::default::Default;
 use std::fs::{self, File};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::result;
 use std::sync::{Arc, Mutex};
@@ -12,7 +12,6 @@ use pcap::{Capture, Device};
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::error::NbugError;
-use crate::message::PcapMessage;
 use crate::{BUFFER_SIZE, HEADER_LENGTH, MESSAGE_VERSION};
 use std::io::{Read, Write};
 
@@ -205,7 +204,7 @@ impl Client {
         let mut pcap_file = File::open(&pcap_path)?;
 
         // get the amount of bytes in the pcap files
-        let mut data_len = fs::metadata(&pcap_path)?.len();
+        let data_len = fs::metadata(&pcap_path)?.len();
         let mut remaining_bytes = data_len;
 
         // fill the header bytes with the relevant behavior
@@ -214,7 +213,6 @@ impl Client {
 
         let data_len_bytes: [u8; 8] = data_len.to_be_bytes();
         buffer[2..HEADER_LENGTH].copy_from_slice(&data_len_bytes);
-        Client::add_name(&mut buffer, interface_name);
 
         // add the interface name to the bufer
         let name_bytes = interface_name.as_bytes();

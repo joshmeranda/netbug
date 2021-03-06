@@ -1,14 +1,9 @@
-use std::convert::TryFrom;
-use std::convert::{Into, TryInto};
-use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::result;
-use std::str;
 
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
 
-use crate::config::error::Error;
 use crate::error::NbugError;
 use crate::MESSAGE_VERSION;
 
@@ -20,12 +15,15 @@ type Result = result::Result<PcapMessage, NbugError>;
 ///
 /// todo: implement a better checksum / hashing method
 pub struct PcapMessage {
+
     /// The version of the message. This will allow for providing backwards compatibility when using
     /// an older client with a newer server which may have an updated message structure.
     version: u8,
 
     /// The name of the capture interface.
     name: String,
+
+    pcap_path: PathBuf
 }
 
 impl PcapMessage {
@@ -35,6 +33,7 @@ impl PcapMessage {
         Ok(PcapMessage {
             version: MESSAGE_VERSION,
             name,
+            pcap_path: path.as_ref().to_path_buf()
         })
     }
 

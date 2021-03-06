@@ -7,9 +7,8 @@ use std::result;
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
 use crate::error::NbugError;
-use crate::message::PcapMessage;
 use crate::{BUFFER_SIZE, HEADER_LENGTH};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 
 type Result = result::Result<(), NbugError>;
 
@@ -48,30 +47,28 @@ impl Server {
 
     /// Start the netbug server and begin listening for tcp connections.
     pub fn start(&self) -> Result {
-        // make sure the target pcap directory exists
-        if !self.pcap_dir.exists() {
-            fs::create_dir_all(&self.pcap_dir)?;
-        }
-
         let listener = TcpListener::bind(self.srv_addr)?;
         let mut handles = vec![];
 
-        for stream in listener.incoming() {
-            // todo: create subdirectory for each new host (use TcpListener::accept in loop)
-            //   will need to ensure each host directory exists before continuing to receiving the
-            //   pcap
+        // todo: implement a clean shutdown
+        loop {
+            let (stream, addr) = listener.accept()?;
+
+            // todo: use hostname rather than raw ip which can change
             let mut pcap_dir = self.pcap_dir.clone();
+            pcap_dir.push(addr.ip().to_string());
+
+            // ensure the host pcap directory exists
+            if ! pcap_dir.exists() {
+                fs::create_dir_all(&pcap_dir)?;
+            }
 
             handles.push(std::thread::spawn(|| {
-                match Server::receive_pcap(stream.unwrap(), pcap_dir) {
-                    Ok(pcap) => println!("Received pcaps"),
+                match Server::receive_pcap(stream, pcap_dir) {
+                    Ok(_) => println!("Received pcaps"),
                     Err(err) => eprintln!("Server Error: {}", err.to_string()),
                 }
             }));
-        }
-
-        for handle in handles {
-            handle.join();
         }
 
         Ok(())
@@ -137,7 +134,7 @@ impl Server {
 
             remaining_bytes -= byte_count;
 
-            pcap_file.write(&buffer[0..byte_count]);
+            pcap_file.write(&buffer[0..byte_count])?;
         }
 
         Ok(())

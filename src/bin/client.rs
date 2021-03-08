@@ -20,7 +20,7 @@ fn main() {
 
         if let Err(err) = client.start_capture() {
             eprintln!("{}", err.to_string());
-        } else if let Err(err) = client.run_scripts() {
+        } else if let Err(err) = client.run_behaviors() {
             eprintln!("{}", err.to_string());
         } else {
             // small delay  to ensure all relevant packets are dumped

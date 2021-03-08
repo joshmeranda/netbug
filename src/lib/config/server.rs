@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 use std::{fs, result};
 
 use crate::config::{defaults, error};
+use crate::behavior::Behavior;
 
-pub type Result = result::Result<ServerConfig, error::Error>;
+pub type Result = result::Result<ServerConfig, error::ConfigError>;
 
 #[derive(Deserialize)]
 pub struct ServerConfig {
@@ -14,6 +15,8 @@ pub struct ServerConfig {
 
     /// The host / ip and port pair of the target socket.
     pub srv_addr: SocketAddr,
+
+    pub behaviors: Vec<Behavior>,
 }
 
 impl ServerConfig {
@@ -28,7 +31,7 @@ impl ServerConfig {
 
         match toml::from_str(content.as_str()) {
             Ok(cfg) => Ok(cfg),
-            Err(err) => Err(error::Error::from(err)),
+            Err(err) => Err(error::ConfigError::from(err)),
         }
     }
 }

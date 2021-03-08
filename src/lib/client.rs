@@ -2,10 +2,11 @@ use std::default::Default;
 use std::fs::{self, File};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
-use std::process::{Child, Command};
 use std::result;
 use std::sync::{Arc, Mutex};
-use std::thread::Builder;
+use std::thread::{Builder, JoinHandle};
+use std::io::{Read, Write};
+use std::thread;
 
 use pcap::{Capture, Device};
 
@@ -13,14 +14,12 @@ use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::error::NbugError;
 use crate::{BUFFER_SIZE, HEADER_LENGTH, MESSAGE_VERSION};
-use std::io::{Read, Write};
+use crate::behavior::Behavior;
 
 type Result = result::Result<(), NbugError>;
 
 /// The main Netbug client to capture network and dump network traffic to pcap files.
 pub struct Client {
-    script_dir: PathBuf,
-
     pcap_dir: PathBuf,
 
     allow_concurrent: bool,
@@ -30,12 +29,13 @@ pub struct Client {
     capturing: Arc<Mutex<bool>>,
 
     srv_addr: SocketAddr,
+
+    behaviors: Vec<Behavior>,
 }
 
 impl Default for Client {
     fn default() -> Client {
         Client {
-            script_dir: defaults::default_script_dir(),
             pcap_dir: defaults::default_pcap_dir(),
             allow_concurrent: defaults::client::default_concurrent_run(),
             devices: vec![],
@@ -44,6 +44,7 @@ impl Default for Client {
                 IpAddr::from(Ipv4Addr::LOCALHOST),
                 defaults::default_server_port(),
             ),
+            behaviors: vec![],
         }
     }
 }
@@ -63,52 +64,39 @@ impl Client {
             .collect();
 
         Client {
-            script_dir: cfg.script_dir,
             pcap_dir: cfg.pcap_dir,
             allow_concurrent: cfg.allow_concurrent,
             srv_addr: cfg.srv_addr,
+            behaviors: cfg.behaviors,
             devices,
             ..Client::default()
         }
     }
 
-    /// Run all scripts found in the configured scrip directory and block until all are complete.
-    /// todo: consider replacing with Runner struct
-    pub fn run_scripts(&self) -> Result {
-        let mut children: Vec<Child> = vec![]; // will not always be used
+    /// Run all client behaviors. Depending on the value of [Client::allow_concurrent], all
+    /// behaviors will be run concurrently in their own thread.
+    pub fn run_behaviors(&self) {
+        let mut handles = Vec::<JoinHandle<()>>::with_capacity(self.behaviors.len());
 
-        for entry in self.script_dir.read_dir()? {
-            let entry = entry?;
-            let path = entry.path();
-            let child = Command::new(path.to_str().unwrap()).spawn();
-
-            if let Err(err) = child {
-                eprintln!(
-                    "Couldn't execute script at '{}': {}",
-                    path.to_str().unwrap(),
-                    err.to_string()
-                );
-                break;
-            };
-
-            let mut child = child.unwrap();
-
-            // if scripts are allowed to run concurrently add to child Vec, else wait to finish before next iteration
+        for behavior in &self.behaviors {
             if self.allow_concurrent {
-                children.push(child);
+                handles.push(thread::spawn(|| Client::run_behavior(behavior)));
             } else {
-                // no need to kill other children since all scripts are run concurrently
-                child.wait()?;
+                Client::run_behavior(behavior);
             }
         }
 
-        if !children.is_empty() {
-            for mut child in children {
-                child.wait()?;
+        for handle in handles {
+            if let Err(_) = handle.join() {
+                eprintln!("Error waiting for behavior thread to finish");
             }
         }
+    }
 
-        Ok(())
+    fn run_behavior(behavior: &Behavior) {
+        if let Err(err) = behavior.run() {
+            eprintln!("Error running behavior: {}", err.to_string());
+        }
     }
 
     /// Begin capturing packets on the configured network devices. Note that there is currently no
@@ -238,5 +226,10 @@ impl Client {
         tcp.shutdown(Shutdown::Both)?;
 
         Ok(())
+    }
+
+    /// Generate the bpf filter to use to minimize the data captured by the client.
+    pub fn generate_bpf_filter(&self) -> String {
+        todo!()
     }
 }

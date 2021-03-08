@@ -4,8 +4,9 @@ use std::path::{Path, PathBuf};
 use std::result;
 
 use super::{defaults, error};
+use crate::behavior::Behavior;
 
-pub type Result = result::Result<ClientConfig, error::Error>;
+pub type Result = result::Result<ClientConfig, error::ConfigError>;
 
 /// Represents basic client configuration.
 /// todo: specify pcap backup
@@ -36,6 +37,8 @@ pub struct ClientConfig {
 
     /// The host / ip and port pair of the target socket
     pub srv_addr: SocketAddr,
+
+    pub behaviors: Vec<Behavior>,
 }
 
 impl ClientConfig {
@@ -53,7 +56,7 @@ impl ClientConfig {
 
         match toml::from_str(content.as_str()) {
             Ok(cfg) => Ok(cfg),
-            Err(err) => Err(error::Error::from(err)),
+            Err(err) => Err(error::ConfigError::from(err)),
         }
     }
 }

@@ -31,7 +31,6 @@ impl Default for Server {
 }
 
 impl Server {
-
     pub fn new() -> Server {
         Server::default()
     }
@@ -59,7 +58,7 @@ impl Server {
             pcap_dir.push(addr.ip().to_string());
 
             // ensure the host pcap directory exists
-            if ! pcap_dir.exists() {
+            if !pcap_dir.exists() {
                 fs::create_dir_all(&pcap_dir)?;
             }
 

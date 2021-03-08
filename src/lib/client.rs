@@ -80,7 +80,8 @@ impl Client {
 
         for behavior in &self.behaviors {
             if self.allow_concurrent {
-                handles.push(thread::spawn(|| Client::run_behavior(behavior)));
+                let cloned = behavior.clone();
+                handles.push(thread::spawn(|| Client::run_behavior(cloned)));
             } else {
                 Client::run_behavior(behavior);
             }

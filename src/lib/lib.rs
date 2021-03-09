@@ -1,3 +1,5 @@
+#![feature(thread_spawn_unchecked)]
+
 pub mod behavior;
 pub mod client;
 pub mod config;

@@ -22,7 +22,7 @@ type Result = result::Result<(), NbugError>;
 pub struct Client {
     pcap_dir: PathBuf,
 
-    allow_concurrent: bool,
+    pub allow_concurrent: bool,
 
     devices: Vec<Device>,
 
@@ -83,14 +83,15 @@ impl Client {
     }
 
     /// Run all client behaviors concurrently.
-    pub fn run_behaviors_concurrent(&'static self) -> Result {
+    pub unsafe fn run_behaviors_concurrent(&self) -> Result {
         if ! self.allow_concurrent {
             return Err(NbugError::Client(String::from("Cannot run client behaviors concurrently when 'allow_concurrent' is false")))
         }
 
         let mut handles = Vec::<JoinHandle<()>>::with_capacity(self.behaviors.len());
         for behavior in &self.behaviors {
-            handles.push(thread::spawn(move || Client::run_behavior(&behavior)));
+            let builder = thread::Builder::new();
+            handles.push(builder.spawn_unchecked(move || Client::run_behavior(&behavior))?);
         }
 
         for handle in handles {

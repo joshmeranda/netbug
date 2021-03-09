@@ -82,8 +82,9 @@ impl Client {
         Ok(())
     }
 
-    /// Run all client behaviors concurrently.
-    pub unsafe fn run_behaviors_concurrent(&self) -> Result {
+    /// Run all client behaviors concurrently. Note that this function blocks until all behaviors
+    /// have finished.
+    pub fn run_behaviors_concurrent(&self) -> Result {
         if ! self.allow_concurrent {
             return Err(NbugError::Client(String::from("Cannot run client behaviors concurrently when 'allow_concurrent' is false")))
         }
@@ -91,7 +92,11 @@ impl Client {
         let mut handles = Vec::<JoinHandle<()>>::with_capacity(self.behaviors.len());
         for behavior in &self.behaviors {
             let builder = thread::Builder::new();
-            handles.push(builder.spawn_unchecked(move || Client::run_behavior(&behavior))?);
+
+            unsafe {
+                // this is safe since all threads are joined before the method returns
+                handles.push(builder.spawn_unchecked(move || Client::run_behavior(&behavior))?);
+            }
         }
 
         for handle in handles {

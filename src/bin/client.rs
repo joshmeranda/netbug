@@ -12,7 +12,7 @@ fn main() {
         }
     };
 
-    unsafe {
+    {
         let delay = client_cfg.delay;
 
         // explicit scope to drop any active captures from the

@@ -73,18 +73,24 @@ impl Client {
         }
     }
 
-    /// Run all client behaviors. Depending on the value of [Client::allow_concurrent], all
-    /// behaviors will be run concurrently in their own thread.
-    pub fn run_behaviors(&self) {
-        let mut handles = Vec::<JoinHandle<()>>::with_capacity(self.behaviors.len());
-
+    /// Run all client behaviors sequentially.
+    pub fn run_behaviors(&self) -> Result {
         for behavior in &self.behaviors {
-            if self.allow_concurrent {
-                let cloned = behavior.clone();
-                handles.push(thread::spawn(|| Client::run_behavior(cloned)));
-            } else {
-                Client::run_behavior(behavior);
-            }
+            Client::run_behavior(behavior);
+        }
+
+        Ok(())
+    }
+
+    /// Run all client behaviors concurrently.
+    pub fn run_behaviors_concurrent(&'static self) -> Result {
+        if ! self.allow_concurrent {
+            return Err(NbugError::Client(String::from("Cannot run client behaviors concurrently when 'allow_concurrent' is false")))
+        }
+
+        let mut handles = Vec::<JoinHandle<()>>::with_capacity(self.behaviors.len());
+        for behavior in &self.behaviors {
+            handles.push(thread::spawn(move || Client::run_behavior(&behavior)));
         }
 
         for handle in handles {
@@ -92,6 +98,8 @@ impl Client {
                 eprintln!("Error waiting for behavior thread to finish");
             }
         }
+
+        Ok(())
     }
 
     fn run_behavior(behavior: &Behavior) {

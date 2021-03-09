@@ -16,7 +16,7 @@ fn main() {
         let delay = client_cfg.delay;
 
         // explicit scope to drop any active captures from the
-        let mut client = Client::from_config(client_cfg);
+        let mut client: Client = Client::from_config(client_cfg);
 
         if let Err(err) = client.start_capture() {
             eprintln!("{}", err.to_string());

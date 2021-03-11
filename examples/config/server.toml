@@ -4,9 +4,9 @@ srv_addr = "127.0.0.1:8081"
 
 [[behaviors]]
 dst = "localhost"
-behavior_type = "icmp"
+protocol = "icmp"
 
 [[behaviors]]
 dst = "8.8.8.8"
-behavior_type = "icmp"
+sprotocol = "icmp"
 command = ["/usr/bin/ping", "-c", "1", "8.8.8.8"]

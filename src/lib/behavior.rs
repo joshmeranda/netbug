@@ -4,18 +4,11 @@ use std::process::Command;
 use std::time::Duration;
 use std::result;
 use std::str::FromStr;
+
+use crate::protocols::Protocol;
 use crate::error;
 
 pub type Result = result::Result<(), error::NbugError>;
-
-/// Describes the packet protocol to expect to be created by a [Behavior] execution.
-#[derive(Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum BehaviorType {
-    Icmp,
-    Tcp,
-    Udp,
-}
 
 /// Specifies the direction traffic should be expected. When used in the client configuration, this
 /// field is ignored and will have no effect.
@@ -44,7 +37,7 @@ impl Default for Direction {
 pub struct Behavior {
     dst: String,
 
-    behavior_type: BehaviorType,
+    protocol: Protocol,
 
     #[serde(default = "std::default::Default::default")]
     direction: Direction,
@@ -76,20 +69,26 @@ impl Behavior {
             return Ok(())
         }
 
-        match self.behavior_type {
-            BehaviorType::Icmp => {
+        match self.protocol {
+            Protocol::Icmp => {
                 let mut handle = Command::new("ping")
                     .args(&["-c", "1", &self.dst])
                     .spawn()?;
                 handle.wait()?;
             }
-            BehaviorType::Tcp => {
+            Protocol::IcmpV6 => {
+                let mut handle = Command::new("ping")
+                    .args(&["-6", "-c", "1", &self.dst])
+                    .spawn()?;
+                handle.wait()?;
+            }
+            Protocol::Tcp => {
                 let addr = SocketAddr::from_str(self.dst.as_str())?;
                 let sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
 
                 sock.shutdown(Shutdown::Both)?;
             }
-            BehaviorType::Udp => {
+            Protocol::Udp => {
                 let addr = SocketAddr::from_str(self.dst.as_str())?;
                 let socket = UdpSocket::bind(&addr).unwrap();
 

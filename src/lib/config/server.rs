@@ -2,10 +2,9 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::{fs, result};
 
-use crate::config::{defaults, error};
+use crate::config::defaults;
+use crate::config::error::{ConfigError, Result};
 use crate::behavior::Behavior;
-
-pub type Result = result::Result<ServerConfig, error::ConfigError>;
 
 #[derive(Deserialize)]
 pub struct ServerConfig {
@@ -20,18 +19,18 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
-    pub fn new() -> Result {
+    pub fn new() -> Result<ServerConfig> {
         let default_path = defaults::default_config_file_path();
 
         ServerConfig::from_path(default_path)
     }
 
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<ServerConfig> {
         let content = fs::read_to_string(path)?;
 
         match toml::from_str(content.as_str()) {
             Ok(cfg) => Ok(cfg),
-            Err(err) => Err(error::ConfigError::from(err)),
+            Err(err) => Err(ConfigError::from(err)),
         }
     }
 }

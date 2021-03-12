@@ -4,10 +4,8 @@ use std::result;
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
 
-use crate::error::NbugError;
+use crate::error::{NbugError, Result};
 use crate::MESSAGE_VERSION;
-
-type Result = result::Result<PcapMessage, NbugError>;
 
 /// Struct representing network packet containing all or part of a client generated pcap file. Note
 /// the actual packet sent over the wire will likely have extra fields not defined here explicitly
@@ -26,7 +24,7 @@ pub struct PcapMessage {
 }
 
 impl PcapMessage {
-    pub fn from_pcap<P: AsRef<Path>>(path: P) -> Result {
+    pub fn from_pcap<P: AsRef<Path>>(path: P) -> Result<PcapMessage> {
         let name: String = String::from(path.as_ref().file_name().unwrap().to_str().unwrap());
 
         Ok(PcapMessage {

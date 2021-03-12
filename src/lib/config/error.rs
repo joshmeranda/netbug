@@ -4,6 +4,8 @@ use std::{error, io};
 use toml::de;
 use std::net::AddrParseError;
 
+pub type Result<T> = std::result::Result<T, ConfigError>;
+
 #[derive(Debug)]
 pub enum ConfigError {
     Io(io::Error),

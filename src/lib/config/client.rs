@@ -3,10 +3,9 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::result;
 
-use super::{defaults, error};
+use super::defaults;
+use super::error::{ConfigError, Result};
 use crate::behavior::Behavior;
-
-pub type Result = result::Result<ClientConfig, error::ConfigError>;
 
 /// Represents basic client configuration.
 /// todo: specify pcap backup
@@ -42,13 +41,13 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    pub fn new() -> Result {
+    pub fn new() -> Result<ClientConfig> {
         let default_path = defaults::default_config_file_path();
 
         ClientConfig::from_path(default_path)
     }
 
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<ClientConfig> {
         // todo: handle toml parsing error
         // todo: handle config errors
         //   script_dir | pcap_dir is not a dir, etc
@@ -56,7 +55,7 @@ impl ClientConfig {
 
         match toml::from_str(content.as_str()) {
             Ok(cfg) => Ok(cfg),
-            Err(err) => Err(error::ConfigError::from(err)),
+            Err(err) => Err(ConfigError::from(err)),
         }
     }
 }

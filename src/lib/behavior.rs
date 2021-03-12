@@ -6,9 +6,7 @@ use std::result;
 use std::str::FromStr;
 
 use crate::protocols::Protocol;
-use crate::error;
-
-pub type Result = result::Result<(), error::NbugError>;
+use crate::error::Result;
 
 /// Specifies the direction traffic should be expected. When used in the client configuration, this
 /// field is ignored and will have no effect.
@@ -53,7 +51,7 @@ pub struct Behavior {
 impl Behavior {
     /// Execute the behavior.
     /// todo: redirect stdout for commands
-    pub fn run(&self) -> Result {
+    pub fn run(&self) -> Result<()> {
         let timeout = if let Some(duration) = self.timeout {
             duration
         } else {

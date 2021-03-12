@@ -12,11 +12,9 @@ use pcap::{Capture, Device};
 
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
-use crate::error::NbugError;
+use crate::error::{NbugError, Result};
 use crate::{BUFFER_SIZE, HEADER_LENGTH, MESSAGE_VERSION};
 use crate::behavior::Behavior;
-
-type Result = result::Result<(), NbugError>;
 
 /// The main Netbug client to capture network and dump network traffic to pcap files.
 pub struct Client {
@@ -74,7 +72,7 @@ impl Client {
     }
 
     /// Run all client behaviors sequentially.
-    pub fn run_behaviors(&self) -> Result {
+    pub fn run_behaviors(&self) -> Result<()> {
         for behavior in &self.behaviors {
             Client::run_behavior(behavior);
         }
@@ -84,7 +82,7 @@ impl Client {
 
     /// Run all client behaviors concurrently. Note that this function blocks until all behaviors
     /// have finished.
-    pub fn run_behaviors_concurrent(&self) -> Result {
+    pub fn run_behaviors_concurrent(&self) -> Result<()> {
         if ! self.allow_concurrent {
             return Err(NbugError::Client(String::from("Cannot run client behaviors concurrently when 'allow_concurrent' is false")))
         }
@@ -117,7 +115,7 @@ impl Client {
     /// Begin capturing packets on the configured network devices. Note that there is currently no
     /// explicit way to end capture and flush its output, be mindful of your client's scoping to
     /// prevent capturing unnecessary packets.
-    pub fn start_capture(&mut self) -> Result {
+    pub fn start_capture(&mut self) -> Result<()> {
         if self.is_capturing() {
             return Err(NbugError::Client(String::from(
                 "capture is already running",
@@ -173,7 +171,7 @@ impl Client {
     /// capturing thread loops to discontinue iteration rather than immediately stopping them.
     /// Therefore, it is possible for extra packets to be captured and written to the resulting pcap
     /// if the current thread iterations are still in progress.
-    pub fn stop_capture(&mut self) -> Result {
+    pub fn stop_capture(&mut self) -> Result<()> {
         if !self.is_capturing() {
             return Err(NbugError::Client(String::from("no capture is running")));
         }
@@ -187,7 +185,7 @@ impl Client {
     }
 
     /// Transfer all
-    pub fn transfer_all(&self) -> Result {
+    pub fn transfer_all(&self) -> Result<()> {
         for device in &self.devices {
             self.transfer_pcap(device.name.as_str())?;
         }
@@ -196,7 +194,7 @@ impl Client {
     }
 
     /// Transfer a single pcap to the server.
-    pub fn transfer_pcap(&self, interface_name: &str) -> Result {
+    pub fn transfer_pcap(&self, interface_name: &str) -> Result<()> {
         let mut tcp = TcpStream::connect(self.srv_addr)?;
         let mut buffer = [u8::default(); BUFFER_SIZE];
 

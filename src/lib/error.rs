@@ -6,6 +6,8 @@ use std::net::AddrParseError;
 
 use super::config::error::ConfigError;
 
+pub type Result<T> = std::result::Result<T, NbugError>;
+
 #[derive(Debug)]
 pub enum NbugError {
     Client(String),

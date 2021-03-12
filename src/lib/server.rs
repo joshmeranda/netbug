@@ -6,11 +6,9 @@ use std::result;
 
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
-use crate::error::NbugError;
+use crate::error::{NbugError, Result};
 use crate::{BUFFER_SIZE, HEADER_LENGTH};
 use std::convert::TryInto;
-
-type Result = result::Result<(), NbugError>;
 
 pub struct Server {
     pcap_dir: PathBuf,
@@ -45,7 +43,7 @@ impl Server {
     }
 
     /// Start the netbug server and begin listening for tcp connections.
-    pub fn start(&self) -> Result {
+    pub fn start(&self) -> Result<()> {
         let listener = TcpListener::bind(self.srv_addr)?;
         let mut handles = vec![];
 
@@ -75,7 +73,7 @@ impl Server {
 
     /// Handler for a tcp connection which will receive and dump a pcap file from a client. This
     /// method assumes that pcap_dir is valid directory, and will throw an error if it is not.
-    fn receive_pcap<P: AsRef<Path>>(mut stream: TcpStream, pcap_dir: P) -> Result {
+    fn receive_pcap<P: AsRef<Path>>(mut stream: TcpStream, pcap_dir: P) -> Result<()> {
         // todo: receive and create pcap file to local server
         let mut buffer = [0; BUFFER_SIZE];
         let mut byte_count: usize = stream.peek(&mut buffer)?;

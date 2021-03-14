@@ -2,7 +2,6 @@ use std::default::Default;
 use std::fs::{self, File};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
-use std::result;
 use std::sync::{Arc, Mutex};
 use std::thread::{Builder, JoinHandle};
 use std::io::{Read, Write};

@@ -1,8 +1,6 @@
 /// Defines many structs and packet serialization from raw packet data. These will largely focus on
 /// packets headers, and will largely ignore any packet payloads, as they are largely irrelevant to
 /// this project.
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-
 mod icmp;
 mod ip;
 mod ethernet;
@@ -14,7 +12,13 @@ mod tcp;
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
     Icmp,
-    IcmpV6,
+    Icmpv6,
+
+    Ip,
+    Ipv6,
+
     Tcp,
     Udp,
+
+    Unknown
 }

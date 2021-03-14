@@ -1,10 +1,9 @@
 use std::path::{Path, PathBuf};
-use std::result;
 
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
 
-use crate::error::{NbugError, Result};
+use crate::error::Result;
 use crate::MESSAGE_VERSION;
 
 /// Struct representing network packet containing all or part of a client generated pcap file. Note

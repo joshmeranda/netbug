@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::{fs, result};
+use std::fs;
 
 use crate::config::defaults;
 use crate::config::error::{ConfigError, Result};

@@ -1,7 +1,6 @@
 use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::result;
 
 use super::defaults;
 use super::error::{ConfigError, Result};

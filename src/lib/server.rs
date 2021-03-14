@@ -2,7 +2,6 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::result;
 
 use crate::config::defaults;
 use crate::config::server::ServerConfig;

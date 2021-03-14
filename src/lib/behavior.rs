@@ -2,11 +2,19 @@ use std::net::SocketAddr;
 use std::net::{Shutdown, TcpStream, UdpSocket};
 use std::process::Command;
 use std::time::Duration;
-use std::result;
 use std::str::FromStr;
 
-use crate::protocols::Protocol;
 use crate::error::Result;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum BehaviorProtocol {
+    Icmp,
+    Icmpv6,
+
+    Tcp,
+    Udp,
+}
 
 /// Specifies the direction traffic should be expected. When used in the client configuration, this
 /// field is ignored and will have no effect.
@@ -35,7 +43,8 @@ impl Default for Direction {
 pub struct Behavior {
     dst: String,
 
-    protocol: Protocol,
+    #[serde(rename = "protocol")]
+    protocol: BehaviorProtocol,
 
     #[serde(default = "std::default::Default::default")]
     direction: Direction,
@@ -68,25 +77,25 @@ impl Behavior {
         }
 
         match self.protocol {
-            Protocol::Icmp => {
+            BehaviorProtocol::Icmp => {
                 let mut handle = Command::new("ping")
                     .args(&["-c", "1", &self.dst])
                     .spawn()?;
                 handle.wait()?;
             }
-            Protocol::IcmpV6 => {
+            BehaviorProtocol::Icmpv6 => {
                 let mut handle = Command::new("ping")
                     .args(&["-6", "-c", "1", &self.dst])
                     .spawn()?;
                 handle.wait()?;
             }
-            Protocol::Tcp => {
+            BehaviorProtocol::Tcp => {
                 let addr = SocketAddr::from_str(self.dst.as_str())?;
                 let sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
 
                 sock.shutdown(Shutdown::Both)?;
             }
-            Protocol::Udp => {
+            BehaviorProtocol::Udp => {
                 let addr = SocketAddr::from_str(self.dst.as_str())?;
                 let socket = UdpSocket::bind(&addr).unwrap();
 

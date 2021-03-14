@@ -8,5 +8,5 @@ protocol = "icmp"
 
 [[behaviors]]
 dst = "8.8.8.8"
-sprotocol = "icmp"
+protocol = "icmp"
 command = ["/usr/bin/ping", "-c", "1", "8.8.8.8"]

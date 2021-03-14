@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use crate::error::{NbugError, Result};
 
 /// An ethernet packet, conforming to either IEE 802.2 or *02.3.
+#[derive(Copy, Clone, Eq, PartialEq)]
 enum IeeEthernet {
     Ieee802_2(Ethernet2),
     Ieee802_3(Ethernet3),
@@ -41,8 +42,45 @@ impl TryFrom<&[u8]> for IeeEthernet {
     }
 }
 
-/// The ethernet packet for IEE 802.2
-struct Ethernet2 {
+impl PartialEq<Ethernet2> for IeeEthernet {
+    fn eq(&self, other: &Ethernet2) -> bool {
+        match self {
+            IeeEthernet::Ieee802_2(ethernet) => ethernet == other,
+            IeeEthernet::Ieee802_3(_) => false
+        }
+    }
+}
+
+impl PartialEq<Ethernet3> for IeeEthernet {
+    fn eq(&self, other: &Ethernet3) -> bool {
+        match self {
+            IeeEthernet::Ieee802_2(_) => false,
+            IeeEthernet::Ieee802_3(ethernet) => ethernet == other
+        }
+    }
+}
+
+/// The ethernet packet for IEE 802.2true
+///
+/// # Exaaples
+///
+/// ```
+/// use netbug::protocols::ethernet::Ethernet2;
+/// use netbug::protocols::Protocol;
+/// use std::convert::TryFrom;
+///
+/// let raw: &[u8] = &[
+///     0, 0, 0, 0, 0, 0, 0, 0, // preamble
+///     0, 0, 0, 0, 0, 0,       // destination MAC
+///     0, 0, 0, 0, 0, 0,       // source MAC
+///     0x08, 0x_00             // type (Iv4)
+/// ];
+///
+/// assert_eq!(Ethernet2::try_from(raw).unwrap(),
+///     Ethernet2::new([0,0,0,0,0,0], [0,0,0,0,0,0], Protocol::Ip));
+/// ```
+#[derive(Copy, Clone, Debug, Eq)]
+pub struct Ethernet2 {
     destination: [u8; 6],
 
     source: [u8; 6],
@@ -56,6 +94,10 @@ impl Ethernet2 {
 
     /// The minimum amount of bytes of data necessary to deserialize an [Ethernet2] using [try_from].
     const MIN_BYTES: usize = IeeEthernet::MAC_BYTES * 2 + IeeEthernet::LENGTH_BYTES;
+
+    pub fn new(destination: [u8; 6], source: [u8; 6], protocol: Protocol) -> Ethernet2 {
+        Ethernet2 { destination, source, protocol }
+    }
 }
 
 impl TryFrom<&[u8]> for Ethernet2 {
@@ -86,13 +128,24 @@ impl TryFrom<&[u8]> for Ethernet2 {
     }
 }
 
+impl PartialEq<Ethernet2> for Ethernet2 {
+    fn eq(&self, other: &Ethernet2) -> bool {
+        self.destination == other.destination &&
+            self.source == other.source &&
+            self.protocol == other.protocol
+    }
+}
+
 /// The ethernet packet for IEE 802.3
+#[derive(Copy, Clone, Eq)]
 struct Ethernet3 {
     destination: [u8; 6],
 
     source: [u8; 6],
 
     length: u16,
+
+    frame_check_sequence: u16
 }
 
 impl Ethernet3 {
@@ -124,10 +177,23 @@ impl TryFrom<&[u8]> for Ethernet3 {
         let length = u16::from_be_bytes(protocol_bytes);
 
         // ensure there is enough data to fit the data and frame sequence
-        if data.len() < Self::MIN_BYTES + length as usize - Self::MIN_BYTES {
+        if data.len() < Self::MIN_BYTES + length as usize - Self::MIN_DATA_BYTES {
             return Err(NbugError::Packet(format!("Too few bytes, expected at least {}", Self::MIN_BYTES + length as usize - Self::MIN_BYTES)));
         }
 
-        Ok(Ethernet3 { destination, source, length })
+        let mut fcs_bytes = [0u8; 2];
+        fcs_bytes.copy_from_slice(&data[Self::MIN_BYTES + length as usize - Self::MIN_DATA_BYTES..]);
+        let frame_check_sequence = u16::from_be_bytes(fcs_bytes);
+
+        Ok(Ethernet3 { destination, source, length, frame_check_sequence})
+    }
+}
+
+impl PartialEq<Ethernet3> for Ethernet3 {
+    fn eq(&self, other: &Ethernet3) -> bool {
+        self.destination == other.destination &&
+            self.source == other.source &&
+            self.length == other.length &&
+            self.frame_check_sequence == other.frame_check_sequence
     }
 }

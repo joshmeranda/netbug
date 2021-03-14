@@ -3,12 +3,12 @@
 /// this project.
 mod icmp;
 mod ip;
-mod ethernet;
+pub mod ethernet;
 mod udp;
 mod tcp;
 
 /// The protocols supported for behavior execution and analysis.s
-#[derive(Deserialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
     Icmp,

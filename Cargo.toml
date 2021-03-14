@@ -16,3 +16,4 @@ rust-crypto = "0.2"
 [lib]
 name = "netbug"
 path = "src/lib/lib.rs"
+doctest = true

@@ -72,10 +72,6 @@ pub struct Ethernet2 {
 }
 
 impl Ethernet2 {
-    const IPV4_PROTO_VL: u16 = 0x08_00;
-    const IPV6_PROTO_VL: u16 = 0x86_dd;
-    const ARP_TYPE_VAL: u16 = 0x08_06;
-
     /// The minimum amount of bytes of data necessary to deserialize an [Ethernet2] using [try_from].
     const MIN_BYTES: usize = IeeEthernet::PREAMBLE_BYTES + IeeEthernet::MAC_BYTES * 2 + IeeEthernet::LENGTH_BYTES;
 
@@ -103,11 +99,7 @@ impl TryFrom<&[u8]> for Ethernet2 {
         protocol_bytes.copy_from_slice(&data[20..22]);
 
         // todo: cover more protocol
-        let protocol = match u16::from_be_bytes(protocol_bytes) {
-            Ethernet2::IPV4_PROTO_VL => Protocol::Ip,
-            Ethernet2::IPV6_PROTO_VL => Protocol::Ipv6,
-            _ => Protocol::Unknown
-        };
+        let protocol = Protocol::from_ethernet_type(u16::from_be_bytes(protocol_bytes));
 
         Ok(Ethernet2 { destination, source, protocol })
     }
@@ -219,7 +211,7 @@ mod test {
         ];
 
         assert_eq!(
-            Ethernet2::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], Protocol::Ip),
+            Ethernet2::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], Protocol::Ipv4),
             Ethernet2::try_from(raw).unwrap());
     }
 

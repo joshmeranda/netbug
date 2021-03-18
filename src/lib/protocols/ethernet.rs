@@ -78,6 +78,14 @@ impl Ethernet2 {
     pub fn new(destination: [u8; 6], source: [u8; 6], protocol: Protocol) -> Ethernet2 {
         Ethernet2 { destination, source, protocol }
     }
+
+    pub fn ethernet_from_u16(value: u16) -> Result<Protocol> {
+        match value {
+            0x08_00 => Ok(Protocol::Ipv4),
+            0x86_dd => Ok(Protocol::Ipv6),
+            _ => Err(NbugError::Packet(format!("unsupported ethernet protocol type value '{}'", value)))
+        }
+    }
 }
 
 impl TryFrom<&[u8]> for Ethernet2 {
@@ -98,8 +106,7 @@ impl TryFrom<&[u8]> for Ethernet2 {
         let mut protocol_bytes = [0u8; 2];
         protocol_bytes.copy_from_slice(&data[20..22]);
 
-        // todo: cover more protocol
-        let protocol = Protocol::from_ethernet_type(u16::from_be_bytes(protocol_bytes));
+        let protocol = Ethernet2::ethernet_from_u16(u16::from_be_bytes(protocol_bytes))?;
 
         Ok(Ethernet2 { destination, source, protocol })
     }

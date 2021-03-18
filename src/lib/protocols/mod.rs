@@ -1,3 +1,6 @@
+use std::convert::TryFrom;
+use crate::error::NbugError;
+
 /// Defines many structs and packet serialization from raw packet data. These will largely focus on
 /// packets headers, and will largely ignore any packet payloads, as they are largely irrelevant to
 /// this project.
@@ -19,16 +22,23 @@ pub enum Protocol {
 
     Tcp,
     Udp,
-
-    Unknown
 }
 
-impl Protocol {
-    pub fn from_ethernet_type(val: u16) -> Protocol {
-        match val {
-            0x08_00 => Protocol::Ipv4,
-            0x86_dd => Protocol::Ipv6,
-            _ => Protocol::Unknown
+impl TryFrom<u8> for Protocol {
+    type Error = NbugError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Protocol::Icmp),
+            58 => Ok(Protocol::Icmpv6),
+
+            4 => Ok(Protocol::Ipv4),
+            41 => Ok(Protocol::Ipv6),
+
+            6 => Ok(Protocol::Tcp),
+            17 => Ok(Protocol::Udp),
+
+            _ => Err(NbugError::Packet(String::from(format!("unsupported protocol assigned number {}", value))))
         }
     }
 }

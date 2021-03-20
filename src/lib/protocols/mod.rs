@@ -6,14 +6,14 @@ use crate::error::NbugError;
 /// this project.
 mod icmp;
 mod ip;
-pub mod ethernet;
+mod ethernet;
 mod udp;
 mod tcp;
 
 /// The protocols supported for behavior execution and analysis.s
 #[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum Protocol {
+pub enum ProtocolType {
     Icmp,
     Icmpv6,
 
@@ -24,21 +24,33 @@ pub enum Protocol {
     Udp,
 }
 
-impl TryFrom<u8> for Protocol {
+impl TryFrom<u8> for ProtocolType {
     type Error = NbugError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Protocol::Icmp),
-            58 => Ok(Protocol::Icmpv6),
+            0 => Ok(ProtocolType::Icmp),
+            58 => Ok(ProtocolType::Icmpv6),
 
-            4 => Ok(Protocol::Ipv4),
-            41 => Ok(Protocol::Ipv6),
+            4 => Ok(ProtocolType::Ipv4),
+            41 => Ok(ProtocolType::Ipv6),
 
-            6 => Ok(Protocol::Tcp),
-            17 => Ok(Protocol::Udp),
+            6 => Ok(ProtocolType::Tcp),
+            17 => Ok(ProtocolType::Udp),
 
             _ => Err(NbugError::Packet(String::from(format!("unsupported protocol assigned number {}", value))))
         }
     }
+}
+
+/// Trait for structs representing a packet for one of the protocols specified by [ProtocolType]
+trait ProtocolPacket {
+    /// Retrieve the total length of the packet header
+    fn header_length(&self) -> usize;
+
+    /// Return the total length of the packet header and data.
+    fn length(&self) -> usize;
+
+    /// Get the type of protocol.
+    fn protocol_type(&self) -> ProtocolType;
 }

@@ -1,4 +1,4 @@
-use crate::protocols::Protocol;
+use crate::protocols::ProtocolType;
 use std::convert::TryFrom;
 use crate::error::{NbugError, Result};
 use std::cmp;
@@ -68,21 +68,21 @@ pub struct Ethernet2 {
 
     source: [u8; 6],
 
-    protocol: Protocol,
+    protocol: ProtocolType,
 }
 
 impl Ethernet2 {
     /// The minimum amount of bytes of data necessary to deserialize an [Ethernet2] using [try_from].
     const MIN_BYTES: usize = IeeEthernet::PREAMBLE_BYTES + IeeEthernet::MAC_BYTES * 2 + IeeEthernet::LENGTH_BYTES;
 
-    pub fn new(destination: [u8; 6], source: [u8; 6], protocol: Protocol) -> Ethernet2 {
+    pub fn new(destination: [u8; 6], source: [u8; 6], protocol: ProtocolType) -> Ethernet2 {
         Ethernet2 { destination, source, protocol }
     }
 
-    pub fn ethernet_from_u16(value: u16) -> Result<Protocol> {
+    pub fn ethernet_from_u16(value: u16) -> Result<ProtocolType> {
         match value {
-            0x08_00 => Ok(Protocol::Ipv4),
-            0x86_dd => Ok(Protocol::Ipv6),
+            0x08_00 => Ok(ProtocolType::Ipv4),
+            0x86_dd => Ok(ProtocolType::Ipv6),
             _ => Err(NbugError::Packet(format!("unsupported ethernet protocol type value '{}'", value)))
         }
     }
@@ -206,7 +206,7 @@ impl PartialEq<Ethernet3> for Ethernet3 {
 mod test {
     use crate::protocols::ethernet::{Ethernet2, Ethernet3};
     use std::convert::TryFrom;
-    use crate::protocols::Protocol;
+    use crate::protocols::ProtocolType;
 
     #[test]
     fn ethernet2_from_raw_ok() {
@@ -218,7 +218,7 @@ mod test {
         ];
 
         assert_eq!(
-            Ethernet2::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], Protocol::Ipv4),
+            Ethernet2::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], ProtocolType::Ipv4),
             Ethernet2::try_from(raw).unwrap());
     }
 

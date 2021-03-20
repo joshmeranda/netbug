@@ -1,4 +1,4 @@
-use crate::protocols::Protocol;
+use crate::protocols::ProtocolType;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::convert::TryFrom;
 use crate::error::NbugError;
@@ -39,9 +39,10 @@ impl TryFrom<u8> for ServiceType {
 
 /// The IPv4 Packet header as specified in [RFC 791](https://tools.ietf.org/html/rfc791#section-3.1).
 struct Ipv4Packet {
+    version: u8,
+
     header_length: u8,
 
-    // todo: consider making enum
     service_type: ServiceType,
 
     total_length: u16,
@@ -54,21 +55,31 @@ struct Ipv4Packet {
 
     ttl: u8,
 
-    protocol: Protocol,
+    protocol: ProtocolType,
 
     checksum: u16,
 
     source: Ipv4Addr,
 
-    destination: Ipv4Addr
+    destination: Ipv4Addr,
+}
+
+impl Ipv4Packet {
+    const MIN_BYTES: usize = 48 // main header data
+        + 1                     // minimum no options packet
+        + 17;                   // padding to ensure alignment on 32 byte boundary
 }
 
 impl TryFrom<&[u8]> for Ipv4Packet {
     type Error = NbugError;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        if data.len() < Ipv4Packet::MIN_BYTES {
+            return Err(NbugError::Packet(String::from(format!("Too few bytes, expected at least {}", Ipv4Packet::MIN_BYTES))))
+        }
+
         let version = data[0] >> 4;
-        let length = data[0] & 0xF;
+        let header_length = data[0] & 0xF;
         let service_type = ServiceType::try_from(data[1])?;
 
         let mut total_length_bytes = [0u8; 2];
@@ -79,15 +90,42 @@ impl TryFrom<&[u8]> for Ipv4Packet {
         identification_bytes.copy_from_slice(&data[5..6]);
         let identification: u16 = u16::from_be_bytes(identification_bytes);
 
-        let flag = data[6] >> 5;
+        let flags = data[6] >> 5;
 
         let mut offset_bytes = [0u8; 2];
         offset_bytes.copy_from_slice(&data[6..8]);
         offset_bytes[0] &= 0b0001_1111u8;
+        let offset = u16::from_be_bytes(offset_bytes);
 
         let ttl = data[8];
+        let protocol = ProtocolType::try_from(data[9])?;
 
-        todo!()
+        let mut checksum_bytes = [0u8; 2];
+        checksum_bytes.copy_from_slice(&data[10..12]);
+        let checksum = u16::from_be_bytes(checksum_bytes);
+
+        let mut source_bytes = [0u8; 4];
+        source_bytes.copy_from_slice(&data[12..16]);
+        let source = Ipv4Addr::from(source_bytes);
+
+        let mut destination_bytes = [0u8; 4];
+        destination_bytes.copy_from_slice(&data[16..20]);
+        let destination = Ipv4Addr::from(destination_bytes);
+
+        Ok(Ipv4Packet {
+            version,
+            header_length,
+            service_type,
+            total_length,
+            identification,
+            flags,
+            offset,
+            ttl,
+            protocol,
+            checksum,
+            source,
+            destination
+        })
     }
 }
 
@@ -102,7 +140,7 @@ struct Ipv6Packet {
 
     payload_length: u16,
 
-    next_header: Protocol,
+    next_header: ProtocolType,
 
     hop_limit: u8,
 

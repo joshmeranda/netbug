@@ -11,6 +11,32 @@ enum IpPacket {
     V6(Ipv6Packet),
 }
 
+impl From<Ipv4Packet> for IpPacket {
+    fn from(value: Ipv4Packet) -> Self {
+        IpPacket::V4(value)
+    }
+}
+
+impl From<Ipv6Packet> for IpPacket {
+    fn from(value: Ipv6Packet) -> Self {
+        IpPacket::V6(value)
+    }
+}
+
+impl TryFrom<&[u8]> for IpPacket {
+    type Error = NbugError;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let version = data[0];
+
+        match version {
+            4 => Ok(IpPacket::V4(Ipv4Packet::try_from(data)?)),
+            6 => Ok(IpPacket::V6(Ipv6Packet::try_from(data)?)),
+            version => Err(NbugError::Packet(String::from(format!("Invalid Ip packet version number '{}'", version))))
+        }
+    }
+}
+
 enum ServiceType {
     Routine,
     Priority,

@@ -2,13 +2,13 @@ use std::cmp;
 use std::convert::TryFrom;
 
 use crate::error::{NbugError, Result};
-use crate::protocols::ProtocolType;
+use crate::protocols::ProtocolNumber;
 
-/// An ethernet packet, conforming to either IEE 802.2 or *02.3.
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum IeeEthernet {
-    Ieee802_2(Ethernet2),
-    Ieee802_3(Ethernet3),
+/// An ethernet packet, conforming to either IEE 802.2 or 802.3.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum IeeEthernet {
+    Ieee8022(Ethernet2),
+    Ieee8023(Ethernet3),
 }
 
 impl IeeEthernet {
@@ -18,11 +18,11 @@ impl IeeEthernet {
 }
 
 impl From<Ethernet2> for IeeEthernet {
-    fn from(ethernet: Ethernet2) -> Self { Self::Ieee802_2(ethernet) }
+    fn from(ethernet: Ethernet2) -> Self { Self::Ieee8022(ethernet) }
 }
 
 impl From<Ethernet3> for IeeEthernet {
-    fn from(ethernet: Ethernet3) -> Self { Self::Ieee802_3(ethernet) }
+    fn from(ethernet: Ethernet3) -> Self { Self::Ieee8023(ethernet) }
 }
 
 impl TryFrom<&[u8]> for IeeEthernet {
@@ -33,9 +33,9 @@ impl TryFrom<&[u8]> for IeeEthernet {
         let length = u16::from_be_bytes(length_bytes);
 
         if length > 1500 {
-            Ok(IeeEthernet::Ieee802_2(Ethernet2::try_from(data)?))
+            Ok(IeeEthernet::Ieee8022(Ethernet2::try_from(data)?))
         } else {
-            Ok(IeeEthernet::Ieee802_3(Ethernet3::try_from(data)?))
+            Ok(IeeEthernet::Ieee8023(Ethernet3::try_from(data)?))
         }
     }
 }
@@ -43,8 +43,8 @@ impl TryFrom<&[u8]> for IeeEthernet {
 impl PartialEq<Ethernet2> for IeeEthernet {
     fn eq(&self, other: &Ethernet2) -> bool {
         match self {
-            IeeEthernet::Ieee802_2(ethernet) => ethernet == other,
-            IeeEthernet::Ieee802_3(_) => false,
+            IeeEthernet::Ieee8022(ethernet) => ethernet == other,
+            IeeEthernet::Ieee8023(_) => false,
         }
     }
 }
@@ -52,8 +52,8 @@ impl PartialEq<Ethernet2> for IeeEthernet {
 impl PartialEq<Ethernet3> for IeeEthernet {
     fn eq(&self, other: &Ethernet3) -> bool {
         match self {
-            IeeEthernet::Ieee802_2(_) => false,
-            IeeEthernet::Ieee802_3(ethernet) => ethernet == other,
+            IeeEthernet::Ieee8022(_) => false,
+            IeeEthernet::Ieee8023(ethernet) => ethernet == other,
         }
     }
 }
@@ -65,7 +65,7 @@ pub struct Ethernet2 {
 
     source: [u8; 6],
 
-    protocol: ProtocolType,
+    protocol: ProtocolNumber,
 }
 
 impl Ethernet2 {
@@ -73,7 +73,7 @@ impl Ethernet2 {
     /// [Ethernet2] using [try_from].
     const MIN_BYTES: usize = IeeEthernet::PREAMBLE_BYTES + IeeEthernet::MAC_BYTES * 2 + IeeEthernet::LENGTH_BYTES;
 
-    pub fn new(destination: [u8; 6], source: [u8; 6], protocol: ProtocolType) -> Ethernet2 {
+    pub fn new(destination: [u8; 6], source: [u8; 6], protocol: ProtocolNumber) -> Ethernet2 {
         Ethernet2 {
             destination,
             source,
@@ -81,10 +81,10 @@ impl Ethernet2 {
         }
     }
 
-    pub fn ethernet_from_u16(value: u16) -> Result<ProtocolType> {
+    pub fn ethernet_from_u16(value: u16) -> Result<ProtocolNumber> {
         match value {
-            0x08_00 => Ok(ProtocolType::Ipv4),
-            0x86_dd => Ok(ProtocolType::Ipv6),
+            0x08_00 => Ok(ProtocolNumber::Ipv4),
+            0x86_dd => Ok(ProtocolNumber::Ipv6),
             _ => Err(NbugError::Packet(format!(
                 "unsupported ethernet protocol type value '{}'",
                 value
@@ -229,8 +229,45 @@ impl PartialEq<Ethernet3> for Ethernet3 {
 mod test {
     use std::convert::TryFrom;
 
-    use crate::protocols::ethernet::{Ethernet2, Ethernet3};
-    use crate::protocols::ProtocolType;
+    use crate::protocols::ethernet::{Ethernet2, Ethernet3, IeeEthernet};
+    use crate::protocols::ProtocolNumber;
+
+    #[test]
+    fn iee_ethernet2_from_raw_ok() {
+        let raw: &[u8] = &[
+            0, 0, 0, 0, 0, 0, 0, 0, // preamble
+            0, 1, 2, 3, 4, 5, // destination MAC
+            5, 4, 3, 2, 1, 0, // source MAC
+            0x08, 0x_00, // type (Iv4)
+        ];
+
+        assert_eq!(
+            IeeEthernet::Ieee8022(Ethernet2::new(
+                [0, 1, 2, 3, 4, 5],
+                [5, 4, 3, 2, 1, 0],
+                ProtocolNumber::Ipv4
+            )),
+            IeeEthernet::try_from(raw).unwrap()
+        );
+    }
+
+    #[test]
+    fn iee_ethernet3_from_raw_ok() {
+        let raw: &[u8] = &[
+            0, 0, 0, 0, 0, 0, 0, 0, // preamble
+            0, 1, 2, 3, 4, 5, // destination MAC
+            5, 4, 3, 2, 1, 0, // source MAC
+            0, 24, // length
+            0, 1, 2, 3, 4, 5, 6, 7, // payload data
+            8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, // frame check sequence
+        ];
+
+        assert_eq!(
+            IeeEthernet::Ieee8023(Ethernet3::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 24, 1)),
+            IeeEthernet::try_from(raw).unwrap()
+        );
+    }
 
     #[test]
     fn ethernet2_from_raw_ok() {
@@ -242,7 +279,7 @@ mod test {
         ];
 
         assert_eq!(
-            Ethernet2::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], ProtocolType::Ipv4),
+            Ethernet2::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], ProtocolNumber::Ipv4),
             Ethernet2::try_from(raw).unwrap()
         );
     }

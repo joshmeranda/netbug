@@ -1,10 +1,12 @@
 use std::convert::TryFrom;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use toml::ser::tables_last;
 
 use crate::error::NbugError;
-use crate::protocols::ProtocolType;
+use crate::protocols::ProtocolNumber;
 
 enum IpPacket {
     V4(Ipv4Packet),
@@ -12,15 +14,11 @@ enum IpPacket {
 }
 
 impl From<Ipv4Packet> for IpPacket {
-    fn from(value: Ipv4Packet) -> Self {
-        IpPacket::V4(value)
-    }
+    fn from(value: Ipv4Packet) -> Self { IpPacket::V4(value) }
 }
 
 impl From<Ipv6Packet> for IpPacket {
-    fn from(value: Ipv6Packet) -> Self {
-        IpPacket::V6(value)
-    }
+    fn from(value: Ipv6Packet) -> Self { IpPacket::V6(value) }
 }
 
 impl TryFrom<&[u8]> for IpPacket {
@@ -32,7 +30,10 @@ impl TryFrom<&[u8]> for IpPacket {
         match version {
             4 => Ok(IpPacket::V4(Ipv4Packet::try_from(data)?)),
             6 => Ok(IpPacket::V6(Ipv6Packet::try_from(data)?)),
-            version => Err(NbugError::Packet(String::from(format!("Invalid Ip packet version number '{}'", version))))
+            version => Err(NbugError::Packet(String::from(format!(
+                "Invalid Ip packet version number '{}'",
+                version
+            )))),
         }
     }
 }
@@ -85,7 +86,7 @@ struct Ipv4Packet {
 
     ttl: u8,
 
-    protocol: ProtocolType,
+    protocol: ProtocolNumber,
 
     checksum: u16,
 
@@ -139,7 +140,16 @@ impl TryFrom<&[u8]> for Ipv4Packet {
         let offset = u16::from_be_bytes(offset_bytes);
 
         let ttl = data[8];
-        let protocol = ProtocolType::try_from(data[9])?;
+
+        let protocol = match FromPrimitive::from_u8(data[9]) {
+            Some(protocol_num) => protocol_num,
+            _ => {
+                return Err(NbugError::Packet(String::from(format!(
+                    "Invalid or unnasigned protocol number {}",
+                    data[9]
+                ))))
+            },
+        };
 
         let mut checksum_bytes = [0u8; 2];
         checksum_bytes.copy_from_slice(&data[10..12]);
@@ -180,7 +190,7 @@ struct Ipv6Packet {
 
     payload_length: u16,
 
-    next_header: ProtocolType,
+    next_header: ProtocolNumber,
 
     hop_limit: u8,
 
@@ -218,7 +228,16 @@ impl TryFrom<&[u8]> for Ipv6Packet {
         length_bytes.copy_from_slice(&data[4..6]);
         let payload_length = u16::from_be_bytes(length_bytes);
 
-        let next_header = ProtocolType::try_from(data[6])?;
+        let next_header = match FromPrimitive::from_u8(data[6]) {
+            Some(protocol_num) => protocol_num,
+            _ => {
+                return Err(NbugError::Packet(String::from(format!(
+                    "Invalid or unnasigned protocol number {}",
+                    data[6]
+                ))))
+            },
+        };
+
         let hop_limit = data[7];
 
         let mut source_bytes = [0u8; 16];

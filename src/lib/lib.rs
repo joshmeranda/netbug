@@ -11,6 +11,9 @@ pub mod server;
 #[macro_use]
 extern crate serde_derive;
 
+#[macro_use]
+extern crate num_derive;
+
 /// The total length og the PcapMessage header as raw bytes. The header is
 /// composed of the packet version number (u8), pcap name length (u8), and the
 /// total data length (u64).

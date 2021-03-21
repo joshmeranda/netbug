@@ -9,7 +9,7 @@ fn main() {
         Err(err) => {
             eprintln!("{}", err.to_string());
             return;
-        }
+        },
     };
 
     {

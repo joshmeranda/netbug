@@ -1,11 +1,14 @@
-use crate::protocols::ProtocolType;
-use std::net::{Ipv4Addr, Ipv6Addr};
 use std::convert::TryFrom;
+use std::net::{Ipv4Addr, Ipv6Addr};
+
+use toml::ser::tables_last;
+
 use crate::error::NbugError;
+use crate::protocols::ProtocolType;
 
 enum IpPacket {
     V4(Ipv4Packet),
-    V6(Ipv6Packet)
+    V6(Ipv6Packet),
 }
 
 enum ServiceType {
@@ -16,7 +19,7 @@ enum ServiceType {
     FlashOverride,
     CriticEcp,
     InternetworkControl,
-    NetworkControl
+    NetworkControl,
 }
 
 impl TryFrom<u8> for ServiceType {
@@ -32,15 +35,16 @@ impl TryFrom<u8> for ServiceType {
             0b0000_0101u8 => Ok(ServiceType::CriticEcp),
             0b0000_0110u8 => Ok(ServiceType::InternetworkControl),
             0b0000_0111u8 => Ok(ServiceType::NetworkControl),
-            _ => Err(NbugError::Packet(String::from(format!("invalid  ip  service type value '{}'", value))))
+            _ => Err(NbugError::Packet(String::from(format!(
+                "invalid  ip  service type value '{}'",
+                value
+            )))),
         }
     }
 }
 
 /// The IPv4 Packet header as specified in [RFC 791](https://tools.ietf.org/html/rfc791#section-3.1).
 struct Ipv4Packet {
-    version: u8,
-
     header_length: u8,
 
     service_type: ServiceType,
@@ -67,7 +71,7 @@ struct Ipv4Packet {
 impl Ipv4Packet {
     const MIN_BYTES: usize = 48 // main header data
         + 1                     // minimum no options packet
-        + 17;                   // padding to ensure alignment on 32 byte boundary
+        + 15; // padding to ensure alignment on 32 byte boundary
 }
 
 impl TryFrom<&[u8]> for Ipv4Packet {
@@ -75,10 +79,21 @@ impl TryFrom<&[u8]> for Ipv4Packet {
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         if data.len() < Ipv4Packet::MIN_BYTES {
-            return Err(NbugError::Packet(String::from(format!("Too few bytes, expected at least {}", Ipv4Packet::MIN_BYTES))))
+            return Err(NbugError::Packet(String::from(format!(
+                "Too few bytes, expected at least {}",
+                Ipv4Packet::MIN_BYTES
+            ))));
         }
 
         let version = data[0] >> 4;
+
+        if version != 4 {
+            return Err(NbugError::Packet(String::from(format!(
+                "Wrong version number, expected '4' received: {}",
+                version
+            ))));
+        }
+
         let header_length = data[0] & 0xF;
         let service_type = ServiceType::try_from(data[1])?;
 
@@ -113,7 +128,6 @@ impl TryFrom<&[u8]> for Ipv4Packet {
         let destination = Ipv4Addr::from(destination_bytes);
 
         Ok(Ipv4Packet {
-            version,
             header_length,
             service_type,
             total_length,
@@ -124,7 +138,7 @@ impl TryFrom<&[u8]> for Ipv4Packet {
             protocol,
             checksum,
             source,
-            destination
+            destination,
         })
     }
 }
@@ -146,5 +160,57 @@ struct Ipv6Packet {
 
     source: Ipv6Addr,
 
-    destination: Ipv6Addr
+    destination: Ipv6Addr,
+}
+
+impl TryFrom<&[u8]> for Ipv6Packet {
+    type Error = NbugError;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let version = data[0] >> 4;
+
+        if version != 4 {
+            return Err(NbugError::Packet(String::from(format!(
+                "Wrong version number, expected '6' received: {}",
+                version
+            ))));
+        }
+
+        let mut traffic_class: u8 = 0;
+        traffic_class |= data[0] | data[1] >> 4; // last 4 of first byte, and first 4 of second byte
+
+        let mut flow_label: u32 = 0;
+        flow_label |= data[1] as u32 & 0x0Fu32; // add last 4 bytes of previous byte
+        flow_label <<= 16;
+
+        flow_label &= data[2] as u32;
+        flow_label <<= 8;
+
+        flow_label &= data[3] as u32;
+
+        let mut length_bytes = [0u8; 2];
+        length_bytes.copy_from_slice(&data[4..6]);
+        let payload_length = u16::from_be_bytes(length_bytes);
+
+        let next_header = ProtocolType::try_from(data[6])?;
+        let hop_limit = data[7];
+
+        let mut source_bytes = [0u8; 16];
+        source_bytes.copy_from_slice(&data[8..12]);
+        let source = Ipv6Addr::from(source_bytes);
+
+        let mut destination_bytes = [0u8; 16];
+        destination_bytes.copy_from_slice(&data[12..16]);
+        let destination = Ipv6Addr::from(destination_bytes);
+
+        Ok(Ipv6Packet {
+            traffic_class,
+            flow_label,
+            payload_length,
+            next_header,
+            hop_limit,
+            source,
+            destination,
+        })
+    }
 }

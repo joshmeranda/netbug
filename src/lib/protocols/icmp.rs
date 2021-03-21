@@ -1,11 +1,12 @@
-/// Defines types relating to the Internet Control Message Protocol (ICMP) versions 4 and 6. These
-/// types will largely ignore packet data as they will be used for netbug analysis which does not
-/// require knowledge of packet payloads.
+/// Defines types relating to the Internet Control Message Protocol (ICMP)
+/// versions 4 and 6. These types will largely ignore packet data as they will
+/// be used for netbug analysis which does not require knowledge of packet
+/// payloads.
 use std::net::Ipv4Addr;
 
 enum Icmp {
     V4(Icmpv4),
-    V6(Icmpv6)
+    V6(Icmpv6),
 }
 
 /// The ICMPv4 packet as specified in [RFC 791](https://tools.ietf.org/html/rfc792).
@@ -26,7 +27,7 @@ struct Icmpv4 {
 
     source: Ipv4Addr,
 
-    destination: Ipv4Addr
+    destination: Ipv4Addr,
 }
 
 /// Defines the available types of ICMPv6 messages.
@@ -52,7 +53,7 @@ enum Icmpv6 {
 struct Icmpv6Header {
     code: u8,
 
-    checksum: u16
+    checksum: u16,
 }
 
 /// The ICMPv6 Echo Request as specified in [RFC 4443 4.1](https://tools.ietf.org/html/rfc4443#section-4.1)

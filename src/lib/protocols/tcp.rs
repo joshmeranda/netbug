@@ -4,7 +4,7 @@ enum TcpControlBits {
     Psh,
     Rst,
     Syn,
-    Fin
+    Fin,
 }
 
 /// The TCP Packet as specified in [RFC 793 3.1](https://tools.ietf.org/html/rfc793#section-3.1).
@@ -25,5 +25,5 @@ struct Tcp {
 
     checksum: u16,
 
-    urgent_pointer: u16
+    urgent_pointer: u16,
 }

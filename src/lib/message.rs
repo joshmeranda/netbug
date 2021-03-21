@@ -6,14 +6,15 @@ use crypto::sha3::Sha3;
 use crate::error::Result;
 use crate::MESSAGE_VERSION;
 
-/// Struct representing network packet containing all or part of a client generated pcap file. Note
-/// the actual packet sent over the wire will likely have extra fields not defined here explicitly
-/// such as the data length.
+/// Struct representing network packet containing all or part of a client
+/// generated pcap file. Note the actual packet sent over the wire will likely
+/// have extra fields not defined here explicitly such as the data length.
 ///
 /// todo: implement a better checksum / hashing method
 pub struct PcapMessage {
-    /// The version of the message. This will allow for providing backwards compatibility when using
-    /// an older client with a newer server which may have an updated message structure.
+    /// The version of the message. This will allow for providing backwards
+    /// compatibility when using an older client with a newer server which
+    /// may have an updated message structure.
     version: u8,
 
     /// The name of the capture interface.

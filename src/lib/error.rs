@@ -1,8 +1,9 @@
-use pcap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::io;
 use std::net::AddrParseError;
+
+use pcap;
 
 use super::config::error::ConfigError;
 
@@ -45,19 +46,13 @@ impl Error for NbugError {
 }
 
 impl From<io::Error> for NbugError {
-    fn from(err: io::Error) -> Self {
-        NbugError::Io(err)
-    }
+    fn from(err: io::Error) -> Self { NbugError::Io(err) }
 }
 
 impl From<pcap::Error> for NbugError {
-    fn from(err: pcap::Error) -> Self {
-        NbugError::Pcap(err)
-    }
+    fn from(err: pcap::Error) -> Self { NbugError::Pcap(err) }
 }
 
 impl From<AddrParseError> for NbugError {
-    fn from(err: AddrParseError) -> Self {
-        NbugError::Config(ConfigError::Addr(err))
-    }
+    fn from(err: AddrParseError) -> Self { NbugError::Config(ConfigError::Addr(err)) }
 }

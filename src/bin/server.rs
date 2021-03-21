@@ -7,7 +7,7 @@ fn main() {
         Err(err) => {
             eprintln!("{}", err.to_string());
             return;
-        }
+        },
     };
 
     let server = Server::from_config(server_cfg);

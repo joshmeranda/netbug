@@ -1,21 +1,22 @@
 use std::default::Default;
 use std::fs::{self, File};
+use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::thread::{Builder, JoinHandle};
-use std::io::{Read, Write};
 use std::thread;
+use std::thread::{Builder, JoinHandle};
 
 use pcap::{Capture, Device};
 
+use crate::behavior::Behavior;
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::error::{NbugError, Result};
 use crate::{BUFFER_SIZE, HEADER_LENGTH, MESSAGE_VERSION};
-use crate::behavior::Behavior;
 
-/// The main Netbug client to capture network and dump network traffic to pcap files.
+/// The main Netbug client to capture network and dump network traffic to pcap
+/// files.
 pub struct Client {
     pcap_dir: PathBuf,
 
@@ -33,23 +34,18 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Client {
         Client {
-            pcap_dir: defaults::default_pcap_dir(),
+            pcap_dir:         defaults::default_pcap_dir(),
             allow_concurrent: defaults::client::default_concurrent_run(),
-            devices: vec![],
-            capturing: Arc::new(Mutex::new(false)),
-            srv_addr: SocketAddr::new(
-                IpAddr::from(Ipv4Addr::LOCALHOST),
-                defaults::default_server_port(),
-            ),
-            behaviors: vec![],
+            devices:          vec![],
+            capturing:        Arc::new(Mutex::new(false)),
+            srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
+            behaviors:        vec![],
         }
     }
 }
 
 impl Client {
-    pub fn new() -> Client {
-        Client::default()
-    }
+    pub fn new() -> Client { Client::default() }
 
     /// Construct a client from a [ClientConfig] which is consumed.
     pub fn from_config(cfg: ClientConfig) -> Client {
@@ -79,11 +75,13 @@ impl Client {
         Ok(())
     }
 
-    /// Run all client behaviors concurrently. Note that this function blocks until all behaviors
-    /// have finished.
+    /// Run all client behaviors concurrently. Note that this function blocks
+    /// until all behaviors have finished.
     pub fn run_behaviors_concurrent(&self) -> Result<()> {
-        if ! self.allow_concurrent {
-            return Err(NbugError::Client(String::from("Cannot run client behaviors concurrently when 'allow_concurrent' is false")))
+        if !self.allow_concurrent {
+            return Err(NbugError::Client(String::from(
+                "Cannot run client behaviors concurrently when 'allow_concurrent' is false",
+            )));
         }
 
         let mut handles = Vec::<JoinHandle<()>>::with_capacity(self.behaviors.len());
@@ -111,18 +109,15 @@ impl Client {
         }
     }
 
-    /// Begin capturing packets on the configured network devices. Note that there is currently no
-    /// explicit way to end capture and flush its output, be mindful of your client's scoping to
-    /// prevent capturing unnecessary packets.
+    /// Begin capturing packets on the configured network devices. Note that
+    /// there is currently no explicit way to end capture and flush its
+    /// output, be mindful of your client's scoping to prevent capturing
+    /// unnecessary packets.
     pub fn start_capture(&mut self) -> Result<()> {
         if self.is_capturing() {
-            return Err(NbugError::Client(String::from(
-                "capture is already running",
-            )));
+            return Err(NbugError::Client(String::from("capture is already running")));
         } else if self.devices.is_empty() {
-            return Err(NbugError::Client(String::from(
-                "no configured network devices",
-            )));
+            return Err(NbugError::Client(String::from("no configured network devices")));
         }
 
         // ensure that the packet capture directory exists
@@ -136,10 +131,7 @@ impl Client {
             let capture_flag = Arc::clone(&self.capturing);
             let device_name = String::from(device.name.clone());
 
-            let mut capture = Capture::from_device(device.clone())?
-                .timeout(1)
-                .open()?
-                .setnonblock()?;
+            let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
             let mut pcap_path = PathBuf::from(&self.pcap_dir);
             pcap_path.push(format!("{}.pcap", &device_name));
@@ -152,7 +144,7 @@ impl Client {
                 while *capture_flag.lock().unwrap() {
                     match capture.next() {
                         Ok(packet) => save_file.write(&packet),
-                        Err(_) => {} // todo: these errors should be handled
+                        Err(_) => {}, // todo: these errors should be handled
                     }
                 }
 
@@ -166,9 +158,10 @@ impl Client {
         Ok(())
     }
 
-    /// Signal the client to stop capturing network packets. Note that this simply signals the
-    /// capturing thread loops to discontinue iteration rather than immediately stopping them.
-    /// Therefore, it is possible for extra packets to be captured and written to the resulting pcap
+    /// Signal the client to stop capturing network packets. Note that this
+    /// simply signals the capturing thread loops to discontinue iteration
+    /// rather than immediately stopping them. Therefore, it is possible for
+    /// extra packets to be captured and written to the resulting pcap
     /// if the current thread iterations are still in progress.
     pub fn stop_capture(&mut self) -> Result<()> {
         if !self.is_capturing() {
@@ -179,9 +172,7 @@ impl Client {
         Ok(())
     }
 
-    pub fn is_capturing(&self) -> bool {
-        *self.capturing.lock().unwrap()
-    }
+    pub fn is_capturing(&self) -> bool { *self.capturing.lock().unwrap() }
 
     /// Transfer all
     pub fn transfer_all(&self) -> Result<()> {
@@ -219,9 +210,9 @@ impl Client {
 
         buffer[HEADER_LENGTH..HEADER_LENGTH + interface_name.len()].copy_from_slice(name_bytes);
 
-        // read first data chunk into free buffer space after the header and interface name
-        let mut bytes_read: usize =
-            pcap_file.read(&mut buffer[HEADER_LENGTH + interface_name.len()..])?;
+        // read first data chunk into free buffer space after the header and interface
+        // name
+        let mut bytes_read: usize = pcap_file.read(&mut buffer[HEADER_LENGTH + interface_name.len()..])?;
 
         // send the header, interface name, and first chunk of pcap data
         tcp.write(&buffer[0..HEADER_LENGTH + interface_name.len() + bytes_read])?;
@@ -240,8 +231,7 @@ impl Client {
         Ok(())
     }
 
-    /// Generate the bpf filter to use to minimize the data captured by the client.
-    pub fn generate_bpf_filter(&self) -> String {
-        todo!()
-    }
+    /// Generate the bpf filter to use to minimize the data captured by the
+    /// client.
+    pub fn generate_bpf_filter(&self) -> String { todo!() }
 }

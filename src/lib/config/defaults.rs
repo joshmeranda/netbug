@@ -32,20 +32,14 @@ pub fn default_pcap_dir() -> PathBuf {
     path
 }
 
-pub fn default_server_port() -> u16 {
-    8081
-}
+pub fn default_server_port() -> u16 { 8081 }
 
 // Client Specific Values
 
 pub mod client {
-    pub fn default_concurrent_run() -> bool {
-        false
-    }
+    pub fn default_concurrent_run() -> bool { false }
 
-    pub fn default_delay() -> u8 {
-        1
-    }
+    pub fn default_delay() -> u8 { 1 }
 }
 
 // Server Specific Values

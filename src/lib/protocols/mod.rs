@@ -1,14 +1,15 @@
 use std::convert::TryFrom;
+
 use crate::error::NbugError;
 
-/// Defines many structs and packet serialization from raw packet data. These will largely focus on
-/// packets headers, and will largely ignore any packet payloads, as they are largely irrelevant to
-/// this project.
+mod ethernet;
+/// Defines many structs and packet serialization from raw packet data. These
+/// will largely focus on packets headers, and will largely ignore any packet
+/// payloads, as they are largely irrelevant to this project.
 mod icmp;
 mod ip;
-mod ethernet;
-mod udp;
 mod tcp;
+mod udp;
 
 /// The protocols supported for behavior execution and analysis.s
 #[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -38,12 +39,16 @@ impl TryFrom<u8> for ProtocolType {
             6 => Ok(ProtocolType::Tcp),
             17 => Ok(ProtocolType::Udp),
 
-            _ => Err(NbugError::Packet(String::from(format!("unsupported protocol assigned number {}", value))))
+            _ => Err(NbugError::Packet(String::from(format!(
+                "unsupported protocol assigned number {}",
+                value
+            )))),
         }
     }
 }
 
-/// Trait for structs representing a packet for one of the protocols specified by [ProtocolType]
+/// Trait for structs representing a packet for one of the protocols specified
+/// by [ProtocolType]
 trait ProtocolPacket {
     /// Retrieve the total length of the packet header
     fn header_length(&self) -> usize;

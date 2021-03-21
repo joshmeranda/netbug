@@ -1,8 +1,7 @@
-use std::net::SocketAddr;
-use std::net::{Shutdown, TcpStream, UdpSocket};
+use std::net::{Shutdown, SocketAddr, TcpStream, UdpSocket};
 use std::process::Command;
-use std::time::Duration;
 use std::str::FromStr;
+use std::time::Duration;
 
 use crate::error::Result;
 
@@ -16,12 +15,13 @@ enum BehaviorProtocol {
     Udp,
 }
 
-/// Specifies the direction traffic should be expected. When used in the client configuration, this
-/// field is ignored and will have no effect.
+/// Specifies the direction traffic should be expected. When used in the client
+/// configuration, this field is ignored and will have no effect.
 ///
 /// # Example
 /// For a Tcp connection's 3-way-handshake:
-///  - In: Will always fail because no Ack will be received without the initial Syn
+///  - In: Will always fail because no Ack will be received without the initial
+///    Syn
 ///  - Out: Will fail if the client receives and Ack for its Syn
 ///  - Both: Will fail if one part of the handshake is not received
 #[derive(Deserialize)]
@@ -33,9 +33,7 @@ enum Direction {
 }
 
 impl Default for Direction {
-    fn default() -> Direction {
-        Direction::Both
-    }
+    fn default() -> Direction { Direction::Both }
 }
 
 /// A basic behavior to emulate the type of traffic
@@ -51,9 +49,10 @@ pub struct Behavior {
 
     timeout: Option<Duration>,
 
-    /// The optional user specified command to cause the specific behavior rather than allowing
-    /// netbug to take the appropriate actions. The first element is the command or path to
-    /// executable to run, and the following elements are the arguments to pass to it.
+    /// The optional user specified command to cause the specific behavior
+    /// rather than allowing netbug to take the appropriate actions. The
+    /// first element is the command or path to executable to run, and the
+    /// following elements are the arguments to pass to it.
     command: Option<Vec<String>>,
 }
 
@@ -68,39 +67,33 @@ impl Behavior {
         };
 
         if let Some(command) = &self.command {
-            let mut handle = Command::new(&command[0])
-                .args(&command.as_slice()[1..])
-                .spawn()?;
+            let mut handle = Command::new(&command[0]).args(&command.as_slice()[1..]).spawn()?;
             handle.wait()?;
 
-            return Ok(())
+            return Ok(());
         }
 
         match self.protocol {
             BehaviorProtocol::Icmp => {
-                let mut handle = Command::new("ping")
-                    .args(&["-c", "1", &self.dst])
-                    .spawn()?;
+                let mut handle = Command::new("ping").args(&["-c", "1", &self.dst]).spawn()?;
                 handle.wait()?;
-            }
+            },
             BehaviorProtocol::Icmpv6 => {
-                let mut handle = Command::new("ping")
-                    .args(&["-6", "-c", "1", &self.dst])
-                    .spawn()?;
+                let mut handle = Command::new("ping").args(&["-6", "-c", "1", &self.dst]).spawn()?;
                 handle.wait()?;
-            }
+            },
             BehaviorProtocol::Tcp => {
                 let addr = SocketAddr::from_str(self.dst.as_str())?;
                 let sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
 
                 sock.shutdown(Shutdown::Both)?;
-            }
+            },
             BehaviorProtocol::Udp => {
                 let addr = SocketAddr::from_str(self.dst.as_str())?;
                 let socket = UdpSocket::bind(&addr).unwrap();
 
                 socket.send(&[])?;
-            }
+            },
         };
 
         Ok(())

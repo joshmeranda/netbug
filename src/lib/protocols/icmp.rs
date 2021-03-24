@@ -104,11 +104,11 @@ mod icmpv4 {
             let original_timestamp = u32::from_be_bytes(original_bytes);
 
             let mut receive_bytes = [0u8; 4];
-            receive_bytes.copy_from_slice(&data[6..10]);
+            receive_bytes.copy_from_slice(&data[10..14]);
             let receive_timestamp = u32::from_be_bytes(receive_bytes);
 
             let mut transmit_bytes = [0u8; 4];
-            transmit_bytes.copy_from_slice(&data[6..10]);
+            transmit_bytes.copy_from_slice(&data[14..18]);
             let transmit_timestamp = u32::from_be_bytes(transmit_bytes);
 
             Ok(IcmpTimestamp {

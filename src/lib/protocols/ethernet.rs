@@ -6,61 +6,61 @@ use crate::protocols::ProtocolNumber;
 
 /// An ethernet packet, conforming to either IEE 802.2 or 802.3.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum IeeEthernet {
-    Ieee8022(Ethernet2),
-    Ieee8023(Ethernet3),
+pub enum IeeEthernetPacket {
+    Ieee8022(Ethernet2Packet),
+    Ieee8023(Ethernet3Packet),
 }
 
-impl IeeEthernet {
+impl IeeEthernetPacket {
     const PREAMBLE_BYTES: usize = 8;
     const MAC_BYTES: usize = 6;
     const LENGTH_BYTES: usize = 2;
 }
 
-impl From<Ethernet2> for IeeEthernet {
-    fn from(ethernet: Ethernet2) -> Self { Self::Ieee8022(ethernet) }
+impl From<Ethernet2Packet> for IeeEthernetPacket {
+    fn from(ethernet: Ethernet2Packet) -> Self { Self::Ieee8022(ethernet) }
 }
 
-impl From<Ethernet3> for IeeEthernet {
-    fn from(ethernet: Ethernet3) -> Self { Self::Ieee8023(ethernet) }
+impl From<Ethernet3Packet> for IeeEthernetPacket {
+    fn from(ethernet: Ethernet3Packet) -> Self { Self::Ieee8023(ethernet) }
 }
 
-impl TryFrom<&[u8]> for IeeEthernet {
+impl TryFrom<&[u8]> for IeeEthernetPacket {
     type Error = NbugError;
 
-    fn try_from(data: &[u8]) -> Result<IeeEthernet> {
+    fn try_from(data: &[u8]) -> Result<IeeEthernetPacket> {
         let length_bytes: [u8; 2] = [data[20], data[21]];
         let length = u16::from_be_bytes(length_bytes);
 
         if length > 1500 {
-            Ok(IeeEthernet::Ieee8022(Ethernet2::try_from(data)?))
+            Ok(IeeEthernetPacket::Ieee8022(Ethernet2Packet::try_from(data)?))
         } else {
-            Ok(IeeEthernet::Ieee8023(Ethernet3::try_from(data)?))
+            Ok(IeeEthernetPacket::Ieee8023(Ethernet3Packet::try_from(data)?))
         }
     }
 }
 
-impl PartialEq<Ethernet2> for IeeEthernet {
-    fn eq(&self, other: &Ethernet2) -> bool {
+impl PartialEq<Ethernet2Packet> for IeeEthernetPacket {
+    fn eq(&self, other: &Ethernet2Packet) -> bool {
         match self {
-            IeeEthernet::Ieee8022(ethernet) => ethernet == other,
-            IeeEthernet::Ieee8023(_) => false,
+            IeeEthernetPacket::Ieee8022(ethernet) => ethernet == other,
+            IeeEthernetPacket::Ieee8023(_) => false,
         }
     }
 }
 
-impl PartialEq<Ethernet3> for IeeEthernet {
-    fn eq(&self, other: &Ethernet3) -> bool {
+impl PartialEq<Ethernet3Packet> for IeeEthernetPacket {
+    fn eq(&self, other: &Ethernet3Packet) -> bool {
         match self {
-            IeeEthernet::Ieee8022(_) => false,
-            IeeEthernet::Ieee8023(ethernet) => ethernet == other,
+            IeeEthernetPacket::Ieee8022(_) => false,
+            IeeEthernetPacket::Ieee8023(ethernet) => ethernet == other,
         }
     }
 }
 
 /// The ethernet packet for IEE 802.2true.
 #[derive(Copy, Clone, Debug, Eq)]
-pub struct Ethernet2 {
+pub struct Ethernet2Packet {
     destination: [u8; 6],
 
     source: [u8; 6],
@@ -68,13 +68,14 @@ pub struct Ethernet2 {
     protocol: ProtocolNumber,
 }
 
-impl Ethernet2 {
+impl Ethernet2Packet {
     /// The minimum amount of bytes of data necessary to deserialize an
     /// [Ethernet2] using [try_from].
-    const MIN_BYTES: usize = IeeEthernet::PREAMBLE_BYTES + IeeEthernet::MAC_BYTES * 2 + IeeEthernet::LENGTH_BYTES;
+    const MIN_BYTES: usize =
+        IeeEthernetPacket::PREAMBLE_BYTES + IeeEthernetPacket::MAC_BYTES * 2 + IeeEthernetPacket::LENGTH_BYTES;
 
-    pub fn new(destination: [u8; 6], source: [u8; 6], protocol: ProtocolNumber) -> Ethernet2 {
-        Ethernet2 {
+    pub fn new(destination: [u8; 6], source: [u8; 6], protocol: ProtocolNumber) -> Ethernet2Packet {
+        Ethernet2Packet {
             destination,
             source,
             protocol,
@@ -93,10 +94,10 @@ impl Ethernet2 {
     }
 }
 
-impl TryFrom<&[u8]> for Ethernet2 {
+impl TryFrom<&[u8]> for Ethernet2Packet {
     type Error = NbugError;
 
-    fn try_from(data: &[u8]) -> Result<Ethernet2> {
+    fn try_from(data: &[u8]) -> Result<Ethernet2Packet> {
         if data.len() < Self::MIN_BYTES {
             return Err(NbugError::Packet(format!(
                 "Too few bytes, expected at least {}",
@@ -114,9 +115,9 @@ impl TryFrom<&[u8]> for Ethernet2 {
         let mut protocol_bytes = [0u8; 2];
         protocol_bytes.copy_from_slice(&data[20..22]);
 
-        let protocol = Ethernet2::ethernet_from_u16(u16::from_be_bytes(protocol_bytes))?;
+        let protocol = Ethernet2Packet::ethernet_from_u16(u16::from_be_bytes(protocol_bytes))?;
 
-        Ok(Ethernet2 {
+        Ok(Ethernet2Packet {
             destination,
             source,
             protocol,
@@ -124,15 +125,15 @@ impl TryFrom<&[u8]> for Ethernet2 {
     }
 }
 
-impl PartialEq<Ethernet2> for Ethernet2 {
-    fn eq(&self, other: &Ethernet2) -> bool {
+impl PartialEq<Ethernet2Packet> for Ethernet2Packet {
+    fn eq(&self, other: &Ethernet2Packet) -> bool {
         self.destination == other.destination && self.source == other.source && self.protocol == other.protocol
     }
 }
 
 /// The ethernet packet for IEE 802.3
 #[derive(Copy, Clone, Debug, Eq)]
-struct Ethernet3 {
+struct Ethernet3Packet {
     destination: [u8; 6],
 
     source: [u8; 6],
@@ -142,18 +143,18 @@ struct Ethernet3 {
     frame_check_sequence: u32,
 }
 
-impl Ethernet3 {
+impl Ethernet3Packet {
     const MIN_DATA_BYTES: usize = 46;
     const FRAME_CHECK_SEQUENCE_BYTES: usize = 4;
 
-    const MIN_BYTES: usize = IeeEthernet::PREAMBLE_BYTES
-        + IeeEthernet::MAC_BYTES * 2
-        + IeeEthernet::LENGTH_BYTES
+    const MIN_BYTES: usize = IeeEthernetPacket::PREAMBLE_BYTES
+        + IeeEthernetPacket::MAC_BYTES * 2
+        + IeeEthernetPacket::LENGTH_BYTES
         + Self::MIN_DATA_BYTES
         + Self::FRAME_CHECK_SEQUENCE_BYTES;
 
-    pub fn new(destination: [u8; 6], source: [u8; 6], length: usize, fcs: u32) -> Ethernet3 {
-        Ethernet3 {
+    pub fn new(destination: [u8; 6], source: [u8; 6], length: usize, fcs: u32) -> Ethernet3Packet {
+        Ethernet3Packet {
             destination,
             source,
             length,
@@ -162,10 +163,10 @@ impl Ethernet3 {
     }
 }
 
-impl TryFrom<&[u8]> for Ethernet3 {
+impl TryFrom<&[u8]> for Ethernet3Packet {
     type Error = NbugError;
 
-    fn try_from(data: &[u8]) -> Result<Ethernet3> {
+    fn try_from(data: &[u8]) -> Result<Ethernet3Packet> {
         if data.len() < Self::MIN_BYTES {
             return Err(NbugError::Packet(format!(
                 "Too few bytes, expected at least {}",
@@ -198,16 +199,19 @@ impl TryFrom<&[u8]> for Ethernet3 {
             )));
         }
 
-        let fcs_offset =
-            IeeEthernet::PREAMBLE_BYTES + IeeEthernet::MAC_BYTES * 2 + IeeEthernet::LENGTH_BYTES + length + padding;
+        let fcs_offset = IeeEthernetPacket::PREAMBLE_BYTES
+            + IeeEthernetPacket::MAC_BYTES * 2
+            + IeeEthernetPacket::LENGTH_BYTES
+            + length
+            + padding;
 
-        let n = IeeEthernet::PREAMBLE_BYTES + IeeEthernet::MAC_BYTES * 2 + IeeEthernet::LENGTH_BYTES;
+        let n = IeeEthernetPacket::PREAMBLE_BYTES + IeeEthernetPacket::MAC_BYTES * 2 + IeeEthernetPacket::LENGTH_BYTES;
 
         let mut fcs_bytes = [0u8; 4];
         fcs_bytes.copy_from_slice(&data[fcs_offset..fcs_offset + 4]);
         let frame_check_sequence = u32::from_be_bytes(fcs_bytes);
 
-        Ok(Ethernet3 {
+        Ok(Ethernet3Packet {
             destination,
             source,
             length,
@@ -216,8 +220,8 @@ impl TryFrom<&[u8]> for Ethernet3 {
     }
 }
 
-impl PartialEq<Ethernet3> for Ethernet3 {
-    fn eq(&self, other: &Ethernet3) -> bool {
+impl PartialEq<Ethernet3Packet> for Ethernet3Packet {
+    fn eq(&self, other: &Ethernet3Packet) -> bool {
         self.destination == other.destination
             && self.source == other.source
             && self.length == other.length
@@ -229,7 +233,7 @@ impl PartialEq<Ethernet3> for Ethernet3 {
 mod test {
     use std::convert::TryFrom;
 
-    use crate::protocols::ethernet::{Ethernet2, Ethernet3, IeeEthernet};
+    use crate::protocols::ethernet::{Ethernet2Packet, Ethernet3Packet, IeeEthernetPacket};
     use crate::protocols::ProtocolNumber;
 
     #[test]
@@ -242,12 +246,12 @@ mod test {
         ];
 
         assert_eq!(
-            IeeEthernet::Ieee8022(Ethernet2::new(
+            IeeEthernetPacket::Ieee8022(Ethernet2Packet::new(
                 [0, 1, 2, 3, 4, 5],
                 [5, 4, 3, 2, 1, 0],
                 ProtocolNumber::Ipv4
             )),
-            IeeEthernet::try_from(raw).unwrap()
+            IeeEthernetPacket::try_from(raw).unwrap()
         );
     }
 
@@ -264,8 +268,8 @@ mod test {
         ];
 
         assert_eq!(
-            IeeEthernet::Ieee8023(Ethernet3::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 24, 1)),
-            IeeEthernet::try_from(raw).unwrap()
+            IeeEthernetPacket::Ieee8023(Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 24, 1)),
+            IeeEthernetPacket::try_from(raw).unwrap()
         );
     }
 
@@ -279,8 +283,8 @@ mod test {
         ];
 
         assert_eq!(
-            Ethernet2::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], ProtocolNumber::Ipv4),
-            Ethernet2::try_from(raw).unwrap()
+            Ethernet2Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], ProtocolNumber::Ipv4),
+            Ethernet2Packet::try_from(raw).unwrap()
         );
     }
 
@@ -293,7 +297,7 @@ mod test {
             0x08, 0x_00, // type (Iv4)
         ];
 
-        if let Ok(_) = Ethernet2::try_from(raw) {
+        if let Ok(_) = Ethernet2Packet::try_from(raw) {
             panic!("too few bytes were provided, try_from should have failed");
         }
     }
@@ -311,8 +315,8 @@ mod test {
         ];
 
         assert_eq!(
-            Ethernet3::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 0, 1),
-            Ethernet3::try_from(raw).unwrap()
+            Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 0, 1),
+            Ethernet3Packet::try_from(raw).unwrap()
         );
     }
 
@@ -329,8 +333,8 @@ mod test {
         ];
 
         assert_eq!(
-            Ethernet3::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 24, 1),
-            Ethernet3::try_from(raw).unwrap()
+            Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 24, 1),
+            Ethernet3Packet::try_from(raw).unwrap()
         );
     }
 
@@ -347,8 +351,8 @@ mod test {
         ];
 
         assert_eq!(
-            Ethernet3::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 46, 1),
-            Ethernet3::try_from(raw).unwrap()
+            Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 46, 1),
+            Ethernet3Packet::try_from(raw).unwrap()
         );
     }
 
@@ -365,8 +369,8 @@ mod test {
         ];
 
         assert_eq!(
-            Ethernet3::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 48, 1),
-            Ethernet3::try_from(raw).unwrap()
+            Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 48, 1),
+            Ethernet3Packet::try_from(raw).unwrap()
         );
     }
 
@@ -382,7 +386,7 @@ mod test {
             0, 0, 0, 0, 0, 1, // frame check sequence
         ];
 
-        if let Ok(n) = Ethernet3::try_from(raw) {
+        if let Ok(n) = Ethernet3Packet::try_from(raw) {
             panic!("too few bytes were provided, try_from should have failed");
         }
     }

@@ -8,7 +8,7 @@ use toml::ser::tables_last;
 use crate::error::NbugError;
 use crate::protocols::ProtocolNumber;
 
-enum IpPacket {
+pub enum IpPacket {
     V4(Ipv4Packet),
     V6(Ipv6Packet),
 }
@@ -71,7 +71,7 @@ impl TryFrom<u8> for ServiceType {
 }
 
 /// The IPv4 Packet header as specified in [RFC 791](https://tools.ietf.org/html/rfc791#section-3.1).
-struct Ipv4Packet {
+pub struct Ipv4Packet {
     header_length: u8,
 
     service_type: ServiceType,
@@ -180,10 +180,8 @@ impl TryFrom<&[u8]> for Ipv4Packet {
 }
 
 /// Ipv6 Packet Header as specified in [RFC 8200](https://tools.ietf.org/html/rfc8200#section-3).
-///
 /// todo: support for extension headers
-struct Ipv6Packet {
-    // todo: consider making enum
+pub struct Ipv6Packet {
     traffic_class: u8,
 
     flow_label: u32,
@@ -232,7 +230,7 @@ impl TryFrom<&[u8]> for Ipv6Packet {
             Some(protocol_num) => protocol_num,
             _ => {
                 return Err(NbugError::Packet(String::from(format!(
-                    "Invalid or unnasigned protocol number {}",
+                    "Invalid or unassigned protocol number {}",
                     data[6]
                 ))))
             },

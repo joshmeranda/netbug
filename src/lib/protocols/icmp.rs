@@ -14,9 +14,53 @@ enum IcmpPacket {
     V6(Icmpv6Packet),
 }
 
+/// Simple wrapper around an icmp echo and reply packet as defined in [RFC 4443 4.1](https://tools.ietf.org/html/rfc4443#section-4.1)
+/// and similarly in [RFC 794 pg 14](https://tools.ietf.org/html/rfc792#page-14)
+struct IcmpCommon {
+    checksum:   u16,
+    identifier: u16,
+    sequence:   u16,
+}
+
+impl TryFrom<&[u8]> for IcmpCommon {
+    type Error = NbugError;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        if data.len() < 6 {
+            return Err(NbugError::Packet(String::from(format!(
+                "Too few bytes, expected at least {}",
+                data.len()
+            ))));
+        }
+
+        let mut checksum_bytes = [0u8; 2];
+        checksum_bytes.copy_from_slice(&data[0..2]);
+        let checksum = u16::from_be_bytes(checksum_bytes);
+
+        let mut identifier_bytes = [0u8; 2];
+        identifier_bytes.copy_from_slice(&data[0..2]);
+        let identifier = u16::from_be_bytes(identifier_bytes);
+
+        let mut sequence_bytes = [0u8; 2];
+        sequence_bytes.copy_from_slice(&data[0..2]);
+        let sequence = u16::from_be_bytes(sequence_bytes);
+
+        Ok(IcmpCommon {
+            checksum,
+            identifier,
+            sequence,
+        })
+    }
+}
+
 mod icmpv4 {
+    use std::convert::{TryFrom, TryInto};
     use std::net::Ipv4Addr;
 
+    use num_traits::FromPrimitive;
+
+    use crate::error::NbugError;
+    use crate::protocols::icmp::IcmpCommon;
     use crate::protocols::ip::Ipv4Packet;
 
     /// Maps variants to icmp message types as defined in [RFC 792 Summary of Message Types](https://tools.ietf.org/html/rfc792#page-20)
@@ -35,86 +79,151 @@ mod icmpv4 {
         InformationReply = 16,
     }
 
+    struct IcmpTimestamp {
+        common: IcmpCommon,
+        original_timestamp: u32,
+        receive_timestamp: u32,
+        transmit_timestamp: u32,
+    }
+
+    impl TryFrom<&[u8]> for IcmpTimestamp {
+        type Error = NbugError;
+
+        fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+            if data.len() < 18 {
+                return Err(NbugError::Packet(String::from(format!(
+                    "Too few bytes, expected at least {}",
+                    data.len()
+                ))));
+            }
+
+            let common = IcmpCommon::try_from(data)?;
+
+            let mut original_bytes = [0u8; 4];
+            original_bytes.copy_from_slice(&data[6..10]);
+            let original_timestamp = u32::from_be_bytes(original_bytes);
+
+            let mut receive_bytes = [0u8; 4];
+            receive_bytes.copy_from_slice(&data[6..10]);
+            let receive_timestamp = u32::from_be_bytes(receive_bytes);
+
+            let mut transmit_bytes = [0u8; 4];
+            transmit_bytes.copy_from_slice(&data[6..10]);
+            let transmit_timestamp = u32::from_be_bytes(transmit_bytes);
+
+            Ok(IcmpTimestamp {
+                common,
+                original_timestamp,
+                receive_timestamp,
+                transmit_timestamp,
+            })
+        }
+    }
+
+    struct IcmpErrorPacket {
+        checksum:        u16,
+        internet_header: Ipv4Packet,
+    }
+
+    impl TryFrom<&[u8]> for IcmpErrorPacket {
+        type Error = NbugError;
+
+        fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+            let mut checksum_bytes = [0u8; 2];
+            checksum_bytes.copy_from_slice(&data[2..4]);
+            let checksum = u16::from_be_bytes(checksum_bytes);
+
+            let internet_header = Ipv4Packet::try_from(&data[8..])?;
+
+            Ok(IcmpErrorPacket {
+                checksum,
+                internet_header,
+            })
+        }
+    }
+
     /// Defines the variants of icmp v4 packets as defined in [RFC 792](https://tools.ietf.org/html/rfc792)
     pub enum Icmpv4Packet {
         /// Described in [RFC 792 Pg 14](https://tools.ietf.org/html/rfc792#page-14)
-        EchoReply {
-            checksum:        u16,
-            identifier:      u16,
-            sequence_number: u16,
-        },
+        EchoReply(IcmpCommon),
 
         /// Described in [RFC 792 Pg 4](https://tools.ietf.org/html/rfc792#page-4)
-        DestinationUnreachable {
-            checksum:        u16,
-            internet_header: Ipv4Packet,
-        },
+        DestinationUnreachable(IcmpErrorPacket),
 
         /// Described in [RFC 792 Pg 10](https://tools.ietf.org/html/rfc792#page-10)
-        SourceQuench {
-            checksum:        u16,
-            internet_header: Ipv4Packet,
-        },
+        SourceQuench(IcmpErrorPacket),
 
         /// Described in [RFC 792 Pg 12](https://tools.ietf.org/html/rfc792#page-12)
         Redirect {
-            checksum:        u16,
+            error:           IcmpErrorPacket,
             gateway_address: Ipv4Addr,
         },
 
         /// Described in [RFC 792 Pg 14](https://tools.ietf.org/html/rfc792#page-14)
-        EchoRequest {
-            checksum:        u16,
-            identifier:      u16,
-            sequence_number: u16,
-        },
+        EchoRequest(IcmpCommon),
 
         /// Described in [RFC 792 Pg 6](https://tools.ietf.org/html/rfc792#page-6)
-        TimeExceeded {
-            checksum:        u16,
-            internet_header: Ipv4Packet,
-        },
+        TimeExceeded(IcmpErrorPacket),
 
         /// Described in [RFC 792 Pg 8](https://tools.ietf.org/html/rfc792#page-8)
-        ParameterProblem {
-            checksum:        u16,
-            pointer:         u8,
-            internet_header: Ipv4Packet,
-        },
+        ParameterProblem { error: IcmpErrorPacket, pointer: u8 },
 
         /// Described in [RFC 792 Pg 16](https://tools.ietf.org/html/rfc792#page-16)
-        TimestampRequest {
-            checksum:           u16,
-            identifier:         u16,
-            sequence_number:    u16,
-            original_timestamp: u32,
-            receive_timestamp:  u32,
-            transmit_timestamp: u32,
-        },
+        TimestampRequest(IcmpTimestamp),
 
         /// Described in [RFC 792 Pg 16](https://tools.ietf.org/html/rfc792#page-16)
-        TimestampReply {
-            checksum:           u16,
-            identifier:         u16,
-            sequence_number:    u16,
-            original_timestamp: u32,
-            receive_timestamp:  u32,
-            transmit_timestamp: u32,
-        },
+        TimestampReply(IcmpTimestamp),
 
         /// Described in [RFC 792 Pg 16](https://tools.ietf.org/html/rfc792#page-18)
-        InformationRequest {
-            checksum:        u16,
-            identifier:      u16,
-            sequence_number: u16,
-        },
+        InformationRequest(IcmpCommon),
 
         /// Described in [RFC 792 Pg 16](https://tools.ietf.org/html/rfc792#page-18)
-        InformationReply {
-            checksum:        u16,
-            identifier:      u16,
-            sequence_number: u16,
-        },
+        InformationReply(IcmpCommon),
+    }
+
+    impl TryFrom<&[u8]> for Icmpv4Packet {
+        type Error = NbugError;
+
+        fn try_from(data: &[u8]) -> Result<Icmpv4Packet, Self::Error> {
+            let kind = if let Some(type_val) = FromPrimitive::from_u8(data[0]) {
+                type_val
+            } else {
+                return Err(NbugError::Packet(String::from(format!(
+                    "Invalid icmp message type value '{}'",
+                    data[0]
+                ))));
+            };
+
+            match kind {
+                Icmpv4MessageKind::EchoReply => Ok(Icmpv4Packet::EchoReply(IcmpCommon::try_from(data)?)),
+                Icmpv4MessageKind::DestinationUnreachable =>
+                    Ok(Icmpv4Packet::DestinationUnreachable(IcmpErrorPacket::try_from(data)?)),
+                Icmpv4MessageKind::SourceQuench => Ok(Icmpv4Packet::SourceQuench(IcmpErrorPacket::try_from(data)?)),
+                Icmpv4MessageKind::Redirect => {
+                    let error = IcmpErrorPacket::try_from(data)?;
+
+                    let mut gateway_bytes = [0u8; 4];
+                    gateway_bytes.copy_from_slice(&data[4..8]);
+                    let gateway_address = Ipv4Addr::from(gateway_bytes);
+
+                    Ok(Icmpv4Packet::Redirect { error, gateway_address })
+                },
+                Icmpv4MessageKind::EchoRequest => Ok(Icmpv4Packet::EchoRequest(IcmpCommon::try_from(data)?)),
+                Icmpv4MessageKind::TimeExceeded => Ok(Icmpv4Packet::TimeExceeded(IcmpErrorPacket::try_from(data)?)),
+                Icmpv4MessageKind::ParameterProblem => {
+                    let error = IcmpErrorPacket::try_from(data)?;
+                    let pointer = data[4];
+
+                    Ok(Icmpv4Packet::ParameterProblem { error, pointer })
+                },
+                Icmpv4MessageKind::TimestampRequest =>
+                    Ok(Icmpv4Packet::TimestampRequest(IcmpTimestamp::try_from(data)?)),
+                Icmpv4MessageKind::TimestampReply => Ok(Icmpv4Packet::TimestampReply(IcmpTimestamp::try_from(data)?)),
+                Icmpv4MessageKind::InformationRequest =>
+                    Ok(Icmpv4Packet::InformationRequest(IcmpCommon::try_from(data)?)),
+                Icmpv4MessageKind::InformationReply => Ok(Icmpv4Packet::InformationReply(IcmpCommon::try_from(data)?)),
+            }
+        }
     }
 }
 
@@ -124,6 +233,7 @@ mod icmpv6 {
     use num_traits::FromPrimitive;
 
     use crate::error::NbugError;
+    use crate::protocols::icmp::IcmpCommon;
 
     /// Map variants to icmp v6 message types as defined in [RFC 4443 2.1](https://tools.ietf.org/html/rfc4443#section-2.1).
     #[derive(FromPrimitive)]
@@ -170,21 +280,14 @@ mod icmpv6 {
         UnrecognizedOption = 2,
     }
 
-    /// Simple wrapper around an icmp echo and reply packet as defined in [RFC 4443 4.1](https://tools.ietf.org/html/rfc4443#section-4.1).
-    struct IcmpEcho {
-        checksum:   u16,
-        identifier: u16,
-        sequence:   u16,
-    }
-
     /// Defines icmp message types as defined in [RFC 4443](https://tools.ietf.org/html/rfc792)
     ///
     /// todo: figure out the invoking packet
     /// todo: support more message types
     pub enum Icmpv6Packet {
-        EchoRequest(IcmpEcho),
+        EchoRequest(IcmpCommon),
 
-        EchoReply(IcmpEcho),
+        EchoReply(IcmpCommon),
     }
 
     impl TryFrom<&[u8]> for Icmpv6Packet {
@@ -201,44 +304,13 @@ mod icmpv6 {
             };
 
             match kind {
-                Icmpv6MessageKind::EchoRequest => Ok(Icmpv6Packet::EchoRequest(IcmpEcho::try_from(data)?)),
-                Icmpv6MessageKind::EchoReply => Ok(Icmpv6Packet::EchoReply(IcmpEcho::try_from(data)?)),
+                Icmpv6MessageKind::EchoRequest => Ok(Icmpv6Packet::EchoRequest(IcmpCommon::try_from(data)?)),
+                Icmpv6MessageKind::EchoReply => Ok(Icmpv6Packet::EchoReply(IcmpCommon::try_from(data)?)),
                 _ => Err(NbugError::Packet(String::from(format!(
                     "unhandled message type '{}'",
                     data[0]
                 )))),
             }
-        }
-    }
-
-    impl TryFrom<&[u8]> for IcmpEcho {
-        type Error = NbugError;
-
-        fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-            if data.len() < 6 {
-                return Err(NbugError::Packet(String::from(format!(
-                    "Too few bytes, expected at least {}",
-                    data.len()
-                ))));
-            }
-
-            let mut checksum_bytes = [0u8; 2];
-            checksum_bytes.copy_from_slice(&data[0..2]);
-            let checksum = u16::from_be_bytes(checksum_bytes);
-
-            let mut identifier_bytes = [0u8; 2];
-            identifier_bytes.copy_from_slice(&data[0..2]);
-            let identifier = u16::from_be_bytes(identifier_bytes);
-
-            let mut sequence_bytes = [0u8; 2];
-            sequence_bytes.copy_from_slice(&data[0..2]);
-            let sequence = u16::from_be_bytes(sequence_bytes);
-
-            Ok(IcmpEcho {
-                checksum,
-                identifier,
-                sequence,
-            })
         }
     }
 }

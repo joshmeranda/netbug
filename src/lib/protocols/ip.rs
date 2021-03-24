@@ -143,12 +143,11 @@ impl TryFrom<&[u8]> for Ipv4Packet {
 
         let protocol = match FromPrimitive::from_u8(data[9]) {
             Some(protocol_num) => protocol_num,
-            _ => {
+            _ =>
                 return Err(NbugError::Packet(String::from(format!(
                     "Invalid or unnasigned protocol number {}",
                     data[9]
-                ))))
-            },
+                )))),
         };
 
         let mut checksum_bytes = [0u8; 2];
@@ -228,12 +227,11 @@ impl TryFrom<&[u8]> for Ipv6Packet {
 
         let next_header = match FromPrimitive::from_u8(data[6]) {
             Some(protocol_num) => protocol_num,
-            _ => {
+            _ =>
                 return Err(NbugError::Packet(String::from(format!(
                     "Invalid or unassigned protocol number {}",
                     data[6]
-                ))))
-            },
+                )))),
         };
 
         let hop_limit = data[7];

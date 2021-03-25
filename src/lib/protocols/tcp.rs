@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+
 use crate::error::NbugError;
 
 enum TcpControlBits {
@@ -77,7 +78,7 @@ impl TryFrom<&[u8]> for Tcp {
             control_bits,
             window,
             checksum,
-            urgent_pointer
+            urgent_pointer,
         })
     }
 }

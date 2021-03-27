@@ -6,7 +6,7 @@ use num_traits::FromPrimitive;
 use toml::ser::tables_last;
 
 use crate::error::NbugError;
-use crate::protocols::{ProtocolNumber, ProtocolPacket};
+use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
 pub enum IpPacket {
     V4(Ipv4Packet),
@@ -38,7 +38,7 @@ impl TryFrom<&[u8]> for IpPacket {
     }
 }
 
-impl ProtocolPacket for IpPacket {
+impl ProtocolPacketHeader for IpPacket {
     fn header_length(&self) -> usize {
         match self {
             IpPacket::V4(packet) => packet.header_length(),
@@ -203,7 +203,7 @@ impl TryFrom<&[u8]> for Ipv4Packet {
     }
 }
 
-impl ProtocolPacket for Ipv4Packet {
+impl ProtocolPacketHeader for Ipv4Packet {
     fn header_length(&self) -> usize { Self::MIN_BYTES }
 
     fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv4 }
@@ -287,7 +287,7 @@ impl TryFrom<&[u8]> for Ipv6Packet {
     }
 }
 
-impl ProtocolPacket for Ipv6Packet {
+impl ProtocolPacketHeader for Ipv6Packet {
     fn header_length(&self) -> usize { 40 }
 
     fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv6 }

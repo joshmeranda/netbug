@@ -8,14 +8,14 @@ use std::net::Ipv4Addr;
 use crate::error::NbugError;
 use crate::protocols::icmp::icmpv4::Icmpv4Packet;
 use crate::protocols::icmp::icmpv6::Icmpv6Packet;
-use crate::protocols::{ProtocolNumber, ProtocolPacket};
+use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
 enum IcmpPacket {
     V4(Icmpv4Packet),
     V6(Icmpv6Packet),
 }
 
-impl ProtocolPacket for IcmpPacket {
+impl ProtocolPacketHeader for IcmpPacket {
     fn header_length(&self) -> usize {
         match self {
             IcmpPacket::V4(packet) => packet.header_length(),
@@ -46,7 +46,7 @@ impl TryFrom<&[u8]> for IcmpCommon {
         if data.len() < 6 {
             return Err(NbugError::Packet(String::from(format!(
                 "Too few bytes, expected at least {}",
-                data.len()
+                6
             ))));
         }
 
@@ -79,28 +79,28 @@ mod icmpv4 {
     use crate::error::NbugError;
     use crate::protocols::icmp::IcmpCommon;
     use crate::protocols::ip::Ipv4Packet;
-    use crate::protocols::{ProtocolNumber, ProtocolPacket};
+    use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
     /// Maps variants to icmp message types as defined in [RFC 792 Summary of Message Types](https://tools.ietf.org/html/rfc792#page-20)
     #[derive(FromPrimitive)]
     enum Icmpv4MessageKind {
-        EchoReply = 0,
+        EchoReply          = 0,
         DestinationUnreachable = 3,
-        SourceQuench = 4,
-        Redirect  = 5,
-        EchoRequest = 8,
-        TimeExceeded = 11,
-        ParameterProblem = 12,
-        TimestampRequest = 13,
-        TimestampReply = 14,
+        SourceQuench       = 4,
+        Redirect           = 5,
+        EchoRequest        = 8,
+        TimeExceeded       = 11,
+        ParameterProblem   = 12,
+        TimestampRequest   = 13,
+        TimestampReply     = 14,
         InformationRequest = 15,
-        InformationReply = 16,
+        InformationReply   = 16,
     }
 
     struct IcmpTimestamp {
-        common: IcmpCommon,
+        common:             IcmpCommon,
         original_timestamp: u32,
-        receive_timestamp: u32,
+        receive_timestamp:  u32,
         transmit_timestamp: u32,
     }
 
@@ -111,7 +111,7 @@ mod icmpv4 {
             if data.len() < 18 {
                 return Err(NbugError::Packet(String::from(format!(
                     "Too few bytes, expected at least {}",
-                    data.len()
+                    18
                 ))));
             }
 
@@ -244,7 +244,7 @@ mod icmpv4 {
         }
     }
 
-    impl ProtocolPacket for Icmpv4Packet {
+    impl ProtocolPacketHeader for Icmpv4Packet {
         fn header_length(&self) -> usize {
             match self {
                 Icmpv4Packet::EchoReply(common)
@@ -275,21 +275,21 @@ mod icmpv6 {
 
     use crate::error::NbugError;
     use crate::protocols::icmp::IcmpCommon;
-    use crate::protocols::{ProtocolNumber, ProtocolPacket};
+    use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
     /// Map variants to icmp v6 message types as defined in [RFC 4443 2.1](https://tools.ietf.org/html/rfc4443#section-2.1).
     #[derive(FromPrimitive)]
     pub enum Icmpv6MessageKind {
         DestinationUnreachable = 1,
-        PacketTooBig = 2,
-        TimeExceeded = 3,
+        PacketTooBig     = 2,
+        TimeExceeded     = 3,
         ParameterProblem = 4,
         PrivateExperimentationError1 = 100,
         PrivateExperimentationError2 = 101,
         ReservedForErrorExpansion = 127,
 
-        EchoRequest = 128,
-        EchoReply = 129,
+        EchoRequest      = 128,
+        EchoReply        = 129,
         PrivateExperimentationInformational1 = 200,
         PrivateExperimentationInformational2 = 201,
         ReservedForInformationalExpansion = 255,
@@ -298,13 +298,13 @@ mod icmpv6 {
     /// As defined in [RFC 4443 Section 3.1](https://tools.ietf.org/html/rfc4443#section-3.1)
     #[derive(FromPrimitive)]
     enum DestinationUnreachableCode {
-        NoRoute    = 0,
-        Prohibited = 1,
-        BeyondScope = 2,
-        AddressUnreachable = 3,
-        PortUnreachable = 4,
+        NoRoute             = 0,
+        Prohibited          = 1,
+        BeyondScope         = 2,
+        AddressUnreachable  = 3,
+        PortUnreachable     = 4,
         FailedTrafficPolicy = 5,
-        RejectedRoute = 6,
+        RejectedRoute       = 6,
     }
 
     /// As defined in [RFC 443 Section 3.3](https://tools.ietf.org/html/rfc4443#section-3.3)
@@ -317,7 +317,7 @@ mod icmpv6 {
     /// As defined in [RFC 443 Section 3.4](https://tools.ietf.org/html/rfc4443#section-3.4)
     #[derive(FromPrimitive)]
     enum ParameterProblemCode {
-        ErroneousHeader = 0,
+        ErroneousHeader    = 0,
         UnrecognizedNextHeader = 1,
         UnrecognizedOption = 2,
     }
@@ -356,7 +356,7 @@ mod icmpv6 {
         }
     }
 
-    impl ProtocolPacket for Icmpv6Packet {
+    impl ProtocolPacketHeader for Icmpv6Packet {
         fn header_length(&self) -> usize { 6 }
 
         fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv6Icmp }

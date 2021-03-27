@@ -2,7 +2,7 @@ use std::cmp;
 use std::convert::TryFrom;
 
 use crate::error::{NbugError, Result};
-use crate::protocols::{ProtocolNumber, ProtocolPacket};
+use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
 /// An ethernet packet, conforming to either IEE 802.2 or 802.3.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -12,7 +12,6 @@ pub enum IeeEthernetPacket {
 }
 
 impl IeeEthernetPacket {
-    const PREAMBLE_BYTES: usize = 8;
     const MAC_BYTES: usize = 6;
     const LENGTH_BYTES: usize = 2;
 }
@@ -29,7 +28,7 @@ impl TryFrom<&[u8]> for IeeEthernetPacket {
     type Error = NbugError;
 
     fn try_from(data: &[u8]) -> Result<IeeEthernetPacket> {
-        let length_bytes: [u8; 2] = [data[20], data[21]];
+        let length_bytes: [u8; 2] = [data[12], data[13]];
         let length = u16::from_be_bytes(length_bytes);
 
         if length > 1500 {
@@ -58,7 +57,7 @@ impl PartialEq<Ethernet3Packet> for IeeEthernetPacket {
     }
 }
 
-impl ProtocolPacket for IeeEthernetPacket {
+impl ProtocolPacketHeader for IeeEthernetPacket {
     fn header_length(&self) -> usize {
         match self {
             IeeEthernetPacket::Ieee8022(packet) => packet.header_length(),
@@ -87,8 +86,7 @@ pub struct Ethernet2Packet {
 impl Ethernet2Packet {
     /// The minimum amount of bytes of data necessary to deserialize an
     /// [Ethernet2] using [try_from].
-    const MIN_BYTES: usize =
-        IeeEthernetPacket::PREAMBLE_BYTES + IeeEthernetPacket::MAC_BYTES * 2 + IeeEthernetPacket::LENGTH_BYTES;
+    const MIN_BYTES: usize = IeeEthernetPacket::MAC_BYTES * 2 + IeeEthernetPacket::LENGTH_BYTES;
 
     pub fn new(destination: [u8; 6], source: [u8; 6], protocol: ProtocolNumber) -> Ethernet2Packet {
         Ethernet2Packet {
@@ -120,16 +118,15 @@ impl TryFrom<&[u8]> for Ethernet2Packet {
                 Self::MIN_BYTES
             )));
         }
-        let n = Self::MIN_BYTES;
 
         let mut destination = [0u8; 6];
         let mut source = [0u8; 6];
 
-        destination.copy_from_slice(&data[8..14]);
-        source.copy_from_slice(&data[14..20]);
+        destination.copy_from_slice(&data[0..6]);
+        source.copy_from_slice(&data[6..12]);
 
         let mut protocol_bytes = [0u8; 2];
-        protocol_bytes.copy_from_slice(&data[20..22]);
+        protocol_bytes.copy_from_slice(&data[12..14]);
 
         let protocol = Ethernet2Packet::ethernet_from_u16(u16::from_be_bytes(protocol_bytes))?;
 
@@ -147,7 +144,7 @@ impl PartialEq<Ethernet2Packet> for Ethernet2Packet {
     }
 }
 
-impl ProtocolPacket for Ethernet2Packet {
+impl ProtocolPacketHeader for Ethernet2Packet {
     fn header_length(&self) -> usize { Self::MIN_BYTES }
 
     fn protocol_type(&self) -> ProtocolNumber {
@@ -159,7 +156,7 @@ impl ProtocolPacket for Ethernet2Packet {
 
 /// The ethernet packet for IEE 802.3
 #[derive(Copy, Clone, Debug, Eq)]
-struct Ethernet3Packet {
+pub struct Ethernet3Packet {
     destination: [u8; 6],
 
     source: [u8; 6],
@@ -173,8 +170,7 @@ impl Ethernet3Packet {
     const MIN_DATA_BYTES: usize = 46;
     const FRAME_CHECK_SEQUENCE_BYTES: usize = 4;
 
-    const MIN_BYTES: usize = IeeEthernetPacket::PREAMBLE_BYTES
-        + IeeEthernetPacket::MAC_BYTES * 2
+    const MIN_BYTES: usize = IeeEthernetPacket::MAC_BYTES * 2
         + IeeEthernetPacket::LENGTH_BYTES
         + Self::MIN_DATA_BYTES
         + Self::FRAME_CHECK_SEQUENCE_BYTES;
@@ -203,11 +199,11 @@ impl TryFrom<&[u8]> for Ethernet3Packet {
         let mut destination = [0u8; 6];
         let mut source = [0u8; 6];
 
-        destination.copy_from_slice(&data[8..14]);
-        source.copy_from_slice(&data[14..20]);
+        destination.copy_from_slice(&data[0..6]);
+        source.copy_from_slice(&data[6..12]);
 
         let mut protocol_bytes = [0u8; 2];
-        protocol_bytes.copy_from_slice(&data[20..22]);
+        protocol_bytes.copy_from_slice(&data[12..14]);
 
         // todo: cover more protocol
         let length = u16::from_be_bytes(protocol_bytes) as usize;
@@ -225,13 +221,10 @@ impl TryFrom<&[u8]> for Ethernet3Packet {
             )));
         }
 
-        let fcs_offset = IeeEthernetPacket::PREAMBLE_BYTES
-            + IeeEthernetPacket::MAC_BYTES * 2
+        let fcs_offset = IeeEthernetPacket::MAC_BYTES * 2
             + IeeEthernetPacket::LENGTH_BYTES
             + length
             + padding;
-
-        let n = IeeEthernetPacket::PREAMBLE_BYTES + IeeEthernetPacket::MAC_BYTES * 2 + IeeEthernetPacket::LENGTH_BYTES;
 
         let mut fcs_bytes = [0u8; 4];
         fcs_bytes.copy_from_slice(&data[fcs_offset..fcs_offset + 4]);
@@ -255,7 +248,7 @@ impl PartialEq<Ethernet3Packet> for Ethernet3Packet {
     }
 }
 
-impl ProtocolPacket for Ethernet3Packet {
+impl ProtocolPacketHeader for Ethernet3Packet {
     fn header_length(&self) -> usize { Self::MIN_BYTES }
 
     fn protocol_type(&self) -> ProtocolNumber {
@@ -275,7 +268,6 @@ mod test {
     #[test]
     fn iee_ethernet2_from_raw_ok() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, 0, // preamble
             0, 1, 2, 3, 4, 5, // destination MAC
             5, 4, 3, 2, 1, 0, // source MAC
             0x08, 0x_00, // type (Iv4)
@@ -294,7 +286,6 @@ mod test {
     #[test]
     fn iee_ethernet3_from_raw_ok() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, 0, // preamble
             0, 1, 2, 3, 4, 5, // destination MAC
             5, 4, 3, 2, 1, 0, // source MAC
             0, 24, // length
@@ -312,7 +303,6 @@ mod test {
     #[test]
     fn ethernet2_from_raw_ok() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, 0, // preamble
             0, 1, 2, 3, 4, 5, // destination MAC
             5, 4, 3, 2, 1, 0, // source MAC
             0x08, 0x_00, // type (Iv4)
@@ -327,8 +317,7 @@ mod test {
     #[test]
     fn ethernet2_from_raw_too_small() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, // preamble (1 byte too small)
-            0, 1, 2, 3, 4, 5, // destination MAC
+            0, 1, 2, 3, 4, // destination MAC (too small)
             5, 4, 3, 2, 1, 0, // source MAC
             0x08, 0x_00, // type (Iv4)
         ];
@@ -341,7 +330,6 @@ mod test {
     #[test]
     fn ethernet3_from_raw_empty_payload_ok() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, 0, // preamble
             0, 1, 2, 3, 4, 5, // destination MAC
             5, 4, 3, 2, 1, 0, // source MAC
             0, 0, // length
@@ -359,7 +347,6 @@ mod test {
     #[test]
     fn ethernet3_from_raw_half_full_ok() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, 0, // preamble
             0, 1, 2, 3, 4, 5, // destination MAC
             5, 4, 3, 2, 1, 0, // source MAC
             0, 24, // length
@@ -377,7 +364,6 @@ mod test {
     #[test]
     fn ethernet3_from_raw_exactly_full_ok() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, 0, // preamble
             0, 1, 2, 3, 4, 5, // destination MAC
             5, 4, 3, 2, 1, 0, // source MAC
             0, 46, // length
@@ -395,7 +381,6 @@ mod test {
     #[test]
     fn ethernet3_from_raw_overfull_payload_ok() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, 0, // preamble
             0, 1, 2, 3, 4, 5, // destination MAC
             5, 4, 3, 2, 1, 0, // source MAC
             0, 48, // length
@@ -413,8 +398,7 @@ mod test {
     #[test]
     fn ethernet_from_raw_too_small() {
         let raw: &[u8] = &[
-            0, 0, 0, 0, 0, 0, 0, // preamble (1 bytes too small)
-            0, 1, 2, 3, 4, 5, // destination MAC
+            0, 1, 2, 3, 4, // destination MAC (too small)
             5, 4, 3, 2, 1, 0, // source MAC
             0, 0, // length
             0, 0, 0, 0, 0, 0, 0, 0, // payload data

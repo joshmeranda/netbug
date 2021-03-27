@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
-use crate::protocols::{ProtocolNumber, ProtocolPacket};
+use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
 enum TcpControlBits {
     Urg = 0b00_100000,
@@ -84,7 +84,7 @@ impl TryFrom<&[u8]> for Tcp {
     }
 }
 
-impl ProtocolPacket for Tcp {
+impl ProtocolPacketHeader for Tcp {
     fn header_length(&self) -> usize { 24 }
 
     fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Tcp }

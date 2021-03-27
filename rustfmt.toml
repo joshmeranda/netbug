@@ -13,8 +13,8 @@ max_width = 120
 imports_granularity = "Module"
 group_imports = "StdExternalCrate"
 
-struct_field_align_threshold = 10
-enum_discrim_align_threshold = 10
+struct_field_align_threshold = 20
+enum_discrim_align_threshold = 20
 
 use_field_init_shorthand = true
 

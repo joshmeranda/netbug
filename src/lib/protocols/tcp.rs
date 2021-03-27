@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 enum TcpControlBits {
     Urg = 0b00_100000,
@@ -81,4 +82,10 @@ impl TryFrom<&[u8]> for Tcp {
             urgent_pointer,
         })
     }
+}
+
+impl ProtocolPacket for Tcp {
+    fn header_length(&self) -> usize { 24 }
+
+    fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Tcp }
 }

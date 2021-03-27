@@ -8,10 +8,27 @@ use std::net::Ipv4Addr;
 use crate::error::NbugError;
 use crate::protocols::icmp::icmpv4::Icmpv4Packet;
 use crate::protocols::icmp::icmpv6::Icmpv6Packet;
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 enum IcmpPacket {
     V4(Icmpv4Packet),
     V6(Icmpv6Packet),
+}
+
+impl ProtocolPacket for IcmpPacket {
+    fn header_length(&self) -> usize {
+        match self {
+            IcmpPacket::V4(packet) => packet.header_length(),
+            IcmpPacket::V6(packet) => packet.header_length(),
+        }
+    }
+
+    fn protocol_type(&self) -> ProtocolNumber {
+        match self {
+            IcmpPacket::V4(packet) => packet.protocol_type(),
+            IcmpPacket::V6(packet) => packet.protocol_type(),
+        }
+    }
 }
 
 /// Simple wrapper around an icmp echo and reply packet as defined in [RFC 4443 4.1](https://tools.ietf.org/html/rfc4443#section-4.1)
@@ -62,6 +79,7 @@ mod icmpv4 {
     use crate::error::NbugError;
     use crate::protocols::icmp::IcmpCommon;
     use crate::protocols::ip::Ipv4Packet;
+    use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
     /// Maps variants to icmp message types as defined in [RFC 792 Summary of Message Types](https://tools.ietf.org/html/rfc792#page-20)
     #[derive(FromPrimitive)]
@@ -225,6 +243,29 @@ mod icmpv4 {
             }
         }
     }
+
+    impl ProtocolPacket for Icmpv4Packet {
+        fn header_length(&self) -> usize {
+            match self {
+                Icmpv4Packet::EchoReply(common)
+                | Icmpv4Packet::EchoRequest(common)
+                | Icmpv4Packet::InformationRequest(common)
+                | Icmpv4Packet::InformationReply(common) => 6,
+
+                Icmpv4Packet::DestinationUnreachable(error)
+                | Icmpv4Packet::SourceQuench(error)
+                | Icmpv4Packet::TimeExceeded(error) => 2 + error.internet_header.header_length(),
+
+                Icmpv4Packet::TimestampRequest(timestamp) | Icmpv4Packet::TimestampReply(timestamp) => 6 + 12,
+
+                Icmpv4Packet::ParameterProblem { error, pointer } => 2 + error.internet_header.header_length() + 1,
+
+                Icmpv4Packet::Redirect { error, gateway_address } => 2 + error.internet_header.header_length() + 4,
+            }
+        }
+
+        fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Icmp }
+    }
 }
 
 mod icmpv6 {
@@ -234,6 +275,7 @@ mod icmpv6 {
 
     use crate::error::NbugError;
     use crate::protocols::icmp::IcmpCommon;
+    use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
     /// Map variants to icmp v6 message types as defined in [RFC 4443 2.1](https://tools.ietf.org/html/rfc4443#section-2.1).
     #[derive(FromPrimitive)]
@@ -312,5 +354,11 @@ mod icmpv6 {
                 )))),
             }
         }
+    }
+
+    impl ProtocolPacket for Icmpv6Packet {
+        fn header_length(&self) -> usize { 6 }
+
+        fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv6Icmp }
     }
 }

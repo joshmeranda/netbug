@@ -171,9 +171,6 @@ trait ProtocolPacket {
     /// Retrieve the total length of the packet header
     fn header_length(&self) -> usize;
 
-    /// Return the total length of the packet header and data.
-    fn length(&self) -> usize;
-
     /// Get the [ProtocolNumber] associated with the protocol packet.
     fn protocol_type(&self) -> ProtocolNumber;
 }

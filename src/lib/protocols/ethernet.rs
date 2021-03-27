@@ -2,7 +2,7 @@ use std::cmp;
 use std::convert::TryFrom;
 
 use crate::error::{NbugError, Result};
-use crate::protocols::ProtocolNumber;
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 /// An ethernet packet, conforming to either IEE 802.2 or 802.3.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -54,6 +54,22 @@ impl PartialEq<Ethernet3Packet> for IeeEthernetPacket {
         match self {
             IeeEthernetPacket::Ieee8022(_) => false,
             IeeEthernetPacket::Ieee8023(ethernet) => ethernet == other,
+        }
+    }
+}
+
+impl ProtocolPacket for IeeEthernetPacket {
+    fn header_length(&self) -> usize {
+        match self {
+            IeeEthernetPacket::Ieee8022(packet) => packet.header_length(),
+            IeeEthernetPacket::Ieee8023(packet) => packet.header_length(),
+        }
+    }
+
+    fn protocol_type(&self) -> ProtocolNumber {
+        match self {
+            IeeEthernetPacket::Ieee8022(packet) => packet.protocol_type(),
+            IeeEthernetPacket::Ieee8023(packet) => packet.protocol_type(),
         }
     }
 }
@@ -128,6 +144,16 @@ impl TryFrom<&[u8]> for Ethernet2Packet {
 impl PartialEq<Ethernet2Packet> for Ethernet2Packet {
     fn eq(&self, other: &Ethernet2Packet) -> bool {
         self.destination == other.destination && self.source == other.source && self.protocol == other.protocol
+    }
+}
+
+impl ProtocolPacket for Ethernet2Packet {
+    fn header_length(&self) -> usize { Self::MIN_BYTES }
+
+    fn protocol_type(&self) -> ProtocolNumber {
+        ProtocolNumber::Ethernet // todo: this is a temporary value which is
+                                 // VERY wrong until a
+                                 //   better fix can be implemented
     }
 }
 
@@ -226,6 +252,16 @@ impl PartialEq<Ethernet3Packet> for Ethernet3Packet {
             && self.source == other.source
             && self.length == other.length
             && self.frame_check_sequence == other.frame_check_sequence
+    }
+}
+
+impl ProtocolPacket for Ethernet3Packet {
+    fn header_length(&self) -> usize { Self::MIN_BYTES }
+
+    fn protocol_type(&self) -> ProtocolNumber {
+        ProtocolNumber::Ethernet // todo: this is a temporary value which is
+                                 //   VERY wrong until a better fix can be
+                                 //   implemented
     }
 }
 

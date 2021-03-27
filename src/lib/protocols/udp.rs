@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 /// The UDP Packet a s specified in [RFC 768](https://tools.ietf.org/html/rfc768).
 struct Udp {
@@ -40,4 +41,10 @@ impl TryFrom<&[u8]> for Udp {
             checksum,
         })
     }
+}
+
+impl ProtocolPacket for Udp {
+    fn header_length(&self) -> usize { 8 }
+
+    fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Udp }
 }

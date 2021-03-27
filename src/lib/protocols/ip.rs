@@ -6,7 +6,7 @@ use num_traits::FromPrimitive;
 use toml::ser::tables_last;
 
 use crate::error::NbugError;
-use crate::protocols::ProtocolNumber;
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 pub enum IpPacket {
     V4(Ipv4Packet),
@@ -34,6 +34,22 @@ impl TryFrom<&[u8]> for IpPacket {
                 "Invalid Ip packet version number '{}'",
                 version
             )))),
+        }
+    }
+}
+
+impl ProtocolPacket for IpPacket {
+    fn header_length(&self) -> usize {
+        match self {
+            IpPacket::V4(packet) => packet.header_length(),
+            IpPacket::V6(packet) => packet.header_length(),
+        }
+    }
+
+    fn protocol_type(&self) -> ProtocolNumber {
+        match self {
+            IpPacket::V4(packet) => packet.protocol_type(),
+            IpPacket::V6(packet) => packet.protocol_type(),
         }
     }
 }
@@ -96,6 +112,8 @@ pub struct Ipv4Packet {
 }
 
 impl Ipv4Packet {
+    /// Minimum amount of bytes required to parse a full [Ipv4Packet], this
+    /// value is the same length as a packet with no options.
     const MIN_BYTES: usize = 48 // main header data
         + 1                     // minimum no options packet
         + 15; // padding to ensure alignment on 32 byte boundary
@@ -110,7 +128,7 @@ impl TryFrom<&[u8]> for Ipv4Packet {
                 "Too few bytes, expected at least {}",
                 Ipv4Packet::MIN_BYTES
             ))));
-        }
+        };
 
         let version = data[0] >> 4;
 
@@ -122,6 +140,13 @@ impl TryFrom<&[u8]> for Ipv4Packet {
         }
 
         let header_length = data[0] & 0xF;
+
+        if header_length as usize != Ipv4Packet::MIN_BYTES {
+            return Err(NbugError::Packet(String::from(format!(
+                "Ipv4 options are not yet supported"
+            ))));
+        }
+
         let service_type = ServiceType::try_from(data[1])?;
 
         let mut total_length_bytes = [0u8; 2];
@@ -145,7 +170,7 @@ impl TryFrom<&[u8]> for Ipv4Packet {
             Some(protocol_num) => protocol_num,
             _ =>
                 return Err(NbugError::Packet(String::from(format!(
-                    "Invalid or unnasigned protocol number {}",
+                    "Invalid or unassigned protocol number {}",
                     data[9]
                 )))),
         };
@@ -176,6 +201,12 @@ impl TryFrom<&[u8]> for Ipv4Packet {
             destination,
         })
     }
+}
+
+impl ProtocolPacket for Ipv4Packet {
+    fn header_length(&self) -> usize { Self::MIN_BYTES }
+
+    fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv4 }
 }
 
 /// Ipv6 Packet Header as specified in [RFC 8200](https://tools.ietf.org/html/rfc8200#section-3).
@@ -254,4 +285,10 @@ impl TryFrom<&[u8]> for Ipv6Packet {
             destination,
         })
     }
+}
+
+impl ProtocolPacket for Ipv6Packet {
+    fn header_length(&self) -> usize { 40 }
+
+    fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv6 }
 }

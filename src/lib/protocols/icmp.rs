@@ -10,7 +10,24 @@ use crate::protocols::icmp::icmpv4::Icmpv4Packet;
 use crate::protocols::icmp::icmpv6::Icmpv6Packet;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
-enum IcmpPacket {
+/// Simple wrapper around icmp types. Since neither icmp version 4 or 6 provide a method for
+/// asserting the version beyond the type used in the internet header, they must be parsed
+/// separately before being wrapped into this enum.
+///
+/// # Examples
+/// ```
+/// use netbug::protocols::icmp::icmpv6::Icmpv6Packet;
+/// use netbug::protocols::icmp::icmpv4::Icmpv4Packet;
+/// use netbug::protocols::icmp::IcmpPacket;
+/// use std::convert::TryFrom;
+///
+/// let data4: &[u8] = &[0x08, 0x00, 0x72, 0x0e, 0x00, 0x0e, 0x00, 0x01, 0x1b, 0x77, 0x47, 0x60, 0x00, 0x00, 0x00, 0x00];
+/// let data6: &[u8] = &[0x80, 0x00, 0x00, 0xa5, 0x00, 0x0d, 0x00, 0x01];
+///
+/// let icmp4 = IcmpPacket::V4(Icmpv4Packet::try_from(data4).unwrap());
+/// let icmp6 = IcmpPacket::V6(Icmpv6Packet::try_from(data6).unwrap());
+/// ```
+pub enum IcmpPacket {
     V4(Icmpv4Packet),
     V6(Icmpv6Packet),
 }
@@ -33,7 +50,7 @@ impl ProtocolPacketHeader for IcmpPacket {
 
 /// Simple wrapper around an icmp echo and reply packet as defined in [RFC 4443 4.1](https://tools.ietf.org/html/rfc4443#section-4.1)
 /// and similarly in [RFC 794 pg 14](https://tools.ietf.org/html/rfc792#page-14)
-struct IcmpCommon {
+pub struct IcmpCommon {
     checksum:   u16,
     identifier: u16,
     sequence:   u16,
@@ -70,7 +87,7 @@ impl TryFrom<&[u8]> for IcmpCommon {
     }
 }
 
-mod icmpv4 {
+pub mod icmpv4 {
     use std::convert::{TryFrom, TryInto};
     use std::net::Ipv4Addr;
 
@@ -83,7 +100,7 @@ mod icmpv4 {
 
     /// Maps variants to icmp message types as defined in [RFC 792 Summary of Message Types](https://tools.ietf.org/html/rfc792#page-20)
     #[derive(FromPrimitive)]
-    enum Icmpv4MessageKind {
+    pub enum Icmpv4MessageKind {
         EchoReply          = 0,
         DestinationUnreachable = 3,
         SourceQuench       = 4,
@@ -97,7 +114,7 @@ mod icmpv4 {
         InformationReply   = 16,
     }
 
-    struct IcmpTimestamp {
+    pub struct IcmpTimestamp {
         common:             IcmpCommon,
         original_timestamp: u32,
         receive_timestamp:  u32,
@@ -138,7 +155,7 @@ mod icmpv4 {
         }
     }
 
-    struct IcmpErrorPacket {
+    pub struct IcmpErrorPacket {
         checksum:        u16,
         internet_header: Ipv4Packet,
     }
@@ -203,14 +220,8 @@ mod icmpv4 {
         type Error = NbugError;
 
         fn try_from(data: &[u8]) -> Result<Icmpv4Packet, Self::Error> {
-            let kind = if let Some(type_val) = FromPrimitive::from_u8(data[0]) {
-                type_val
-            } else {
-                return Err(NbugError::Packet(String::from(format!(
-                    "Invalid icmp message type value '{}'",
-                    data[0]
-                ))));
-            };
+            let kind =
+                FromPrimitive::from_u8(data[0]).expect(&*format!("Invalid icmp message type value '{}'", data[0]));
 
             match kind {
                 Icmpv4MessageKind::EchoReply => Ok(Icmpv4Packet::EchoReply(IcmpCommon::try_from(data)?)),
@@ -268,7 +279,7 @@ mod icmpv4 {
     }
 }
 
-mod icmpv6 {
+pub mod icmpv6 {
     use std::convert::TryFrom;
 
     use num_traits::FromPrimitive;
@@ -297,7 +308,7 @@ mod icmpv6 {
 
     /// As defined in [RFC 4443 Section 3.1](https://tools.ietf.org/html/rfc4443#section-3.1)
     #[derive(FromPrimitive)]
-    enum DestinationUnreachableCode {
+    pub enum DestinationUnreachableCode {
         NoRoute             = 0,
         Prohibited          = 1,
         BeyondScope         = 2,
@@ -309,14 +320,14 @@ mod icmpv6 {
 
     /// As defined in [RFC 443 Section 3.3](https://tools.ietf.org/html/rfc4443#section-3.3)
     #[derive(FromPrimitive)]
-    enum TimeExceededCode {
+    pub enum TimeExceededCode {
         HopLimitExceeded = 0,
         FragmentReassemblyExceeded = 1,
     }
 
     /// As defined in [RFC 443 Section 3.4](https://tools.ietf.org/html/rfc4443#section-3.4)
     #[derive(FromPrimitive)]
-    enum ParameterProblemCode {
+    pub enum ParameterProblemCode {
         ErroneousHeader    = 0,
         UnrecognizedNextHeader = 1,
         UnrecognizedOption = 2,
@@ -336,14 +347,8 @@ mod icmpv6 {
         type Error = NbugError;
 
         fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-            let kind = if let Some(type_val) = FromPrimitive::from_u8(data[0]) {
-                type_val
-            } else {
-                return Err(NbugError::Packet(String::from(format!(
-                    "Invalid icmp message type value '{}'",
-                    data[0]
-                ))));
-            };
+            let kind =
+                FromPrimitive::from_u8(data[0]).expect(&*format!("Invalid icmp message type value '{}'", data[0]));
 
             match kind {
                 Icmpv6MessageKind::EchoRequest => Ok(Icmpv6Packet::EchoRequest(IcmpCommon::try_from(data)?)),
@@ -362,3 +367,4 @@ mod icmpv6 {
         fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv6Icmp }
     }
 }
+

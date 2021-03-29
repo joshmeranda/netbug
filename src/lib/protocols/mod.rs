@@ -167,7 +167,7 @@ pub enum ProtocolNumber {
 
 /// Trait for structs representing a packet for one of the protocols specified
 /// by [ProtocolType]
-trait ProtocolPacketHeader {
+pub trait ProtocolPacketHeader {
     /// Retrieve the total length of the packet header
     fn header_length(&self) -> usize;
 

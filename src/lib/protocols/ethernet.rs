@@ -76,11 +76,11 @@ impl ProtocolPacketHeader for IeeEthernetPacket {
 /// The ethernet packet for IEE 802.2true.
 #[derive(Copy, Clone, Debug, Eq)]
 pub struct Ethernet2Packet {
-    destination: [u8; 6],
+    pub destination: [u8; 6],
 
-    source: [u8; 6],
+    pub source: [u8; 6],
 
-    protocol: ProtocolNumber,
+    pub protocol: ProtocolNumber,
 }
 
 impl Ethernet2Packet {
@@ -157,11 +157,11 @@ impl ProtocolPacketHeader for Ethernet2Packet {
 /// The ethernet packet for IEE 802.3
 #[derive(Copy, Clone, Debug, Eq)]
 pub struct Ethernet3Packet {
-    destination: [u8; 6],
+    pub destination: [u8; 6],
 
-    source: [u8; 6],
+    pub source: [u8; 6],
 
-    length: usize,
+    pub length: usize,
 
     frame_check_sequence: u32,
 }
@@ -221,10 +221,7 @@ impl TryFrom<&[u8]> for Ethernet3Packet {
             )));
         }
 
-        let fcs_offset = IeeEthernetPacket::MAC_BYTES * 2
-            + IeeEthernetPacket::LENGTH_BYTES
-            + length
-            + padding;
+        let fcs_offset = IeeEthernetPacket::MAC_BYTES * 2 + IeeEthernetPacket::LENGTH_BYTES + length + padding;
 
         let mut fcs_bytes = [0u8; 4];
         fcs_bytes.copy_from_slice(&data[fcs_offset..fcs_offset + 4]);

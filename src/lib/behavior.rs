@@ -21,7 +21,7 @@ enum BehaviorProtocol {
 /// # Example
 /// For a Tcp connection's 3-way-handshake:
 ///  - In: Will always fail because no Ack will be received without the initial
-///    Syn
+///        Syn
 ///  - Out: Will fail if the client receives and Ack for its Syn
 ///  - Both: Will fail if one part of the handshake is not received
 #[derive(Deserialize)]

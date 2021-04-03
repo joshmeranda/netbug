@@ -10,9 +10,9 @@ use crate::protocols::icmp::icmpv4::Icmpv4Packet;
 use crate::protocols::icmp::icmpv6::Icmpv6Packet;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
-/// Simple wrapper around icmp types. Since neither icmp version 4 or 6 provide a method for
-/// asserting the version beyond the type used in the internet header, they must be parsed
-/// separately before being wrapped into this enum.
+/// Simple wrapper around icmp types. Since neither icmp version 4 or 6 provide
+/// a method for asserting the version beyond the type used in the internet
+/// header, they must be parsed separately before being wrapped into this enum.
 ///
 /// # Examples
 /// ```
@@ -367,4 +367,3 @@ pub mod icmpv6 {
         fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv6Icmp }
     }
 }
-

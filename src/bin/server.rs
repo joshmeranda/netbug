@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use netbug::analysis::PcapProcessor;
 use netbug::config::server::ServerConfig;
 use netbug::server::Server;
 

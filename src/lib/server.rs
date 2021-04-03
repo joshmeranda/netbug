@@ -1,12 +1,17 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
+use pcap::Capture;
+
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
 use crate::error::{NbugError, Result};
+use crate::protocols::ethernet::IeeEthernetPacket;
+use crate::protocols::ip::IpPacket;
+use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 use crate::{BUFFER_SIZE, HEADER_LENGTH};
 
 pub struct Server {
@@ -118,6 +123,47 @@ impl Server {
             remaining_bytes -= byte_count;
 
             pcap_file.write(&buffer[0..byte_count])?;
+        }
+
+        Ok(())
+    }
+
+    pub fn process(&self) -> Result<()> {
+        for entry in fs::read_dir(&self.pcap_dir)? {
+            let child = entry?;
+
+            if child.file_type()?.is_dir() {
+                for sub_entry in fs::read_dir(child.path())? {
+                    self.process_pcap(sub_entry?.path());
+                }
+            } else {
+                self.process_pcap(child.path());
+            };
+        }
+
+        Ok(())
+    }
+
+    fn process_pcap(&self, path: PathBuf) -> Result<()> {
+        println!("{}", &path.to_str().unwrap());
+        let mut capture = Capture::from_file(path)?;
+
+        while let Ok(packet) = capture.next() {
+            let ethernet = IeeEthernetPacket::try_from(packet.data)?;
+            let ip = IpPacket::try_from(&packet.data[ethernet.header_length()..])?;
+
+            let protocol = match &ip {
+                IpPacket::V4(packet) => packet.protocol,
+                IpPacket::V6(packet) => packet.next_header,
+            };
+
+            match protocol {
+                ProtocolNumber::Icmp => println!("icmp"),
+                ProtocolNumber::Ipv6Icmp => println!("icmp6"),
+                ProtocolNumber::Tcp => println!("tcp"),
+                ProtocolNumber::Udp => println!("udp"),
+                _ => println!("else: {}", ip.protocol_type() as u8),
+            };
         }
 
         Ok(())

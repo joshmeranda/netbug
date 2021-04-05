@@ -2,6 +2,7 @@ use std::convert::TryFrom;
 
 use crate::error::NbugError;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
+use std::collections::HashMap;
 
 enum TcpControlBits {
     Urg = 0b00_100000,
@@ -31,6 +32,14 @@ struct Tcp {
     checksum: u16,
 
     urgent_pointer: u16,
+}
+
+impl <'a> Tcp {
+    const CONTROL_BITS: &'a str = "CONTROL_BITS";
+
+    const SEQUENCE_NUMBER: &'a str = "SEQUENCE_NUMBER";
+
+    const ACKNOWLEDGEMENT_NUMBER: &'a str = "ACKNOWLEDGEMENT_NUMBER";
 }
 
 impl TryFrom<&[u8]> for Tcp {
@@ -88,4 +97,12 @@ impl ProtocolPacketHeader for Tcp {
     fn header_length(&self) -> usize { 24 }
 
     fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Tcp }
+
+    fn header_data(&self) -> Option<HashMap<&str, u64>> {
+        let mut map = HashMap::new();
+
+        map.insert(Tcp::CONTROL_BITS, self.control_bits as u64);
+
+        Some(map)
+    }
 }

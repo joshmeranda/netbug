@@ -1,9 +1,10 @@
-use std::net::{Shutdown, SocketAddr, TcpStream, UdpSocket};
+use std::net::{Shutdown, SocketAddr, TcpStream, UdpSocket, IpAddr};
 use std::process::Command;
 use std::str::FromStr;
 use std::time::Duration;
 
 use crate::error::Result;
+use crate::protocols::ProtocolPacketHeader;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -39,6 +40,8 @@ impl Default for Direction {
 /// A basic behavior to emulate the type of traffic
 #[derive(Deserialize)]
 pub struct Behavior {
+    src: Option<String>,
+
     dst: String,
 
     #[serde(rename = "protocol")]
@@ -97,5 +100,10 @@ impl Behavior {
         };
 
         Ok(())
+    }
+
+    /// Determine if a list off packet headers satisfies the expected behavior.
+    pub fn passed<'a>(&self, _headers: Vec<&'a dyn ProtocolPacketHeader>) {
+        todo!()
     }
 }

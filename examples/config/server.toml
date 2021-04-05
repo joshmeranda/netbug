@@ -10,3 +10,17 @@ protocol = "icmp"
 dst = "8.8.8.8"
 protocol = "icmp"
 command = ["/usr/bin/ping", "-c", "1", "8.8.8.8"]
+
+# expectedd behaviors are specified same as done in the client; however, a
+# source is not required. While a command can be specified for each behavior,
+# it will be ignored.
+[[behaviors]]
+src = "192.168.0.2"
+dst = "localhost"
+protocol = "icmp"
+
+[[behaviors]]
+src = "192.168.0.2"
+dst = "8.8.8.8"
+protocol = "icmp"
+command = ["/usr/bin/ping", "-c", "1", "8.8.8.8"]

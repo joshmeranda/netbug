@@ -4,6 +4,7 @@
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
+use std::collections::HashMap;
 
 pub mod ethernet;
 pub mod icmp;
@@ -173,4 +174,7 @@ pub trait ProtocolPacketHeader {
 
     /// Get the [ProtocolNumber] associated with the protocol packet.
     fn protocol_type(&self) -> ProtocolNumber;
+
+    /// Retrieve important data about the header such as TCP flags.
+    fn header_data(&self) -> Option<HashMap<&str, u64>> { None }
 }

@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
-use pcap::Capture;
+use pcap::{Capture, Packet};
 
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
@@ -13,11 +13,14 @@ use crate::protocols::ethernet::IeeEthernetPacket;
 use crate::protocols::ip::IpPacket;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 use crate::{BUFFER_SIZE, HEADER_LENGTH};
+use crate::behavior::Behavior;
 
 pub struct Server {
     pcap_dir: PathBuf,
 
     srv_addr: SocketAddr,
+    
+    behaviors: Vec<Behavior>,
 }
 
 impl Default for Server {
@@ -25,6 +28,7 @@ impl Default for Server {
         Server {
             pcap_dir: defaults::default_pcap_dir(),
             srv_addr: SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
+            behaviors: Vec::<Behavior>::new(),
         }
     }
 }
@@ -46,7 +50,7 @@ impl Server {
         let listener = TcpListener::bind(self.srv_addr)?;
         let mut handles = vec![];
 
-        // todo: implement a clean shutdown
+        // todo: implement a clean shutdown (catch interrupts)
         loop {
             let (stream, addr) = listener.accept()?;
 
@@ -128,6 +132,11 @@ impl Server {
         Ok(())
     }
 
+    /// Iterate over server capture directory. This method will only traverse
+    /// up to 2 levels deep, so only files which are a direct child of the root
+    /// pcap directory or files in a directory in the root pcap directory will
+    /// be processed. Any directories outside of the root pcap directory will
+    /// be ignored.
     pub fn process(&self) -> Result<()> {
         for entry in fs::read_dir(&self.pcap_dir)? {
             let child = entry?;
@@ -144,8 +153,8 @@ impl Server {
         Ok(())
     }
 
+    /// Process a single pcap file.
     fn process_pcap(&self, path: PathBuf) -> Result<()> {
-        println!("{}", &path.to_str().unwrap());
         let mut capture = Capture::from_file(path)?;
 
         while let Ok(packet) = capture.next() {

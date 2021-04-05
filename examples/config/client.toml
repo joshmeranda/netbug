@@ -6,6 +6,11 @@ interfaces = [ "lo", "wlp1s0" ]
 
 srv_addr = "127.0.0.1:8081"
 
+# Defines how the network should behave for different types of traffic
+# originating from this machine. Most protocols will have default behavior
+# (tcp, udp, icmp) youmay also define a specigic command to run to mock sample
+# network traffic. To do this specify the command each argument as discrete
+# elemnts of an array.
 [[behaviors]]
 dst = "localhost"
 protocol = "icmp"

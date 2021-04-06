@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use pcap::{Capture, Packet};
 
+use crate::behavior::Behavior;
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
 use crate::error::{NbugError, Result};
@@ -13,21 +14,20 @@ use crate::protocols::ethernet::IeeEthernetPacket;
 use crate::protocols::ip::IpPacket;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 use crate::{BUFFER_SIZE, HEADER_LENGTH};
-use crate::behavior::Behavior;
 
 pub struct Server {
     pcap_dir: PathBuf,
 
     srv_addr: SocketAddr,
-    
+
     behaviors: Vec<Behavior>,
 }
 
 impl Default for Server {
     fn default() -> Server {
         Server {
-            pcap_dir: defaults::default_pcap_dir(),
-            srv_addr: SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
+            pcap_dir:  defaults::default_pcap_dir(),
+            srv_addr:  SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behaviors: Vec::<Behavior>::new(),
         }
     }

@@ -1,8 +1,8 @@
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
-use std::collections::HashMap;
 
 enum TcpControlBits {
     Urg = 0b00_100000,
@@ -34,7 +34,7 @@ struct Tcp {
     urgent_pointer: u16,
 }
 
-impl <'a> Tcp {
+impl<'a> Tcp {
     const CONTROL_BITS: &'a str = "CONTROL_BITS";
 
     const SEQUENCE_NUMBER: &'a str = "SEQUENCE_NUMBER";

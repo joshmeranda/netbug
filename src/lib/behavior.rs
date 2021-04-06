@@ -1,4 +1,5 @@
-use std::net::{Shutdown, SocketAddr, TcpStream, UdpSocket, IpAddr};
+use std::collections::HashMap;
+use std::net::{IpAddr, Shutdown, SocketAddr, TcpStream, UdpSocket};
 use std::process::Command;
 use std::str::FromStr;
 use std::time::Duration;
@@ -6,7 +7,7 @@ use std::time::Duration;
 use crate::error::Result;
 use crate::protocols::ProtocolPacketHeader;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 enum BehaviorProtocol {
     Icmp,
@@ -25,7 +26,7 @@ enum BehaviorProtocol {
 ///    Syn
 ///  - Out: Will fail if the client receives and Ack for its Syn
 ///  - Both: Will fail if one part of the handshake is not received
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 enum Direction {
     In,
@@ -38,7 +39,7 @@ impl Default for Direction {
 }
 
 /// A basic behavior to emulate the type of traffic
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq, Eq, Hash)]
 pub struct Behavior {
     src: Option<String>,
 
@@ -103,7 +104,28 @@ impl Behavior {
     }
 
     /// Determine if a list off packet headers satisfies the expected behavior.
-    pub fn passed<'a>(&self, _headers: Vec<&'a dyn ProtocolPacketHeader>) {
-        todo!()
+    pub fn passed<'a>(&self, _headers: Vec<&'a dyn ProtocolPacketHeader>) { todo!() }
+}
+
+struct BehaviorCollector<'a> {
+    behavior_map: HashMap<&'a Behavior, Vec<&'a dyn ProtocolPacketHeader>>,
+}
+
+impl<'a> BehaviorCollector<'a> {
+    pub fn new() -> BehaviorCollector<'a> {
+        BehaviorCollector {
+            behavior_map: HashMap::new(),
+        }
     }
+
+    /// Insert a new behavior into the collector.
+    pub fn insert_behavior(&mut self, behavior: &'a Behavior) -> Result<()> {
+        self.behavior_map.insert(behavior, vec![]);
+
+        Ok(())
+    }
+
+
+    /// Insert a new header to the collector, if no mathcing behavior is found Err is returned.
+    pub fn insert_header(&mut self, _header: &'a dyn ProtocolPacketHeader) -> Result<()> { todo!() }
 }

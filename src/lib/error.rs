@@ -13,6 +13,7 @@ pub type Result<T> = std::result::Result<T, NbugError>;
 pub enum NbugError {
     Client(String),
     Server(String),
+    Processing(String),
     Io(io::Error),
     Config(ConfigError),
     Pcap(pcap::Error),
@@ -24,6 +25,7 @@ impl Display for NbugError {
         match self {
             NbugError::Client(msg) => write!(f, "Client error: {}", msg),
             NbugError::Server(msg) => write!(f, "Server error: {}", msg),
+            NbugError::Processing(msg) => write!(f, "Processing error: {}", msg),
             NbugError::Io(err) => write!(f, "System io error: {}", err.to_string()),
             NbugError::Config(err) => write!(f, "{}", err.to_string()),
             NbugError::Pcap(err) => write!(f, "Pcap Error: {}", err.to_string()),
@@ -37,6 +39,7 @@ impl Error for NbugError {
         match self {
             NbugError::Client(_) => None,
             NbugError::Server(_) => None,
+            NbugError::Processing(_) => None,
             NbugError::Io(err) => Some(err),
             NbugError::Config(err) => Some(err),
             NbugError::Pcap(err) => Some(err),

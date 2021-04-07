@@ -14,7 +14,7 @@ pub mod udp;
 
 /// Wrapper around the official [protocol number](https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml)
 /// provided by the IANA.
-#[derive(Copy, Clone, Debug, Deserialize, Eq, FromPrimitive, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ProtocolNumber {
     HopOpt           = 0,

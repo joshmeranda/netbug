@@ -4,18 +4,8 @@ use std::process::Command;
 use std::str::FromStr;
 use std::time::Duration;
 
-use crate::error::Result;
-use crate::protocols::ProtocolPacketHeader;
-
-#[derive(Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "lowercase")]
-enum BehaviorProtocol {
-    Icmp,
-    Icmpv6,
-
-    Tcp,
-    Udp,
-}
+use crate::error::{NbugError, Result};
+use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
 /// Specifies the direction traffic should be expected. When used in the client
 /// configuration, this field is ignored and will have no effect.
@@ -46,7 +36,7 @@ pub struct Behavior {
     dst: String,
 
     #[serde(rename = "protocol")]
-    protocol: BehaviorProtocol,
+    protocol: ProtocolNumber,
 
     #[serde(default = "std::default::Default::default")]
     direction: Direction,
@@ -78,26 +68,31 @@ impl Behavior {
         }
 
         match self.protocol {
-            BehaviorProtocol::Icmp => {
+            ProtocolNumber::Icmp => {
                 let mut handle = Command::new("ping").args(&["-c", "1", &self.dst]).spawn()?;
                 handle.wait()?;
             },
-            BehaviorProtocol::Icmpv6 => {
+            ProtocolNumber::Ipv6Icmp => {
                 let mut handle = Command::new("ping").args(&["-6", "-c", "1", &self.dst]).spawn()?;
                 handle.wait()?;
             },
-            BehaviorProtocol::Tcp => {
+            ProtocolNumber::Tcp => {
                 let addr = SocketAddr::from_str(self.dst.as_str())?;
                 let sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
 
                 sock.shutdown(Shutdown::Both)?;
             },
-            BehaviorProtocol::Udp => {
+            ProtocolNumber::Udp => {
                 let addr = SocketAddr::from_str(self.dst.as_str())?;
                 let socket = UdpSocket::bind(&addr).unwrap();
 
                 socket.send(&[])?;
             },
+            _ =>
+                return Err(NbugError::Client(String::from(format!(
+                    "found unsupported protocol number: {}",
+                    self.protocol as u8
+                )))),
         };
 
         Ok(())
@@ -125,7 +120,27 @@ impl<'a> BehaviorCollector<'a> {
         Ok(())
     }
 
+    /// Insert a new header to the collector, if no matching behavior is found
+    /// Err is returned.
+    pub fn insert_header(
+        &mut self,
+        header: &'a dyn ProtocolPacketHeader,
+        src: Option<String>,
+        dst: String,
+    ) -> Result<()> {
+        for (behavior, headers) in &mut self.behavior_map {
+            if behavior.protocol == header.protocol_type() && behavior.src == src && behavior.dst == dst {
+                headers.push(header);
 
-    /// Insert a new header to the collector, if no mathcing behavior is found Err is returned.
-    pub fn insert_header(&mut self, _header: &'a dyn ProtocolPacketHeader) -> Result<()> { todo!() }
+                return Ok(());
+            }
+        }
+
+        Err(NbugError::Processing(String::from(format!(
+            "no behavior matches header: {} src: {} and dst: {}",
+            header.protocol_type() as u8,
+            if let Some(s) = src { s } else { String::from("None") },
+            dst
+        ))))
+    }
 }

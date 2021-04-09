@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use crate::error::{NbugError, Result};
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
+use crate::Addr;
 
 /// Specifies the direction traffic should be expected. When used in the client
 /// configuration, this field is ignored and will have no effect.
@@ -29,11 +30,12 @@ impl Default for Direction {
 }
 
 /// A basic behavior to emulate the type of traffic
+/// todo: provide an optional description
 #[derive(Deserialize, PartialEq, Eq, Hash)]
 pub struct Behavior {
-    src: Option<String>,
+    src: Option<Addr>,
 
-    dst: String,
+    dst: Addr,
 
     #[serde(rename = "protocol")]
     protocol: ProtocolNumber,
@@ -69,25 +71,39 @@ impl Behavior {
 
         match self.protocol {
             ProtocolNumber::Icmp => {
-                let mut handle = Command::new("ping").args(&["-c", "1", &self.dst]).spawn()?;
+                let mut handle = Command::new("ping").args(&["-c", "1", &self.dst.to_string()]).spawn()?;
                 handle.wait()?;
             },
+
             ProtocolNumber::Ipv6Icmp => {
-                let mut handle = Command::new("ping").args(&["-6", "-c", "1", &self.dst]).spawn()?;
+                let mut handle = Command::new("ping")
+                    .args(&["-6", "-c", "1", &self.dst.to_string()])
+                    .spawn()?;
                 handle.wait()?;
             },
+
             ProtocolNumber::Tcp => {
-                let addr = SocketAddr::from_str(self.dst.as_str())?;
+                let addr = match self.dst {
+                    Addr::Socket(addr) => addr,
+                    _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
+                };
+
                 let sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
 
                 sock.shutdown(Shutdown::Both)?;
             },
+
             ProtocolNumber::Udp => {
-                let addr = SocketAddr::from_str(self.dst.as_str())?;
+                let addr = match self.dst {
+                    Addr::Socket(addr) => addr,
+                    _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
+                };
+
                 let socket = UdpSocket::bind(&addr).unwrap();
 
                 socket.send(&[])?;
             },
+
             _ =>
                 return Err(NbugError::Client(String::from(format!(
                     "found unsupported protocol number: {}",
@@ -122,12 +138,7 @@ impl<'a> BehaviorCollector<'a> {
 
     /// Insert a new header to the collector, if no matching behavior is found
     /// Err is returned.
-    pub fn insert_header(
-        &mut self,
-        header: &'a dyn ProtocolPacketHeader,
-        src: Option<String>,
-        dst: String,
-    ) -> Result<()> {
+    pub fn insert_header(&mut self, header: &'a dyn ProtocolPacketHeader, src: Option<Addr>, dst: Addr) -> Result<()> {
         for (behavior, headers) in &mut self.behavior_map {
             if behavior.protocol == header.protocol_type() && behavior.src == src && behavior.dst == dst {
                 headers.push(header);
@@ -139,8 +150,21 @@ impl<'a> BehaviorCollector<'a> {
         Err(NbugError::Processing(String::from(format!(
             "no behavior matches header: {} src: {} and dst: {}",
             header.protocol_type() as u8,
-            if let Some(s) = src { s } else { String::from("None") },
-            dst
+            if let Some(s) = src {
+                s.to_string()
+            } else {
+                String::from("None")
+            },
+            dst.to_string()
         ))))
     }
+}
+
+struct Evaluator<'a> {
+    collector: BehaviorCollector<'a>,
+}
+
+impl Evaluator<'_> {
+    /// Construct a new [Evaluator] by consuming a [BehaviorCollector].
+    pub fn new(collector: BehaviorCollector) -> Evaluator { Evaluator { collector } }
 }

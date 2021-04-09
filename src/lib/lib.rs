@@ -41,7 +41,7 @@ const MESSAGE_VERSION: u8 = 0;
 
 /// Simple wrapper around address types allowing for multiple address
 /// specifications.
-#[derive(Debug, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 enum Addr {
     /// An internet address with only an ip.
     Internet(IpAddr),
@@ -68,5 +68,32 @@ impl ToString for Addr {
             Addr::Internet(addr) => addr.to_string(),
             Addr::Socket(addr) => addr.to_string(),
         }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Addr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>
+    {
+        struct AddrVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for AddrVisitor {
+            type Value = Addr;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a string from which an Addr could be parsed")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Addr, E> {
+                if let Ok(addr) = Addr::from_str(s) {
+                    Ok(addr)
+                } else {
+                    Err(E::invalid_value(serde::de::Unexpected::Str(s), &self))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(AddrVisitor)
     }
 }

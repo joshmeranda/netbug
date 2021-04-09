@@ -12,7 +12,7 @@ srv_addr = "127.0.0.1:8081"
 # network traffic. To do this specify the command each argument as discrete
 # elemnts of an array.
 [[behaviors]]
-dst = "localhost"
+dst = "127.0.0.1"
 protocol = "icmp"
 
 [[behaviors]]

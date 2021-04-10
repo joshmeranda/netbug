@@ -114,10 +114,14 @@ impl Behavior {
         Ok(())
     }
 
-    /// Determine if a list off packet headers satisfies the expected behavior.
-    pub fn passed<'a>(&self, _headers: Vec<&'a dyn ProtocolPacketHeader>) { todo!() }
+    /// Determine if a list off packet headers satisfies the expected behavior,
+    /// and build a description of which steps of the behavior passed  and which
+    /// failed.
+    pub fn evaluate<'a>(&self, _headers: Vec<&'a dyn ProtocolPacketHeader>) -> BehaviorEvaluation { todo!() }
 }
 
+/// A basic collector for [Behavior]s and their corresponding
+/// [ProtocolPacketHeaders].
 struct BehaviorCollector<'a> {
     behavior_map: HashMap<&'a Behavior, Vec<&'a dyn ProtocolPacketHeader>>,
 }
@@ -158,13 +162,49 @@ impl<'a> BehaviorCollector<'a> {
             dst.to_string()
         ))))
     }
+
+    /// Produce a comprehensive report on the behaviors gathered by the
+    /// collector, but consumes the collector.
+    pub fn evaluate(self) -> BehaviorReport {
+        let mut report = BehaviorReport::new();
+
+        for (behavior, headers) in self.behavior_map {
+            let evaluation = behavior.evaluate(headers);
+
+            report.add(evaluation);
+        }
+
+        report
+    }
 }
 
-struct Evaluator<'a> {
-    collector: BehaviorCollector<'a>,
+enum BehaviorStatus {
+    Pass,
+    Fail,
+
+    Received,
+    NotReceived,
 }
 
-impl Evaluator<'_> {
-    /// Construct a new [Evaluator] by consuming a [BehaviorCollector].
-    pub fn new(collector: BehaviorCollector) -> Evaluator { Evaluator { collector } }
+/// A simple evaluation of single behavior, including a breakdown of any
+/// specific steps required by the behavior.
+pub struct BehaviorEvaluation {
+    result: BehaviorStatus,
+
+    reason: String,
+
+    /// A set of status of sub steps of the total behavior.
+    sub: HashMap<String, BehaviorStatus>,
+}
+
+struct BehaviorReport {
+    evaluations: Vec<BehaviorEvaluation>,
+}
+
+/// A collection of [BehaviorEvaluation]s
+impl BehaviorReport {
+    pub fn new() -> Self { BehaviorReport { evaluations: vec![] } }
+
+    /// Add another evaluation to the report.
+    pub fn add(&mut self, evaluation: BehaviorEvaluation) { self.evaluations.push(evaluation); }
 }

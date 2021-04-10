@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 /// Defines many structs and packet serialization from raw packet data. These
 /// will largely focus on packets headers, and will largely ignore any packet
 /// payloads, as they are largely irrelevant to this project.
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::error::NbugError;

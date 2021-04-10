@@ -73,9 +73,8 @@ impl ToString for Addr {
 
 impl<'de> serde::Deserialize<'de> for Addr {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>
-    {
+    where
+        D: serde::Deserializer<'de>, {
         struct AddrVisitor;
 
         impl<'de> serde::de::Visitor<'de> for AddrVisitor {

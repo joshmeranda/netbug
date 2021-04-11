@@ -10,6 +10,8 @@ use crate::protocols::icmp::icmpv4::Icmpv4Packet;
 use crate::protocols::icmp::icmpv6::Icmpv6Packet;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
+pub static ICMP_KIND_KEY: &str = "IcmpKind";
+
 /// Simple wrapper around icmp types. Since neither icmp version 4 or 6 provide
 /// a method for asserting the version beyond the type used in the internet
 /// header, they must be parsed separately before being wrapped into this enum.
@@ -88,13 +90,14 @@ impl TryFrom<&[u8]> for IcmpCommon {
 }
 
 pub mod icmpv4 {
+    use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
     use std::net::Ipv4Addr;
 
     use num_traits::FromPrimitive;
 
     use crate::error::NbugError;
-    use crate::protocols::icmp::IcmpCommon;
+    use crate::protocols::icmp::{IcmpCommon, ICMP_KIND_KEY};
     use crate::protocols::ip::Ipv4Packet;
     use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
@@ -216,6 +219,24 @@ pub mod icmpv4 {
         InformationReply(IcmpCommon),
     }
 
+    impl Icmpv4Packet {
+        pub fn message_kind(&self) -> Icmpv4MessageKind {
+            match self {
+                Icmpv4Packet::EchoReply(_) => Icmpv4MessageKind::EchoReply,
+                Icmpv4Packet::DestinationUnreachable(_) => Icmpv4MessageKind::DestinationUnreachable,
+                Icmpv4Packet::SourceQuench(_) => Icmpv4MessageKind::SourceQuench,
+                Icmpv4Packet::Redirect { .. } => Icmpv4MessageKind::Redirect,
+                Icmpv4Packet::EchoRequest(_) => Icmpv4MessageKind::EchoRequest,
+                Icmpv4Packet::TimeExceeded(_) => Icmpv4MessageKind::TimeExceeded,
+                Icmpv4Packet::ParameterProblem { .. } => Icmpv4MessageKind::ParameterProblem,
+                Icmpv4Packet::TimestampRequest(_) => Icmpv4MessageKind::TimestampRequest,
+                Icmpv4Packet::TimestampReply(_) => Icmpv4MessageKind::TimestampReply,
+                Icmpv4Packet::InformationRequest(_) => Icmpv4MessageKind::InformationRequest,
+                Icmpv4Packet::InformationReply(_) => Icmpv4MessageKind::InformationReply,
+            }
+        }
+    }
+
     impl TryFrom<&[u8]> for Icmpv4Packet {
         type Error = NbugError;
 
@@ -276,16 +297,25 @@ pub mod icmpv4 {
         }
 
         fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Icmp }
+
+        fn header_data(&self) -> Option<HashMap<&str, u64>> {
+            let mut data = HashMap::<&str, u64>::new();
+
+            data.insert(ICMP_KIND_KEY, self.message_kind() as u64);
+
+            Some(data)
+        }
     }
 }
 
 pub mod icmpv6 {
+    use std::collections::HashMap;
     use std::convert::TryFrom;
 
     use num_traits::FromPrimitive;
 
     use crate::error::NbugError;
-    use crate::protocols::icmp::IcmpCommon;
+    use crate::protocols::icmp::{IcmpCommon, ICMP_KIND_KEY};
     use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
     /// Map variants to icmp v6 message types as defined in [RFC 4443 2.1](https://tools.ietf.org/html/rfc4443#section-2.1).
@@ -343,6 +373,15 @@ pub mod icmpv6 {
         EchoReply(IcmpCommon),
     }
 
+    impl Icmpv6Packet {
+        pub fn message_kind(&self) -> Icmpv6MessageKind {
+            match self {
+                Icmpv6Packet::EchoRequest(_) => Icmpv6MessageKind::EchoRequest,
+                Icmpv6Packet::EchoReply(_) => Icmpv6MessageKind::EchoReply,
+            }
+        }
+    }
+
     impl TryFrom<&[u8]> for Icmpv6Packet {
         type Error = NbugError;
 
@@ -365,5 +404,13 @@ pub mod icmpv6 {
         fn header_length(&self) -> usize { 6 }
 
         fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv6Icmp }
+
+        fn header_data(&self) -> Option<HashMap<&str, u64>> {
+            let mut data = HashMap::<&str, u64>::new();
+
+            data.insert(ICMP_KIND_KEY, self.message_kind() as u64);
+
+            Some(data)
+        }
     }
 }

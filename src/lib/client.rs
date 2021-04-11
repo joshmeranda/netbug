@@ -112,7 +112,8 @@ impl Client {
     /// Begin capturing packets on the configured network devices. Note that
     /// there is currently no explicit way to end capture and flush its
     /// output, be mindful of your client's scoping to prevent capturing
-    /// unnecessary packets.
+    /// unnecessary packets. The resulting captures will always be in sequential
+    /// order.
     pub fn start_capture(&mut self) -> Result<()> {
         if self.is_capturing() {
             return Err(NbugError::Client(String::from("capture is already running")));

@@ -1,7 +1,8 @@
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
-use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
+use crate::protocols::{ProtocolNumber, ProtocolPacketHeader, SRC_ADDR_KEY, SRC_PORT_KEY, DST_PORT_KEY};
+use std::collections::HashMap;
 
 /// The UDP Packet a s specified in [RFC 768](https://tools.ietf.org/html/rfc768).
 struct Udp {
@@ -47,4 +48,13 @@ impl ProtocolPacketHeader for Udp {
     fn header_length(&self) -> usize { 8 }
 
     fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Udp }
+
+    fn header_data(&self) -> Option<HashMap<&str, u64>> {
+        let mut data = HashMap::<&str, u64>::new();
+
+        data.insert(SRC_PORT_KEY, self.source_port as u64);
+        data.insert(DST_PORT_KEY, self.destination_port as u64);
+
+        Some(data)
+    }
 }

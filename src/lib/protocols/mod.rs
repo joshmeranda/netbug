@@ -12,6 +12,12 @@ pub mod ip;
 pub mod tcp;
 pub mod udp;
 
+pub static SRC_ADDR_KEY: &str = "SrcAddr";
+pub static SRC_PORT_KEY: &str = "SrcPort";
+
+pub static DST_ADDR_KEY: &str = "DstAddr";
+pub static DST_PORT_KEY: &str = "DstPort";
+
 /// Wrapper around the official [protocol number](https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml)
 /// provided by the IANA.
 #[derive(Copy, Clone, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq)]

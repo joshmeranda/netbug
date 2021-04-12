@@ -16,7 +16,7 @@ extern crate num_derive;
 
 use std::fmt;
 use std::marker::PhantomData;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, SocketAddr, Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 
 use serde::de::{MapAccess, Visitor};
@@ -41,7 +41,7 @@ const MESSAGE_VERSION: u8 = 0;
 
 /// Simple wrapper around address types allowing for multiple address
 /// specifications.
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 enum Addr {
     /// An internet address with only an ip.
     Internet(IpAddr),

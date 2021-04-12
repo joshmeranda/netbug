@@ -1,16 +1,72 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 
-enum TcpControlBits {
+pub static CONTROL_BITS_KEY: &str = "CONTROL_BITS";
+
+static SEQUENCE_NUMBER: &str = "SEQUENCE_NUMBER";
+
+static ACKNOWLEDGEMENT_NUMBER: &str = "ACKNOWLEDGEMENT_NUMBER";
+
+#[derive(Hash, Eq, PartialEq)]
+pub enum TcpControlBits {
     Urg = 0b00_100000,
     Ack = 0b00_010000,
     Psh = 0b00_001000,
     Rst = 0b00_000100,
     Syn = 0b00_000010,
     Fin = 0b00_000001,
+}
+
+impl TcpControlBits {
+    /// Build a [HashSet] of [TcpControlBits] from a single u8 based on which bits are set. Note that this method will not only look at the 6 least significant bits, so if either or both of the 2 most significant bits are set, the returned set will be empty.
+    pub fn find_control_bits(bits: u8) -> HashSet<TcpControlBits> {
+        let mut set = HashSet::<TcpControlBits>::with_capacity(6);
+
+        if bits & TcpControlBits::Urg as u8 == TcpControlBits::Urg as u8 {
+            set.insert(TcpControlBits::Urg);
+        }
+
+        if bits & TcpControlBits::Ack as u8 == TcpControlBits::Ack as u8  {
+            set.insert(TcpControlBits::Ack);
+        }
+
+        if bits & TcpControlBits::Psh as u8 == TcpControlBits::Psh as u8  {
+            set.insert(TcpControlBits::Psh);
+        }
+
+        if bits & TcpControlBits::Rst as u8 == TcpControlBits::Rst as u8  {
+            set.insert(TcpControlBits::Rst);
+        }
+
+        if bits & TcpControlBits::Syn as u8 == TcpControlBits::Syn as u8  {
+            set.insert(TcpControlBits::Syn);
+        }
+
+        if bits & TcpControlBits::Fin as u8 == TcpControlBits::Fin as u8  {
+            set.insert(TcpControlBits::Fin);
+        }
+
+        set
+    }
+
+    pub fn is_syn(control_bits: &HashSet<TcpControlBits>) -> bool {
+        control_bits.contains(&TcpControlBits::Syn) && control_bits.len() == 1
+    }
+
+    pub fn is_ack(control_bits: &HashSet<TcpControlBits>) -> bool {
+        control_bits.contains(&TcpControlBits::Ack) && control_bits.len() == 1
+    }
+
+    pub fn is_syn_ack(control_bits: &HashSet<TcpControlBits>) -> bool {
+        control_bits.contains(&TcpControlBits::Syn) && control_bits.contains(&TcpControlBits::Ack) && control_bits.len() == 2
+    }
+
+    pub fn is_fin(control_bits: &HashSet<TcpControlBits>) -> bool {
+        control_bits.contains(&TcpControlBits::Fin) && control_bits.len() == 1
+    }
 }
 
 /// The TCP Packet as specified in [RFC 793 3.1](https://tools.ietf.org/html/rfc793#section-3.1).
@@ -32,14 +88,6 @@ struct Tcp {
     checksum: u16,
 
     urgent_pointer: u16,
-}
-
-impl<'a> Tcp {
-    const CONTROL_BITS: &'a str = "CONTROL_BITS";
-
-    const SEQUENCE_NUMBER: &'a str = "SEQUENCE_NUMBER";
-
-    const ACKNOWLEDGEMENT_NUMBER: &'a str = "ACKNOWLEDGEMENT_NUMBER";
 }
 
 impl TryFrom<&[u8]> for Tcp {
@@ -101,7 +149,7 @@ impl ProtocolPacketHeader for Tcp {
     fn header_data(&self) -> Option<HashMap<&str, u64>> {
         let mut map = HashMap::new();
 
-        map.insert(Tcp::CONTROL_BITS, self.control_bits as u64);
+        map.insert(CONTROL_BITS_KEY, self.control_bits as u64);
 
         Some(map)
     }

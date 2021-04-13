@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
+use crate::Addr;
 
 pub mod ethernet;
 pub mod icmp;

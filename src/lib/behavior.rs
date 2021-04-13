@@ -11,7 +11,7 @@ use crate::protocols::tcp::{CONTROL_BITS_KEY, TcpControlBits};
 use crate::protocols::icmp::icmpv4::Icmpv4MessageKind;
 use crate::protocols::icmp::icmpv6::Icmpv6MessageKind;
 use crate::protocols::icmp::ICMP_KIND_KEY;
-use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
+use crate::protocols::{ProtocolNumber, ProtocolPacketHeader, SRC_PORT_KEY, DST_PORT_KEY};
 use crate::Addr;
 use std::convert::TryFrom;
 
@@ -89,6 +89,9 @@ impl<'a> Behavior {
     const TCP_SYN_ACK: &'a str = "TcpSynAck";
     const TCP_FIN: &'a str = "TcpFin";
 
+    const UDP_INGRESS: &'a str = "UdpIngress";
+    const UDP_EGRESS: &'a str = "UdpEgress";
+
     /// Execute the behavior.
     /// todo: redirect stdout for commands
     pub fn run(&self) -> Result<()> {
@@ -162,15 +165,6 @@ impl<'a> Behavior {
             _ => todo!(),
         }
     }
-
-    /// Test the given packet status map for the target keys, and add the [PacketStatus::NotReceived] if no entry found.
-    // fn insert_not_received(packet_status: &'a mut HashMap<&'a str, PacketStatus>, targets: &[&'a str]) {
-    //     for s in targets {
-    //         if packet_status.contains_ley(s) {
-    //             packet_status.insert(s, PacketStatus::NotReceived);
-    //         }
-    //     }
-    // }
 
     /// evaluate behavior as icmpv4
     fn evaluate_icmp(&self, headers: Vec<&'a dyn ProtocolPacketHeader>) -> BehaviorEvaluation {
@@ -307,6 +301,65 @@ impl<'a> Behavior {
 
         BehaviorEvaluation {
             packet_status,
+        }
+    }
+
+    fn evaluate_udp(&self, headers: Vec<&'a dyn ProtocolPacketHeader>) -> BehaviorEvaluation {
+        let mut has_egress = false;
+        let mut has_ingress = false;
+
+        let behavior_src = if let Some(Addr::Socket(addr)) = self.src {
+            addr.port() as u64
+        } else {
+            0u64 // todo: consider failing or a better default source port
+        };
+
+        let behavior_dst = if let Addr::Socket(addr) = self.dst {
+            addr.port() as u64
+        } else {
+            0u64 // todo: consider failing or a better default source port
+        };
+
+        for header in headers {
+            let data = if let Some(data) = header.header_data() {
+                data
+            } else {
+                continue
+            };
+
+            if ! data.contains_key(SRC_PORT_KEY) || ! data.contains_key(DST_PORT_KEY) {
+                continue;
+            }
+
+            let packet_src = data.get(SRC_PORT_KEY).unwrap();
+            let packet_dst = data.get(DST_PORT_KEY).unwrap();
+
+            if *packet_src == behavior_src && *packet_dst == behavior_dst {
+                has_egress = true;
+            } else {
+                has_ingress = true;
+            }
+        }
+
+        let mut packet_status = HashMap::<&str, PacketStatus>::new();
+
+        match self.direction {
+            Direction::Out => {
+                packet_status.insert(Self::UDP_EGRESS, if has_egress { PacketStatus::Ok } else { PacketStatus::NotReceived });
+                packet_status.insert(Self::UDP_INGRESS, if has_ingress { PacketStatus::Received } else { PacketStatus::Ok });
+            },
+            Direction::In => {
+                packet_status.insert(Self::UDP_EGRESS, if has_egress { PacketStatus::Received } else { PacketStatus::Ok });
+                packet_status.insert(Self::UDP_INGRESS, if has_ingress { PacketStatus::Ok } else { PacketStatus::NotReceived });
+            },
+            Direction::Both => {
+                packet_status.insert(Self::UDP_EGRESS, if has_egress { PacketStatus::Ok } else { PacketStatus::NotReceived });
+                packet_status.insert(Self::UDP_INGRESS, if has_ingress { PacketStatus::Ok } else { PacketStatus::NotReceived });
+            }
+        }
+
+        BehaviorEvaluation {
+            packet_status
         }
     }
 }

@@ -16,7 +16,7 @@ extern crate num_derive;
 
 use std::fmt;
 use std::marker::PhantomData;
-use std::net::{IpAddr, SocketAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::str::FromStr;
 
 use serde::de::{MapAccess, Visitor};

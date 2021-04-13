@@ -21,7 +21,10 @@ pub enum TcpControlBits {
 }
 
 impl TcpControlBits {
-    /// Build a [HashSet] of [TcpControlBits] from a single u8 based on which bits are set. Note that this method will not only look at the 6 least significant bits, so if either or both of the 2 most significant bits are set, the returned set will be empty.
+    /// Build a [HashSet] of [TcpControlBits] from a single u8 based on which
+    /// bits are set. Note that this method will not only look at the 6 least
+    /// significant bits, so if either or both of the 2 most significant bits
+    /// are set, the returned set will be empty.
     pub fn find_control_bits(bits: u8) -> HashSet<TcpControlBits> {
         let mut set = HashSet::<TcpControlBits>::with_capacity(6);
 
@@ -29,23 +32,23 @@ impl TcpControlBits {
             set.insert(TcpControlBits::Urg);
         }
 
-        if bits & TcpControlBits::Ack as u8 == TcpControlBits::Ack as u8  {
+        if bits & TcpControlBits::Ack as u8 == TcpControlBits::Ack as u8 {
             set.insert(TcpControlBits::Ack);
         }
 
-        if bits & TcpControlBits::Psh as u8 == TcpControlBits::Psh as u8  {
+        if bits & TcpControlBits::Psh as u8 == TcpControlBits::Psh as u8 {
             set.insert(TcpControlBits::Psh);
         }
 
-        if bits & TcpControlBits::Rst as u8 == TcpControlBits::Rst as u8  {
+        if bits & TcpControlBits::Rst as u8 == TcpControlBits::Rst as u8 {
             set.insert(TcpControlBits::Rst);
         }
 
-        if bits & TcpControlBits::Syn as u8 == TcpControlBits::Syn as u8  {
+        if bits & TcpControlBits::Syn as u8 == TcpControlBits::Syn as u8 {
             set.insert(TcpControlBits::Syn);
         }
 
-        if bits & TcpControlBits::Fin as u8 == TcpControlBits::Fin as u8  {
+        if bits & TcpControlBits::Fin as u8 == TcpControlBits::Fin as u8 {
             set.insert(TcpControlBits::Fin);
         }
 
@@ -61,7 +64,9 @@ impl TcpControlBits {
     }
 
     pub fn is_syn_ack(control_bits: &HashSet<TcpControlBits>) -> bool {
-        control_bits.contains(&TcpControlBits::Syn) && control_bits.contains(&TcpControlBits::Ack) && control_bits.len() == 2
+        control_bits.contains(&TcpControlBits::Syn)
+            && control_bits.contains(&TcpControlBits::Ack)
+            && control_bits.len() == 2
     }
 
     pub fn is_fin(control_bits: &HashSet<TcpControlBits>) -> bool {

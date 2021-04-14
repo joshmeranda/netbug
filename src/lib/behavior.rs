@@ -499,7 +499,7 @@ impl<'a> Behavior {
 
 /// A basic collector for [Behavior]s and their corresponding
 /// [ProtocolPacketHeaders].
-struct BehaviorCollector<'a> {
+pub struct BehaviorCollector<'a> {
     behavior_map: HashMap<&'a Behavior, Vec<&'a dyn ProtocolPacketHeader>>,
 }
 
@@ -507,6 +507,18 @@ impl<'a> BehaviorCollector<'a> {
     pub fn new() -> BehaviorCollector<'a> {
         BehaviorCollector {
             behavior_map: HashMap::new(),
+        }
+    }
+
+    pub fn with_behaviors(behaviors: &'a [&Behavior]) -> BehaviorCollector<'a> {
+        let mut behavior_map = HashMap::new();
+
+        for behavior in behaviors {
+            behavior_map.insert(*behavior, vec![]);
+        }
+
+        BehaviorCollector {
+            behavior_map
         }
     }
 
@@ -560,7 +572,7 @@ impl<'a> BehaviorCollector<'a> {
 }
 
 #[derive(Serialize)]
-struct BehaviorReport<'a> {
+pub struct BehaviorReport<'a> {
     passing: usize,
 
     failing: usize,

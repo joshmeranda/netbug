@@ -37,7 +37,7 @@ const MESSAGE_VERSION: u8 = 0;
 /// Simple wrapper around address types allowing for multiple address
 /// specifications.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-enum Addr {
+pub enum Addr {
     /// An internet address with only an ip.
     Internet(IpAddr),
 

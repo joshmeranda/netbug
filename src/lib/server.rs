@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use pcap::Capture;
 
-use crate::behavior::Behavior;
+use crate::behavior::{Behavior, BehaviorCollector};
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
 use crate::error::{NbugError, Result};
@@ -142,6 +142,12 @@ impl Server {
     /// the children of the root pcap directory, and so any non-directory files
     /// in the root pcap directory will be ignored.
     pub fn process(&self) -> Result<()> {
+        let mut collector = BehaviorCollector::new();
+
+        for behavior in &self.behaviors {
+            collector.insert_behavior(&behavior);
+        }
+
         for entry in fs::read_dir(&self.pcap_dir)? {
             let child = match entry {
                 Ok(entry) => entry,
@@ -160,8 +166,8 @@ impl Server {
                         Err(_) => continue,
                     };
 
-                    match self.process_pcap(&path) {
-                        Ok(_) => {},
+                    match self.process_pcap(&path, &mut collector) {
+                        Ok(_) => { },
                         Err(err) => eprintln!(
                             "Error processing pcap '{}': {}",
                             path.to_str().unwrap(),
@@ -175,8 +181,8 @@ impl Server {
         Ok(())
     }
 
-    /// Process a single pcap file.
-    fn process_pcap(&self, path: &PathBuf) -> Result<()> {
+    /// Process a single pcap file, by adding the found [ProtocolPacketHeaders into the given [BehaviorCollector].
+    fn process_pcap(&self, path: &PathBuf, _collector: &mut BehaviorCollector) -> Result<()> {
         let mut capture = Capture::from_file(path)?;
 
         while let Ok(packet) = capture.next() {

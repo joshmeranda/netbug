@@ -99,8 +99,6 @@ impl TryFrom<&[u8]> for Tcp {
     type Error = NbugError;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-        unimplemented!();
-
         let mut source_bytes = [0u8; 2];
         source_bytes.copy_from_slice(&data[0..2]);
         let source_port = u16::from_be_bytes(source_bytes);

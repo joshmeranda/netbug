@@ -14,13 +14,8 @@ extern crate serde_derive;
 #[macro_use]
 extern crate num_derive;
 
-use std::fmt;
-use std::marker::PhantomData;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
-
-use serde::de::{MapAccess, Visitor};
-use serde::{de, Deserialize, Deserializer};
 
 use crate::config::error::ConfigError;
 use crate::error::NbugError;

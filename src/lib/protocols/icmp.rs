@@ -1,9 +1,4 @@
 use std::convert::TryFrom;
-/// Defines types relating to the Internet Control Message Protocol (ICMP)
-/// versions 4 and 6. These types will largely ignore packet data as they will
-/// be used for netbug analysis which does not require knowledge of packet
-/// payloads.
-use std::net::Ipv4Addr;
 
 use crate::error::NbugError;
 use crate::protocols::icmp::icmpv4::Icmpv4Packet;
@@ -91,7 +86,7 @@ impl TryFrom<&[u8]> for IcmpCommon {
 
 pub mod icmpv4 {
     use std::collections::HashMap;
-    use std::convert::{TryFrom, TryInto};
+    use std::convert::TryFrom;
     use std::net::Ipv4Addr;
 
     use num_traits::FromPrimitive;
@@ -279,20 +274,20 @@ pub mod icmpv4 {
     impl ProtocolPacketHeader for Icmpv4Packet {
         fn header_length(&self) -> usize {
             match self {
-                Icmpv4Packet::EchoReply(common)
-                | Icmpv4Packet::EchoRequest(common)
-                | Icmpv4Packet::InformationRequest(common)
-                | Icmpv4Packet::InformationReply(common) => 6,
+                Icmpv4Packet::EchoReply(_)
+                | Icmpv4Packet::EchoRequest(_)
+                | Icmpv4Packet::InformationRequest(_)
+                | Icmpv4Packet::InformationReply(_) => 6,
 
                 Icmpv4Packet::DestinationUnreachable(error)
                 | Icmpv4Packet::SourceQuench(error)
                 | Icmpv4Packet::TimeExceeded(error) => 2 + error.internet_header.header_length(),
 
-                Icmpv4Packet::TimestampRequest(timestamp) | Icmpv4Packet::TimestampReply(timestamp) => 6 + 12,
+                Icmpv4Packet::TimestampRequest(_) | Icmpv4Packet::TimestampReply(_) => 6 + 12,
 
-                Icmpv4Packet::ParameterProblem { error, pointer } => 2 + error.internet_header.header_length() + 1,
+                Icmpv4Packet::ParameterProblem { error, .. } => 2 + error.internet_header.header_length() + 1,
 
-                Icmpv4Packet::Redirect { error, gateway_address } => 2 + error.internet_header.header_length() + 4,
+                Icmpv4Packet::Redirect { error, .. } => 2 + error.internet_header.header_length() + 4,
             }
         }
 

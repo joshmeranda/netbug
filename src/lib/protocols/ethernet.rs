@@ -1,4 +1,3 @@
-use std::cmp;
 use std::convert::TryFrom;
 
 use crate::error::{NbugError, Result};

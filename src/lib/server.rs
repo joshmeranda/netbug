@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
-use pcap::{Capture, Packet};
+use pcap::Capture;
 
 use crate::behavior::Behavior;
 use crate::config::defaults;
@@ -47,20 +47,28 @@ impl Server {
 
     /// Start the netbug server and begin listening for tcp connections.
     pub fn start(&self) -> Result<()> {
+        // todo: implement a clean shutdown (catch interrupts)
         let listener = TcpListener::bind(self.srv_addr)?;
         let mut handles = vec![];
 
-        // todo: implement a clean shutdown (catch interrupts)
         loop {
-            let (stream, addr) = listener.accept()?;
+            let (stream, addr) = match listener.accept() {
+                Ok((s, a)) => (s, a),
+                Err(err) => {
+                    eprintln!("Error accepting connection: {}", err.to_string());
+                    continue;
+                },
+            };
 
-            // todo: use hostname rather than raw ip which can change
+            // todo: support hostname rather than raw ip which can change
             let mut pcap_dir = self.pcap_dir.clone();
             pcap_dir.push(addr.ip().to_string());
 
             // ensure the host pcap directory exists
             if !pcap_dir.exists() {
-                fs::create_dir_all(&pcap_dir)?;
+                if let Err(err) = fs::create_dir_all(&pcap_dir) {
+                    eprintln!("Error creating pcap directory: {}", err.to_string());
+                };
             }
 
             handles.push(std::thread::spawn(|| match Server::receive_pcap(stream, pcap_dir) {
@@ -68,8 +76,6 @@ impl Server {
                 Err(err) => eprintln!("Server Error: {}", err.to_string()),
             }));
         }
-
-        Ok(())
     }
 
     /// Handler for a tcp connection which will receive and dump a pcap file
@@ -132,29 +138,45 @@ impl Server {
         Ok(())
     }
 
-    /// Iterate over server capture directory. This method will only traverse
-    /// up to 2 levels deep, so only files which are a direct child of the root
-    /// pcap directory or files in a directory in the root pcap directory will
-    /// be processed. Any directories outside of the root pcap directory will
-    /// be ignored.
+    /// Iterate over server capture directory. This method will traverse only
+    /// the children of the root pcap directory, and so any non-directory files
+    /// in the root pcap directory will be ignored.
     pub fn process(&self) -> Result<()> {
         for entry in fs::read_dir(&self.pcap_dir)? {
-            let child = entry?;
-
-            if child.file_type()?.is_dir() {
-                for sub_entry in fs::read_dir(child.path())? {
-                    self.process_pcap(sub_entry?.path());
-                }
-            } else {
-                self.process_pcap(child.path());
+            let child = match entry {
+                Ok(entry) => entry,
+                Err(_) => continue,
             };
+
+            let file_type = match child.file_type() {
+                Ok(file_type) => file_type,
+                Err(_) => continue,
+            };
+
+            if file_type.is_dir() {
+                for sub_entry in fs::read_dir(child.path())? {
+                    let path = match sub_entry {
+                        Ok(sub_entry) => sub_entry.path(),
+                        Err(_) => continue,
+                    };
+
+                    match self.process_pcap(&path) {
+                        Ok(_) => {},
+                        Err(err) => eprintln!(
+                            "Error processing pcap '{}': {}",
+                            path.to_str().unwrap(),
+                            err.to_string()
+                        ),
+                    }
+                }
+            }
         }
 
         Ok(())
     }
 
     /// Process a single pcap file.
-    fn process_pcap(&self, path: PathBuf) -> Result<()> {
+    fn process_pcap(&self, path: &PathBuf) -> Result<()> {
         let mut capture = Capture::from_file(path)?;
 
         while let Ok(packet) = capture.next() {

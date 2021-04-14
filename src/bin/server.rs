@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use netbug::config::server::ServerConfig;
 use netbug::server::Server;
 

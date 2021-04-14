@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::net::{IpAddr, Shutdown, SocketAddr, TcpStream, UdpSocket};
+use std::net::{Shutdown, TcpStream, UdpSocket};
 use std::process::Command;
-use std::str::FromStr;
 use std::time::Duration;
 
 use num_traits::FromPrimitive;
@@ -218,8 +217,6 @@ impl<'a> Behavior {
                 _ => {},
             }
         }
-
-        let mut packet_status = HashMap::<&str, PacketStatus>::new();
 
         self.build_icmp_evaluation(has_reply, has_request)
     }

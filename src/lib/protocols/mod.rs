@@ -2,10 +2,6 @@
 /// will largely focus on packets headers, and will largely ignore any packet
 /// payloads, as they are largely irrelevant to this project.
 use std::collections::HashMap;
-use std::convert::TryFrom;
-
-use crate::error::NbugError;
-use crate::Addr;
 
 pub mod ethernet;
 pub mod icmp;

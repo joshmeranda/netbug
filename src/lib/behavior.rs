@@ -155,7 +155,7 @@ impl<'a> Behavior {
     /// Determine if a list off packet headers satisfies the expected behavior,
     /// and build a description of which steps of the behavior passed  and which
     /// failed.
-    pub fn evaluate(&self, headers: Vec<&'a dyn ProtocolPacketHeader>) -> BehaviorEvaluation {
+    pub fn evaluate(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
         match self.protocol {
             ProtocolNumber::Icmp => self.evaluate_icmp(headers),
             ProtocolNumber::Ipv6Icmp => self.evaluate_icmpv6(headers),
@@ -166,7 +166,7 @@ impl<'a> Behavior {
     }
 
     /// evaluate behavior as icmpv4
-    fn evaluate_icmp(&self, headers: Vec<&'a dyn ProtocolPacketHeader>) -> BehaviorEvaluation {
+    fn evaluate_icmp(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
         let mut has_request = false;
         let mut has_reply = false;
 
@@ -194,7 +194,7 @@ impl<'a> Behavior {
     }
 
     /// evaluate behavior as icmpv6
-    fn evaluate_icmpv6(&self, headers: Vec<&'a dyn ProtocolPacketHeader>) -> BehaviorEvaluation {
+    fn evaluate_icmpv6(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
         let mut has_request = false;
         let mut has_reply = false;
 
@@ -286,7 +286,7 @@ impl<'a> Behavior {
         BehaviorEvaluation { packet_status }
     }
 
-    fn evaluate_tcp(&self, headers: Vec<&'a dyn ProtocolPacketHeader>) -> BehaviorEvaluation {
+    fn evaluate_tcp(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
         let mut has_syn = false;
         let mut has_syn_ack = false;
         let mut has_ack = false;
@@ -397,7 +397,7 @@ impl<'a> Behavior {
         BehaviorEvaluation { packet_status }
     }
 
-    fn evaluate_udp(&self, headers: Vec<&'a dyn ProtocolPacketHeader>) -> BehaviorEvaluation {
+    fn evaluate_udp(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
         let mut has_egress = false;
         let mut has_ingress = false;
 
@@ -500,7 +500,8 @@ impl<'a> Behavior {
 /// A basic collector for [Behavior]s and their corresponding
 /// [ProtocolPacketHeaders].
 pub struct BehaviorCollector<'a> {
-    behavior_map: HashMap<&'a Behavior, Vec<&'a dyn ProtocolPacketHeader>>,
+    // todo: this vector probably takes up a lot of heap space and will cause a performance hit
+    behavior_map: HashMap<&'a Behavior, Vec<Box<dyn ProtocolPacketHeader>>>,
 }
 
 impl<'a> BehaviorCollector<'a> {
@@ -517,9 +518,7 @@ impl<'a> BehaviorCollector<'a> {
             behavior_map.insert(*behavior, vec![]);
         }
 
-        BehaviorCollector {
-            behavior_map
-        }
+        BehaviorCollector { behavior_map }
     }
 
     /// Insert a new behavior into the collector.
@@ -531,7 +530,7 @@ impl<'a> BehaviorCollector<'a> {
 
     /// Insert a new header to the collector, if no matching behavior is found
     /// Err is returned.
-    pub fn insert_header(&mut self, header: &'a dyn ProtocolPacketHeader, src: Option<Addr>, dst: Addr) -> Result<()> {
+    pub fn insert_header(&mut self, header: Box<dyn ProtocolPacketHeader>, src: Option<Addr>, dst: Addr) -> Result<()> {
         for (behavior, headers) in &mut self.behavior_map {
             // todo: better handle more protocols like tcp, udp, etc
             if behavior.protocol == header.protocol_type()

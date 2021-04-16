@@ -11,9 +11,13 @@ use crate::config::defaults;
 use crate::config::server::ServerConfig;
 use crate::error::{NbugError, Result};
 use crate::protocols::ethernet::IeeEthernetPacket;
+use crate::protocols::icmp::icmpv4::Icmpv4Packet;
+use crate::protocols::icmp::icmpv6::Icmpv6Packet;
 use crate::protocols::ip::IpPacket;
+use crate::protocols::tcp::TcpPacket;
+use crate::protocols::udp::UdpPacket;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
-use crate::{BUFFER_SIZE, HEADER_LENGTH};
+use crate::{Addr, BUFFER_SIZE, HEADER_LENGTH};
 
 pub struct Server {
     pcap_dir: PathBuf,
@@ -167,7 +171,7 @@ impl Server {
                     };
 
                     match self.process_pcap(&path, &mut collector) {
-                        Ok(_) => { },
+                        Ok(_) => {},
                         Err(err) => eprintln!(
                             "Error processing pcap '{}': {}",
                             path.to_str().unwrap(),
@@ -181,26 +185,67 @@ impl Server {
         Ok(())
     }
 
-    /// Process a single pcap file, by adding the found [ProtocolPacketHeaders into the given [BehaviorCollector].
-    fn process_pcap(&self, path: &PathBuf, _collector: &mut BehaviorCollector) -> Result<()> {
+    /// Process a single pcap file, by adding the found [ProtocolPacketHeaders
+    /// into the given [BehaviorCollector].
+    fn process_pcap(&self, path: &PathBuf, collector: &mut BehaviorCollector) -> Result<()> {
         let mut capture = Capture::from_file(path)?;
 
         while let Ok(packet) = capture.next() {
             let ethernet = IeeEthernetPacket::try_from(packet.data)?;
-            let ip = IpPacket::try_from(&packet.data[ethernet.header_length()..])?;
+
+            let mut offset: usize = ethernet.header_length();
+            let ip = IpPacket::try_from(&packet.data[offset..])?;
+
+            offset += ip.header_length();
 
             let protocol = match &ip {
                 IpPacket::V4(packet) => packet.protocol,
                 IpPacket::V6(packet) => packet.next_header,
             };
 
-            match protocol {
-                ProtocolNumber::Icmp => println!("icmp"),
-                ProtocolNumber::Ipv6Icmp => println!("icmp6"),
-                ProtocolNumber::Tcp => println!("tcp"),
-                ProtocolNumber::Udp => println!("udp"),
-                _ => println!("else: {}", ip.protocol_type() as u8),
+            let packet_header: Option<Box<dyn ProtocolPacketHeader>> = match protocol {
+                ProtocolNumber::Icmp => match Icmpv4Packet::try_from(&packet.data[offset..]) {
+                    Ok(packet) => Some(Box::new(packet)),
+                    Err(err) => {
+                        eprintln!("Error parsing icmp packet: {}", err.to_string());
+                        None
+                    },
+                },
+                ProtocolNumber::Ipv6Icmp => match Icmpv6Packet::try_from(&packet.data[offset..]) {
+                    Ok(packet) => Some(Box::new(packet)),
+                    Err(err) => {
+                        eprintln!("Error parsing icmpv6 packet: {}", err.to_string());
+                        None
+                    },
+                },
+                ProtocolNumber::Tcp => match TcpPacket::try_from(&packet.data[offset..]) {
+                    Ok(packet) => Some(Box::new(packet)),
+                    Err(err) => {
+                        eprintln!("Error parsing icmpv6 packet: {}", err.to_string());
+                        None
+                    },
+                },
+                ProtocolNumber::Udp => match UdpPacket::try_from(&packet.data[offset..]) {
+                    Ok(packet) => Some(Box::new(packet)),
+                    Err(err) => {
+                        eprintln!("Error parsing icmp packet: {}", err.to_string());
+                        None
+                    },
+                },
+                _ => {
+                    println!("else: {}", ip.protocol_type() as u8);
+                    None
+                },
             };
+
+            if let Some(header) = packet_header {
+                let src = Some(Addr::Internet(ip.source()));
+                let dst = Addr::Internet(ip.destination());
+
+                if let Err(err) = collector.insert_header(header, src, dst) {
+                    eprintln!("{}", err.to_string());
+                }
+            }
         }
 
         Ok(())

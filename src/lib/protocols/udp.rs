@@ -5,7 +5,7 @@ use crate::error::NbugError;
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader, DST_PORT_KEY, SRC_PORT_KEY};
 
 /// The UDP Packet a s specified in [RFC 768](https://tools.ietf.org/html/rfc768).
-struct Udp {
+pub struct UdpPacket {
     source_port: u16,
 
     destination_port: u16,
@@ -15,7 +15,7 @@ struct Udp {
     checksum: u16,
 }
 
-impl TryFrom<&[u8]> for Udp {
+impl TryFrom<&[u8]> for UdpPacket {
     type Error = NbugError;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
@@ -35,7 +35,7 @@ impl TryFrom<&[u8]> for Udp {
         checksum_bytes.copy_from_slice(&data[0..2]);
         let checksum = u16::from_be_bytes(checksum_bytes);
 
-        Ok(Udp {
+        Ok(UdpPacket {
             source_port,
             destination_port,
             length,
@@ -44,7 +44,7 @@ impl TryFrom<&[u8]> for Udp {
     }
 }
 
-impl ProtocolPacketHeader for Udp {
+impl ProtocolPacketHeader for UdpPacket {
     fn header_length(&self) -> usize { 8 }
 
     fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Udp }

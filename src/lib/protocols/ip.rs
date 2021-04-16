@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -10,6 +10,22 @@ use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
 pub enum IpPacket {
     V4(Ipv4Packet),
     V6(Ipv6Packet),
+}
+
+impl IpPacket {
+    pub fn source(&self) -> IpAddr {
+        match self {
+            IpPacket::V4(packet) => IpAddr::from(packet.source),
+            IpPacket::V6(packet) => IpAddr::from(packet.source),
+        }
+    }
+
+    pub fn destination(&self) -> IpAddr {
+        match self {
+            IpPacket::V4(packet) => IpAddr::from(packet.destination),
+            IpPacket::V6(packet) => IpAddr::from(packet.destination),
+        }
+    }
 }
 
 impl From<Ipv4Packet> for IpPacket {

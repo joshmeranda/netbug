@@ -75,7 +75,7 @@ impl TcpControlBits {
 }
 
 /// The TCP Packet as specified in [RFC 793 3.1](https://tools.ietf.org/html/rfc793#section-3.1).
-struct Tcp {
+pub struct TcpPacket {
     source_port: u16,
 
     destination_port: u16,
@@ -95,7 +95,7 @@ struct Tcp {
     urgent_pointer: u16,
 }
 
-impl TryFrom<&[u8]> for Tcp {
+impl TryFrom<&[u8]> for TcpPacket {
     type Error = NbugError;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
@@ -130,7 +130,7 @@ impl TryFrom<&[u8]> for Tcp {
         urgent_bytes.copy_from_slice(&data[18..20]);
         let urgent_pointer = u16::from_be_bytes(urgent_bytes);
 
-        Ok(Tcp {
+        Ok(TcpPacket {
             source_port,
             destination_port,
             sequence_number,
@@ -144,7 +144,7 @@ impl TryFrom<&[u8]> for Tcp {
     }
 }
 
-impl ProtocolPacketHeader for Tcp {
+impl ProtocolPacketHeader for TcpPacket {
     fn header_length(&self) -> usize { 24 }
 
     fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Tcp }

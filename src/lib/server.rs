@@ -45,6 +45,7 @@ impl Server {
         Server {
             pcap_dir: cfg.pcap_dir,
             srv_addr: cfg.srv_addr,
+            behaviors: cfg.behaviors,
             ..Server::default()
         }
     }
@@ -79,6 +80,8 @@ impl Server {
                 Ok(_) => println!("Received pcaps"),
                 Err(err) => eprintln!("Server Error: {}", err.to_string()),
             }));
+
+            self.process();
         }
     }
 

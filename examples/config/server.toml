@@ -3,7 +3,7 @@ pcap_dir = "recv_pcap"
 srv_addr = "127.0.0.1:8081"
 
 [[behaviors]]
-dst = "localhost"
+dst = "127.0.0.1"
 protocol = "icmp"
 
 [[behaviors]]
@@ -15,8 +15,8 @@ command = ["/usr/bin/ping", "-c", "1", "8.8.8.8"]
 # source is not required. While a command can be specified for each behavior,
 # it will be ignored.
 [[behaviors]]
-src = "192.168.0.2"
-dst = "localhost"
+src = "127.0.0.1"
+dst = "127.0.0.1"
 protocol = "icmp"
 
 [[behaviors]]

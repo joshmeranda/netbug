@@ -75,7 +75,7 @@ pub struct BehaviorEvaluation<'a> {
 }
 
 impl BehaviorEvaluation<'_> {
-    pub fn passed(&self) -> bool { self.packet_status.values().all(|status| *status != PacketStatus::Ok) }
+    pub fn passed(&self) -> bool { self.packet_status.values().all(|status| *status == PacketStatus::Ok) }
 }
 
 impl<'a> Behavior {
@@ -593,7 +593,7 @@ impl<'a> BehaviorReport<'a> {
     pub fn add(&mut self, evaluation: BehaviorEvaluation<'a>) {
         match evaluation.passed() {
             true => self.passing += 1,
-            false => self.passing += 1,
+            false => self.failing += 1,
         }
 
         self.evaluations.push(evaluation);

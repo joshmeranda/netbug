@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use pcap::Capture;
 
-use crate::behavior::{Behavior, BehaviorCollector};
+use crate::behavior::{Behavior, BehaviorCollector, BehaviorReport};
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
 use crate::error::{NbugError, Result};
@@ -148,7 +148,7 @@ impl Server {
     /// Iterate over server capture directory. This method will traverse only
     /// the children of the root pcap directory, and so any non-directory files
     /// in the root pcap directory will be ignored.
-    pub fn process(&self) -> Result<()> {
+    pub fn process(&self) -> Result<BehaviorReport> {
         let mut collector = BehaviorCollector::new();
 
         for behavior in &self.behaviors {
@@ -185,7 +185,9 @@ impl Server {
             }
         }
 
-        Ok(())
+        let report = collector.evaluate();
+
+        Ok(report)
     }
 
     /// Process a single pcap file, by adding the found [ProtocolPacketHeaders

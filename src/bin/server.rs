@@ -14,7 +14,15 @@ fn main() {
 
     if let Err(err) = server.start() {
         eprintln!("Could not start the server: {}", err.to_string());
+        return;
+    } else {
+        println!("Starting server...");
     }
 
-    loop {}
+    while server.is_running() {
+
+        server.stop();
+    }
+
+    println!("Stopping server...");
 }

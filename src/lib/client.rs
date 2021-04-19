@@ -173,6 +173,7 @@ impl Client {
         Ok(())
     }
 
+    /// Determine if the client is capturing network traffic.
     pub fn is_capturing(&self) -> bool { *self.capturing.lock().unwrap() }
 
     /// Transfer all

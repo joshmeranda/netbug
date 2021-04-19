@@ -3,6 +3,8 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::thread::Builder;
 
 use pcap::Capture;
 
@@ -25,6 +27,8 @@ pub struct Server {
     srv_addr: SocketAddr,
 
     behaviors: Vec<Behavior>,
+
+    running: Arc<Mutex<bool>>,
 }
 
 impl Default for Server {
@@ -33,6 +37,7 @@ impl Default for Server {
             pcap_dir:  defaults::default_pcap_dir(),
             srv_addr:  SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behaviors: Vec::<Behavior>::new(),
+            running:   Arc::new(Mutex::new(false)),
         }
     }
 }
@@ -52,22 +57,51 @@ impl Server {
 
     /// Start the netbug server and begin listening for tcp connections.
     pub fn start(&self) -> Result<()> {
+        let builder = Builder::new().name(String::from("nbug_server"));
+
+        let running_flag = Arc::clone(&self.running);
+        let srv_addr = &self.srv_addr;
+        let pcap_dir = &self.pcap_dir;
+
+        *running_flag.lock().unwrap() = true;
+
+        let handle;
+
+        unsafe {
+            handle = builder.spawn_unchecked(|| {
+                Server::handle_connections(&running_flag, srv_addr, pcap_dir);
+
+                // once connections are not being handled stop the server
+                *running_flag.lock().unwrap() = false;
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Handle accepting client connections.
+    fn handle_connections(running_flag: &Arc<Mutex<bool>>, srv_addr: &SocketAddr, pcap_dir: &PathBuf) -> Result<()> {
         // todo: implement a clean shutdown (catch interrupts)
-        let listener = TcpListener::bind(self.srv_addr)?;
+        let listener = TcpListener::bind(srv_addr)?;
+
+        println!("Bound server to '{}'", srv_addr.to_string());
+
+        // todo: make map of thread id to handle?
+        //   currently handle vector will keep building until server is shutdown
         let mut handles = vec![];
 
-        loop {
+        // todo: consider polling for better performance
+        while *running_flag.lock().unwrap() {
             let (stream, addr) = match listener.accept() {
-                Ok((s, a)) => (s, a),
-                Err(err) => {
-                    eprintln!("Error accepting connection: {}", err.to_string());
-                    continue;
-                },
+                Ok((stream, addr)) => (stream, addr),
+                Err(_) => continue,
             };
 
+            println!("Accepted connection from '{}'", addr.to_string());
+
             // todo: support hostname rather than raw ip which can change
-            let mut pcap_dir = self.pcap_dir.clone();
-            pcap_dir.push(addr.ip().to_string());
+            let mut pcap_dir = pcap_dir.clone();
+            pcap_dir.push(addr.to_string());
 
             // ensure the host pcap directory exists
             if !pcap_dir.exists() {
@@ -80,10 +114,29 @@ impl Server {
                 Ok(_) => println!("Received pcaps"),
                 Err(err) => eprintln!("Server Error: {}", err.to_string()),
             }));
+        }
 
-            self.process();
+        while !handles.is_empty() {
+            let handle = handles.pop().unwrap();
+            handle.join().expect("error waiting for stream thead to exit");
+        }
+
+        Ok(())
+    }
+
+    /// Stop a running server, if the server is not running, Err is returned.
+    pub fn stop(&self) -> Result<()> {
+        if *self.running.lock().unwrap() {
+            *self.running.lock().unwrap() = false;
+
+            Ok(())
+        } else {
+            Err(NbugError::Server(String::from("Server not running")))
         }
     }
+
+    /// Check if the server is running.
+    pub fn is_running(&self) -> bool { *self.running.lock().unwrap() }
 
     /// Handler for a tcp connection which will receive and dump a pcap file
     /// from a client. This method assumes that pcap_dir is valid directory,
@@ -185,9 +238,7 @@ impl Server {
             }
         }
 
-        let report = collector.evaluate();
-
-        Ok(report)
+        Ok(collector.evaluate())
     }
 
     /// Process a single pcap file, by adding the found [ProtocolPacketHeaders

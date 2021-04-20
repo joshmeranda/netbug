@@ -8,7 +8,9 @@ use std::thread::Builder;
 
 use pcap::Capture;
 
-use crate::behavior::{Behavior, BehaviorCollector, BehaviorReport};
+use crate::behavior::collector::BehaviorCollector;
+use crate::behavior::evaluate::BehaviorReport;
+use crate::behavior::Behavior;
 use crate::config::defaults;
 use crate::config::server::ServerConfig;
 use crate::error::{NbugError, Result};

@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use num_traits::FromPrimitive;
 
+use crate::behavior::evaluate::BehaviorEvaluation;
 use crate::error::{NbugError, Result};
 use crate::protocols::icmp::icmpv4::Icmpv4MessageKind;
 use crate::protocols::icmp::icmpv6::Icmpv6MessageKind;
@@ -13,6 +14,11 @@ use crate::protocols::icmp::ICMP_KIND_KEY;
 use crate::protocols::tcp::{TcpControlBits, CONTROL_BITS_KEY};
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader, DST_PORT_KEY, SRC_PORT_KEY};
 use crate::Addr;
+
+pub mod collector;
+pub mod evaluate;
+
+use evaluate::PacketStatus;
 
 /// Specifies the direction traffic should be expected. When used in the client
 /// configuration, this field is ignored and will have no effect.
@@ -56,26 +62,6 @@ pub struct Behavior {
     /// first element is the command or path to executable to run, and the
     /// following elements are the arguments to pass to it.
     command: Option<Vec<String>>,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
-enum PacketStatus {
-    Ok, // the packet was received or not received as expected
-    Received,
-    NotReceived,
-}
-
-/// A simple evaluation of single behavior, including a breakdown of any
-/// specific steps required by the behavior.
-#[derive(Serialize)]
-pub struct BehaviorEvaluation<'a> {
-    /// The statuses of individual packets / packet types of the behavior's
-    /// protocol.
-    packet_status: HashMap<&'a str, PacketStatus>,
-}
-
-impl BehaviorEvaluation<'_> {
-    pub fn passed(&self) -> bool { self.packet_status.values().all(|status| *status == PacketStatus::Ok) }
 }
 
 impl<'a> Behavior {
@@ -159,8 +145,8 @@ impl<'a> Behavior {
         match self.protocol {
             ProtocolNumber::Icmp => self.evaluate_icmp(headers),
             ProtocolNumber::Ipv6Icmp => self.evaluate_icmpv6(headers),
-            ProtocolNumber::Tcp => todo!(),
-            ProtocolNumber::Udp => todo!(),
+            ProtocolNumber::Tcp => self.evaluate_tcp(headers),
+            ProtocolNumber::Udp => self.evaluate_udp(headers),
             _ => todo!(),
         }
     }
@@ -222,11 +208,11 @@ impl<'a> Behavior {
     }
 
     fn build_icmp_evaluation(&self, has_reply: bool, has_request: bool) -> BehaviorEvaluation {
-        let mut packet_status = HashMap::<&str, PacketStatus>::new();
+        let mut eval = BehaviorEvaluation::new();
 
         match self.direction {
             Direction::Out => {
-                packet_status.insert(
+                eval.insert_status(
                     Self::ICMP_ECHO_REPLY,
                     if has_reply {
                         PacketStatus::Received
@@ -234,7 +220,7 @@ impl<'a> Behavior {
                         PacketStatus::Ok
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::ICMP_ECHO_REQUEST,
                     if has_request {
                         PacketStatus::Ok
@@ -244,7 +230,7 @@ impl<'a> Behavior {
                 );
             },
             Direction::In => {
-                packet_status.insert(
+                eval.insert_status(
                     Self::ICMP_ECHO_REPLY,
                     if has_reply {
                         PacketStatus::Ok
@@ -254,7 +240,7 @@ impl<'a> Behavior {
                 );
 
                 // Receiving a request should not fail the behavior
-                packet_status.insert(
+                eval.insert_status(
                     Self::ICMP_ECHO_REQUEST,
                     if has_request {
                         PacketStatus::Received
@@ -264,7 +250,7 @@ impl<'a> Behavior {
                 );
             },
             Direction::Both => {
-                packet_status.insert(
+                eval.insert_status(
                     Self::ICMP_ECHO_REPLY,
                     if has_reply {
                         PacketStatus::Ok
@@ -272,7 +258,7 @@ impl<'a> Behavior {
                         PacketStatus::NotReceived
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::ICMP_ECHO_REQUEST,
                     if has_request {
                         PacketStatus::Ok
@@ -283,7 +269,7 @@ impl<'a> Behavior {
             },
         }
 
-        BehaviorEvaluation { packet_status }
+        eval
     }
 
     fn evaluate_tcp(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
@@ -317,13 +303,13 @@ impl<'a> Behavior {
             }
         }
 
-        let mut packet_status = HashMap::<&str, PacketStatus>::new();
+        let mut eval = BehaviorEvaluation::new();
 
         match self.direction {
             Direction::Out | Direction::In => {
                 // the initial syn would still be recorded on the network if not allowed out of
                 // the network
-                packet_status.insert(
+                eval.insert_status(
                     Self::TCP_SYN,
                     if has_syn {
                         PacketStatus::Ok
@@ -331,7 +317,7 @@ impl<'a> Behavior {
                         PacketStatus::NotReceived
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::TCP_SYN_ACK,
                     if has_syn_ack {
                         PacketStatus::Received
@@ -339,7 +325,7 @@ impl<'a> Behavior {
                         PacketStatus::Ok
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::TCP_ACK,
                     if has_ack {
                         PacketStatus::Received
@@ -347,7 +333,7 @@ impl<'a> Behavior {
                         PacketStatus::Ok
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::TCP_FIN,
                     if has_fin {
                         PacketStatus::Received
@@ -359,7 +345,7 @@ impl<'a> Behavior {
             Direction::Both => {
                 // the initial syn would still be recorded on the network if not allowed out of
                 // the network
-                packet_status.insert(
+                eval.insert_status(
                     Self::TCP_SYN,
                     if has_syn {
                         PacketStatus::Ok
@@ -367,7 +353,7 @@ impl<'a> Behavior {
                         PacketStatus::NotReceived
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::TCP_SYN_ACK,
                     if has_syn_ack {
                         PacketStatus::Ok
@@ -375,7 +361,7 @@ impl<'a> Behavior {
                         PacketStatus::NotReceived
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::TCP_ACK,
                     if has_ack {
                         PacketStatus::Ok
@@ -383,7 +369,7 @@ impl<'a> Behavior {
                         PacketStatus::NotReceived
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::TCP_FIN,
                     if has_fin {
                         PacketStatus::Ok
@@ -394,7 +380,7 @@ impl<'a> Behavior {
             },
         }
 
-        BehaviorEvaluation { packet_status }
+        eval
     }
 
     fn evaluate_udp(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
@@ -434,11 +420,11 @@ impl<'a> Behavior {
             }
         }
 
-        let mut packet_status = HashMap::<&str, PacketStatus>::new();
+        let mut eval = BehaviorEvaluation::new();
 
         match self.direction {
             Direction::Out => {
-                packet_status.insert(
+                eval.insert_status(
                     Self::UDP_EGRESS,
                     if has_egress {
                         PacketStatus::Ok
@@ -446,7 +432,7 @@ impl<'a> Behavior {
                         PacketStatus::NotReceived
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::UDP_INGRESS,
                     if has_ingress {
                         PacketStatus::Received
@@ -456,7 +442,7 @@ impl<'a> Behavior {
                 );
             },
             Direction::In => {
-                packet_status.insert(
+                eval.insert_status(
                     Self::UDP_EGRESS,
                     if has_egress {
                         PacketStatus::Received
@@ -464,7 +450,7 @@ impl<'a> Behavior {
                         PacketStatus::Ok
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::UDP_INGRESS,
                     if has_ingress {
                         PacketStatus::Ok
@@ -474,7 +460,7 @@ impl<'a> Behavior {
                 );
             },
             Direction::Both => {
-                packet_status.insert(
+                eval.insert_status(
                     Self::UDP_EGRESS,
                     if has_egress {
                         PacketStatus::Ok
@@ -482,7 +468,7 @@ impl<'a> Behavior {
                         PacketStatus::NotReceived
                     },
                 );
-                packet_status.insert(
+                eval.insert_status(
                     Self::UDP_INGRESS,
                     if has_ingress {
                         PacketStatus::Ok
@@ -493,109 +479,6 @@ impl<'a> Behavior {
             },
         }
 
-        BehaviorEvaluation { packet_status }
-    }
-}
-
-/// A basic collector for [Behavior]s and their corresponding
-/// [ProtocolPacketHeaders].
-pub struct BehaviorCollector<'a> {
-    // todo: this vector probably takes up a lot of heap space and will cause a performance hit
-    behavior_map: HashMap<&'a Behavior, Vec<Box<dyn ProtocolPacketHeader>>>,
-}
-
-impl<'a> BehaviorCollector<'a> {
-    pub fn new() -> BehaviorCollector<'a> {
-        BehaviorCollector {
-            behavior_map: HashMap::new(),
-        }
-    }
-
-    pub fn with_behaviors(behaviors: &'a [&Behavior]) -> BehaviorCollector<'a> {
-        let mut behavior_map = HashMap::new();
-
-        for behavior in behaviors {
-            behavior_map.insert(*behavior, vec![]);
-        }
-
-        BehaviorCollector { behavior_map }
-    }
-
-    /// Insert a new behavior into the collector.
-    pub fn insert_behavior(&mut self, behavior: &'a Behavior) -> Result<()> {
-        self.behavior_map.insert(behavior, vec![]);
-
-        Ok(())
-    }
-
-    /// Insert a new header to the collector, if no matching behavior is found
-    /// Err is returned.
-    pub fn insert_header(&mut self, header: Box<dyn ProtocolPacketHeader>, src: Option<Addr>, dst: Addr) -> Result<()> {
-        for (behavior, headers) in &mut self.behavior_map {
-            // todo: better handle more protocols like tcp, udp, etc
-            if behavior.protocol == header.protocol_type()
-                && (behavior.src == src && behavior.dst == dst
-                    || behavior.src == Some(dst) && Some(behavior.dst) == src)
-            {
-                headers.push(header);
-
-                return Ok(());
-            }
-        }
-
-        Err(NbugError::Processing(String::from(format!(
-            "no behavior matches header: {} src: {} and dst: {}",
-            header.protocol_type() as u8,
-            if let Some(s) = src {
-                s.to_string()
-            } else {
-                String::from("None")
-            },
-            dst.to_string()
-        ))))
-    }
-
-    /// Produce a comprehensive report on the behaviors gathered by the
-    /// collector, but consumes the collector.
-    pub fn evaluate(self) -> BehaviorReport<'a> {
-        let mut report = BehaviorReport::new();
-
-        for (behavior, headers) in self.behavior_map {
-            let evaluation = behavior.evaluate(headers);
-
-            report.add(evaluation);
-        }
-
-        report
-    }
-}
-
-#[derive(Serialize)]
-pub struct BehaviorReport<'a> {
-    passing: usize,
-
-    failing: usize,
-
-    evaluations: Vec<BehaviorEvaluation<'a>>,
-}
-
-/// A collection of [BehaviorEvaluation]s
-impl<'a> BehaviorReport<'a> {
-    pub fn new() -> Self {
-        BehaviorReport {
-            passing:     0,
-            failing:     0,
-            evaluations: vec![],
-        }
-    }
-
-    /// Add another evaluation to the report.
-    pub fn add(&mut self, evaluation: BehaviorEvaluation<'a>) {
-        match evaluation.passed() {
-            true => self.passing += 1,
-            false => self.failing += 1,
-        }
-
-        self.evaluations.push(evaluation);
+        eval
     }
 }

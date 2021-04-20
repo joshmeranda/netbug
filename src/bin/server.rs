@@ -20,7 +20,6 @@ fn main() {
     }
 
     while server.is_running() {
-
         server.stop();
     }
 

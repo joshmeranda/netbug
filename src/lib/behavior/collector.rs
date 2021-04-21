@@ -39,12 +39,12 @@ impl<'a> BehaviorCollector<'a> {
 
     /// Insert a new header to the collector, if no matching behavior is found
     /// Err is returned.
-    pub fn insert_header(&mut self, header: Box<dyn ProtocolPacketHeader>, src: Option<Addr>, dst: Addr) -> Result<()> {
+    pub fn insert_header(&mut self, header: Box<dyn ProtocolPacketHeader>, src: Addr, dst: Addr) -> Result<()> {
         for (behavior, headers) in &mut self.behavior_map {
             // todo: better handle more protocols like tcp, udp, etc
             if behavior.protocol == header.protocol_type()
                 && (behavior.src == src && behavior.dst == dst
-                    || behavior.src == Some(dst) && Some(behavior.dst) == src)
+                    || behavior.src == dst && behavior.dst == src)
             {
                 headers.push(header);
 
@@ -55,12 +55,7 @@ impl<'a> BehaviorCollector<'a> {
         Err(NbugError::Processing(String::from(format!(
             "no behavior matches header: {} src: {} and dst: {}",
             header.protocol_type() as u8,
-            if let Some(s) = src {
-                s.to_string()
-            } else {
-                String::from("None")
-            },
-            dst.to_string()
+                src.to_string(), dst.to_string()
         ))))
     }
 

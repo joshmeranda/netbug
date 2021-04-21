@@ -297,7 +297,7 @@ impl Server {
             };
 
             if let Some(header) = packet_header {
-                let src = Some(Addr::Internet(ip.source()));
+                let src = Addr::Internet(ip.source());
                 let dst = Addr::Internet(ip.destination());
 
                 if let Err(err) = collector.insert_header(header, src, dst) {

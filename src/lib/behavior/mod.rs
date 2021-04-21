@@ -14,6 +14,7 @@ use crate::protocols::icmp::ICMP_KIND_KEY;
 use crate::protocols::tcp::{TcpControlBits, CONTROL_BITS_KEY};
 use crate::protocols::{ProtocolNumber, ProtocolPacketHeader, DST_PORT_KEY, SRC_PORT_KEY};
 use crate::Addr;
+use crate::config::defaults;
 
 pub mod collector;
 pub mod evaluate;
@@ -45,7 +46,8 @@ impl Default for Direction {
 /// todo: provide an optional description
 #[derive(Deserialize, PartialEq, Eq, Hash)]
 pub struct Behavior {
-    src: Option<Addr>,
+    #[serde(default = "defaults::client::default_addr")]
+    src: Addr,
 
     dst: Addr,
 
@@ -387,7 +389,7 @@ impl<'a> Behavior {
         let mut has_egress = false;
         let mut has_ingress = false;
 
-        let behavior_src = if let Some(Addr::Socket(addr)) = self.src {
+        let behavior_src = if let Addr::Socket(addr) = self.src {
             addr.port() as u64
         } else {
             0u64 // todo: consider failing or a better default source port

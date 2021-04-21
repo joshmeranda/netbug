@@ -37,9 +37,14 @@ pub fn default_server_port() -> u16 { 8081 }
 // Client Specific Values
 
 pub mod client {
+    use crate::Addr;
+    use std::net::{IpAddr, Ipv4Addr};
+
     pub fn default_concurrent_run() -> bool { false }
 
     pub fn default_delay() -> u8 { 1 }
+
+    pub fn default_addr() -> Addr { Addr::Internet(IpAddr::V4(Ipv4Addr::UNSPECIFIED)) }
 }
 
 // Server Specific Values

@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::error::{NbugError, Result};
-use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 /// An ethernet packet, conforming to either IEE 802.2 or 802.3.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -56,22 +56,6 @@ impl PartialEq<Ethernet3Packet> for IeeEthernetPacket {
     }
 }
 
-impl ProtocolPacketHeader for IeeEthernetPacket {
-    fn header_length(&self) -> usize {
-        match self {
-            IeeEthernetPacket::Ieee8022(packet) => packet.header_length(),
-            IeeEthernetPacket::Ieee8023(packet) => packet.header_length(),
-        }
-    }
-
-    fn protocol_type(&self) -> ProtocolNumber {
-        match self {
-            IeeEthernetPacket::Ieee8022(packet) => packet.protocol_type(),
-            IeeEthernetPacket::Ieee8023(packet) => packet.protocol_type(),
-        }
-    }
-}
-
 /// The ethernet packet for IEE 802.2true.
 #[derive(Copy, Clone, Debug, Eq)]
 pub struct Ethernet2Packet {
@@ -85,7 +69,7 @@ pub struct Ethernet2Packet {
 impl Ethernet2Packet {
     /// The minimum amount of bytes of data necessary to deserialize an
     /// [Ethernet2] using [try_from].
-    const MIN_BYTES: usize = IeeEthernetPacket::MAC_BYTES * 2 + IeeEthernetPacket::LENGTH_BYTES;
+    pub const MIN_BYTES: usize = IeeEthernetPacket::MAC_BYTES * 2 + IeeEthernetPacket::LENGTH_BYTES;
 
     pub fn new(destination: [u8; 6], source: [u8; 6], protocol: ProtocolNumber) -> Ethernet2Packet {
         Ethernet2Packet {
@@ -143,16 +127,6 @@ impl PartialEq<Ethernet2Packet> for Ethernet2Packet {
     }
 }
 
-impl ProtocolPacketHeader for Ethernet2Packet {
-    fn header_length(&self) -> usize { Self::MIN_BYTES }
-
-    fn protocol_type(&self) -> ProtocolNumber {
-        ProtocolNumber::Ethernet // todo: this is a temporary value which is
-                                 // VERY wrong until a
-                                 //   better fix can be implemented
-    }
-}
-
 /// The ethernet packet for IEE 802.3
 #[derive(Copy, Clone, Debug, Eq)]
 pub struct Ethernet3Packet {
@@ -169,7 +143,7 @@ impl Ethernet3Packet {
     const MIN_DATA_BYTES: usize = 46;
     const FRAME_CHECK_SEQUENCE_BYTES: usize = 4;
 
-    const MIN_BYTES: usize = IeeEthernetPacket::MAC_BYTES * 2
+    pub const MIN_BYTES: usize = IeeEthernetPacket::MAC_BYTES * 2
         + IeeEthernetPacket::LENGTH_BYTES
         + Self::MIN_DATA_BYTES
         + Self::FRAME_CHECK_SEQUENCE_BYTES;
@@ -241,16 +215,6 @@ impl PartialEq<Ethernet3Packet> for Ethernet3Packet {
             && self.source == other.source
             && self.length == other.length
             && self.frame_check_sequence == other.frame_check_sequence
-    }
-}
-
-impl ProtocolPacketHeader for Ethernet3Packet {
-    fn header_length(&self) -> usize { Self::MIN_BYTES }
-
-    fn protocol_type(&self) -> ProtocolNumber {
-        ProtocolNumber::Ethernet // todo: this is a temporary value which is
-                                 //   VERY wrong until a better fix can be
-                                 //   implemented
     }
 }
 

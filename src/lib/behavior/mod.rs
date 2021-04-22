@@ -12,7 +12,7 @@ use crate::protocols::icmp::icmpv4::Icmpv4MessageKind;
 use crate::protocols::icmp::icmpv6::Icmpv6MessageKind;
 use crate::protocols::icmp::ICMP_KIND_KEY;
 use crate::protocols::tcp::{TcpControlBits, CONTROL_BITS_KEY};
-use crate::protocols::{ProtocolNumber, ProtocolPacketHeader, DST_PORT_KEY, SRC_PORT_KEY};
+use crate::protocols::{ProtocolNumber, DST_PORT_KEY, SRC_PORT_KEY, ProtocolPacket};
 use crate::Addr;
 use crate::config::defaults;
 
@@ -143,7 +143,7 @@ impl<'a> Behavior {
     /// Determine if a list off packet headers satisfies the expected behavior,
     /// and build a description of which steps of the behavior passed  and which
     /// failed.
-    pub fn evaluate(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
+    pub fn evaluate(&self, headers: Vec<ProtocolPacket>) -> BehaviorEvaluation {
         match self.protocol {
             ProtocolNumber::Icmp => self.evaluate_icmp(headers),
             ProtocolNumber::Ipv6Icmp => self.evaluate_icmpv6(headers),
@@ -154,7 +154,7 @@ impl<'a> Behavior {
     }
 
     /// evaluate behavior as icmpv4
-    fn evaluate_icmp(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
+    fn evaluate_icmp(&self, headers: Vec<ProtocolPacket>) -> BehaviorEvaluation {
         let mut has_request = false;
         let mut has_reply = false;
 
@@ -182,7 +182,7 @@ impl<'a> Behavior {
     }
 
     /// evaluate behavior as icmpv6
-    fn evaluate_icmpv6(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
+    fn evaluate_icmpv6(&self, headers: Vec<ProtocolPacket>) -> BehaviorEvaluation {
         let mut has_request = false;
         let mut has_reply = false;
 
@@ -274,7 +274,7 @@ impl<'a> Behavior {
         eval
     }
 
-    fn evaluate_tcp(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
+    fn evaluate_tcp(&self, headers: Vec<ProtocolPacket>) -> BehaviorEvaluation {
         let mut has_syn = false;
         let mut has_syn_ack = false;
         let mut has_ack = false;
@@ -385,7 +385,7 @@ impl<'a> Behavior {
         eval
     }
 
-    fn evaluate_udp(&self, headers: Vec<Box<dyn ProtocolPacketHeader>>) -> BehaviorEvaluation {
+    fn evaluate_udp(&self, headers: Vec<ProtocolPacket>) -> BehaviorEvaluation {
         let mut has_egress = false;
         let mut has_ingress = false;
 

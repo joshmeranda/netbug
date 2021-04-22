@@ -2,6 +2,15 @@
 /// will largely focus on packets headers, and will largely ignore any packet
 /// payloads, as they are largely irrelevant to this project.
 use std::collections::HashMap;
+use crate::protocols::ethernet::IeeEthernetPacket;
+use crate::protocols::icmp::icmpv6::Icmpv6Packet;
+use crate::protocols::ip::{IpPacket, Ipv6Packet, Ipv4Packet};
+use crate::protocols::icmp::icmpv4::Icmpv4Packet;
+use crate::protocols::tcp::TcpPacket;
+use crate::protocols::udp::UdpPacket;
+use std::convert::TryFrom;
+use crate::error::NbugError;
+use crate::Addr;
 
 pub mod ethernet;
 pub mod icmp;
@@ -169,15 +178,58 @@ pub enum ProtocolNumber {
     Reserved         = 255,
 }
 
-/// Trait for structs representing a packet for one of the protocols specified
-/// by [ProtocolType]
-pub trait ProtocolPacketHeader {
-    /// Retrieve the total length of the packet header
-    fn header_length(&self) -> usize;
+pub enum ProtocolHeader {
+    Icmpv4(Icmpv4Packet),
+    Icmpv6(Icmpv6Packet),
+    Tcp(TcpPacket),
+    Udp(UdpPacket),
+}
 
-    /// Get the [ProtocolNumber] associated with the protocol packet.
-    fn protocol_type(&self) -> ProtocolNumber;
+impl ProtocolHeader {
+    pub fn header_length(&self) -> usize {
+        todo!()
+    }
+}
 
-    /// Retrieve important data about the header such as TCP flags.
-    fn header_data(&self) -> Option<HashMap<&str, u64>> { None }
+pub struct ProtocolPacket(IeeEthernetPacket, IpPacket, ProtocolHeader);
+
+impl ProtocolPacket {
+    pub fn source(&self) -> Addr {
+        todo!()
+    }
+
+    pub fn destination(&self) -> Addr {
+        todo!()
+    }
+}
+
+impl TryFrom<&[u8]> for ProtocolPacket {
+    type Error = NbugError;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let mut offset = 0;
+
+        let ether = IeeEthernetPacket::try_from(data)?;
+        offset += match ether {
+            IeeEthernetPacket::Ieee8022(_) => ethernet::Ethernet2Packet::MIN_BYTES,
+            IeeEthernetPacket::Ieee8023(_) => ethernet::Ethernet3Packet::MIN_BYTES,
+        };
+
+        let ip = IpPacket::try_from(&data[offset..])?;
+        offset += match ip {
+            IpPacket::V4(_) => Ipv4Packet::MIN_BYTES,
+            IpPacket::V6(_) => Ipv6Packet::MIN_BYTES,
+        };
+
+        let header = match ip.protocol() {
+            ProtocolNumber::Icmp => ProtocolHeader::Icmpv4(Icmpv4Packet::try_from(&data[offset..])?),
+            ProtocolNumber::Ipv6Icmp => ProtocolHeader::Icmpv6(Icmpv6Packet::try_from(&data[offset..])?),
+            ProtocolNumber::Tcp => ProtocolHeader::Tcp(TcpPacket::try_from(&data[offset..])?),
+            ProtocolNumber::Udp => ProtocolHeader::Udp(UdpPacket::try_from(&data[offset..])?),
+            number => Err(NbugError::Packet(String::from(format!("Unsupported or invalid protocol number: {}", number as u8))))?
+            // number => return Err(NbugError::Packet(String::from(format!("Unsupported or invalid protocol number: {}", number as u8))))
+        };
+
+        Ok(ProtocolPacket(ether, ip, header))
+    }
 }

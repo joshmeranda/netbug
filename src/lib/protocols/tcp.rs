@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
-use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 pub static CONTROL_BITS_KEY: &str = "CONTROL_BITS";
 
@@ -141,19 +141,5 @@ impl TryFrom<&[u8]> for TcpPacket {
             checksum,
             urgent_pointer,
         })
-    }
-}
-
-impl ProtocolPacketHeader for TcpPacket {
-    fn header_length(&self) -> usize { 24 }
-
-    fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Tcp }
-
-    fn header_data(&self) -> Option<HashMap<&str, u64>> {
-        let mut map = HashMap::new();
-
-        map.insert(CONTROL_BITS_KEY, self.control_bits as u64);
-
-        Some(map)
     }
 }

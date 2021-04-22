@@ -5,7 +5,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
 use crate::error::NbugError;
-use crate::protocols::{ProtocolNumber, ProtocolPacketHeader};
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 pub enum IpPacket {
     V4(Ipv4Packet),
@@ -24,6 +24,13 @@ impl IpPacket {
         match self {
             IpPacket::V4(packet) => IpAddr::from(packet.destination),
             IpPacket::V6(packet) => IpAddr::from(packet.destination),
+        }
+    }
+
+    pub fn protocol(&self) -> ProtocolNumber {
+        match self {
+            IpPacket::V4(packet) => packet.protocol,
+            IpPacket::V6(packet) => packet.next_header,
         }
     }
 }
@@ -49,22 +56,6 @@ impl TryFrom<&[u8]> for IpPacket {
                 "Invalid Ip packet version number '{}'",
                 version
             )))),
-        }
-    }
-}
-
-impl ProtocolPacketHeader for IpPacket {
-    fn header_length(&self) -> usize {
-        match self {
-            IpPacket::V4(packet) => packet.header_length(),
-            IpPacket::V6(packet) => packet.header_length(),
-        }
-    }
-
-    fn protocol_type(&self) -> ProtocolNumber {
-        match self {
-            IpPacket::V4(packet) => packet.protocol_type(),
-            IpPacket::V6(packet) => packet.protocol_type(),
         }
     }
 }
@@ -115,7 +106,7 @@ pub struct Ipv4Packet {
 impl Ipv4Packet {
     /// Minimum amount of bytes required to parse a full [Ipv4Packet], this
     /// value is the same length as a packet with no options.
-    const MIN_BYTES: usize = 20; // main header data
+    pub const MIN_BYTES: usize = 20; // main header data
 }
 
 impl TryFrom<&[u8]> for Ipv4Packet {
@@ -202,12 +193,6 @@ impl TryFrom<&[u8]> for Ipv4Packet {
     }
 }
 
-impl ProtocolPacketHeader for Ipv4Packet {
-    fn header_length(&self) -> usize { Self::MIN_BYTES }
-
-    fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv4 }
-}
-
 /// Ipv6 Packet Header as specified in [RFC 8200](https://tools.ietf.org/html/rfc8200#section-3).
 /// todo: support for extension headers
 pub struct Ipv6Packet {
@@ -224,6 +209,10 @@ pub struct Ipv6Packet {
     pub source: Ipv6Addr,
 
     pub destination: Ipv6Addr,
+}
+
+impl Ipv6Packet {
+    pub const MIN_BYTES: usize = 40;
 }
 
 impl TryFrom<&[u8]> for Ipv6Packet {
@@ -278,10 +267,4 @@ impl TryFrom<&[u8]> for Ipv6Packet {
             destination,
         })
     }
-}
-
-impl ProtocolPacketHeader for Ipv6Packet {
-    fn header_length(&self) -> usize { 40 }
-
-    fn protocol_type(&self) -> ProtocolNumber { ProtocolNumber::Ipv6 }
 }

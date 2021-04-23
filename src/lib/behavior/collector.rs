@@ -42,12 +42,12 @@ impl<'a> BehaviorCollector<'a> {
         let src = packet.source();
         let dst =  packet.source();
 
-        for (behavior, headers) in &mut self.behavior_map {
-            if behavior.protocol == packet.protocol_type()
+        for (behavior, packets) in &mut self.behavior_map {
+            if behavior.protocol == packet.header.protocol()
                 && (behavior.src == src && behavior.dst == dst
                     || behavior.src == dst && behavior.dst == src)
             {
-                headers.push(packet);
+                packets.push(packet);
 
                 return Ok(());
             }
@@ -55,7 +55,7 @@ impl<'a> BehaviorCollector<'a> {
 
         Err(NbugError::Processing(String::from(format!(
             "no behavior matches header: {} src: {} and dst: {}",
-            packet.protocol_type() as u8,
+            packet.header.protocol() as u8,
             src.to_string(), dst.to_string()
         ))))
     }
@@ -65,8 +65,8 @@ impl<'a> BehaviorCollector<'a> {
     pub fn evaluate(self) -> BehaviorReport<'a> {
         let mut report = BehaviorReport::new();
 
-        for (behavior, headers) in self.behavior_map {
-            let evaluation = behavior.evaluate(headers);
+        for (behavior, packets) in self.behavior_map {
+            let evaluation = behavior.evaluate(packets);
 
             report.add(evaluation);
         }

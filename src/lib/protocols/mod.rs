@@ -189,9 +189,25 @@ impl ProtocolHeader {
     pub fn header_length(&self) -> usize {
         todo!()
     }
+
+    /// Retrieve the [ProtocolNumber] for this header.
+    pub fn protocol(&self) -> ProtocolNumber {
+        match self {
+            ProtocolHeader::Icmpv4(..) => ProtocolNumber::Icmp,
+            ProtocolHeader::Icmpv6(..) => ProtocolNumber::Ipv6Icmp,
+            ProtocolHeader::Tcp(..) => ProtocolNumber::Tcp,
+            ProtocolHeader::Udp(..) => ProtocolNumber::Udp,
+        }
+    }
 }
 
-pub struct ProtocolPacket(IeeEthernetPacket, IpPacket, ProtocolHeader);
+pub struct ProtocolPacket {
+    pub ether: IeeEthernetPacket,
+
+    pub ip: IpPacket,
+
+    pub header: ProtocolHeader,
+}
 
 impl ProtocolPacket {
     pub fn source(&self) -> Addr {
@@ -230,6 +246,6 @@ impl TryFrom<&[u8]> for ProtocolPacket {
             // number => return Err(NbugError::Packet(String::from(format!("Unsupported or invalid protocol number: {}", number as u8))))
         };
 
-        Ok(ProtocolPacket(ether, ip, header))
+        Ok(ProtocolPacket{ ether, ip, header })
     }
 }

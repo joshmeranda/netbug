@@ -6,9 +6,9 @@ use crate::protocols::{ProtocolNumber, ProtocolPacket, DST_PORT_KEY, SRC_PORT_KE
 
 /// The UDP Packet a s specified in [RFC 768](https://tools.ietf.org/html/rfc768).
 pub struct UdpPacket {
-    source_port: u16,
+    pub source_port: u16,
 
-    destination_port: u16,
+    pub destination_port: u16,
 
     length: u16,
 

@@ -86,7 +86,7 @@ pub struct TcpPacket {
 
     offset: u8,
 
-    control_bits: u8,
+    pub control_bits: u8,
 
     window: u16,
 

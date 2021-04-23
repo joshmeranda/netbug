@@ -3,7 +3,7 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread;
 use std::thread::{Builder, JoinHandle};
 
@@ -14,6 +14,7 @@ use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::error::{NbugError, Result};
 use crate::{BUFFER_SIZE, HEADER_LENGTH, MESSAGE_VERSION};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The main Netbug client to capture network and dump network traffic to pcap
 /// files.
@@ -24,7 +25,7 @@ pub struct Client {
 
     devices: Vec<Device>,
 
-    capturing: Arc<Mutex<bool>>,
+    capturing: Arc<AtomicBool>,
 
     srv_addr: SocketAddr,
 
@@ -37,7 +38,7 @@ impl Default for Client {
             pcap_dir:         defaults::default_pcap_dir(),
             allow_concurrent: defaults::client::default_concurrent_run(),
             devices:          vec![],
-            capturing:        Arc::new(Mutex::new(false)),
+            capturing:        Arc::new(AtomicBool::new(false)),
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behaviors:        vec![],
         }
@@ -126,7 +127,7 @@ impl Client {
             fs::create_dir(self.pcap_dir.clone())?;
         }
 
-        *self.capturing.lock().unwrap() = true;
+        self.capturing.store(true, Ordering::SeqCst);
 
         for device in &self.devices {
             let capture_flag = Arc::clone(&self.capturing);
@@ -142,7 +143,7 @@ impl Client {
             // todo: add timestamp to end of pcap name
             let builder = Builder::new().name(device_name.clone());
             builder.spawn(move || {
-                while *capture_flag.lock().unwrap() {
+                while capture_flag.load(Ordering::SeqCst) {
                     match capture.next() {
                         Ok(packet) => save_file.write(&packet),
                         Err(_) => {}, // todo: these errors should be handled
@@ -169,12 +170,13 @@ impl Client {
             return Err(NbugError::Client(String::from("no capture is running")));
         }
 
-        *self.capturing.lock().unwrap() = false;
+        self.capturing.store(false, Ordering::SeqCst);
+
         Ok(())
     }
 
     /// Determine if the client is capturing network traffic.
-    pub fn is_capturing(&self) -> bool { *self.capturing.lock().unwrap() }
+    pub fn is_capturing(&self) -> bool { self.capturing.load(Ordering::SeqCst) }
 
     /// Transfer all
     pub fn transfer_all(&self) -> Result<()> {

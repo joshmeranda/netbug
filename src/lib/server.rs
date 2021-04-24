@@ -3,9 +3,9 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::Builder;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use pcap::Capture;
 
@@ -37,10 +37,10 @@ pub struct Server {
 impl Default for Server {
     fn default() -> Server {
         Server {
-            pcap_dir: defaults::default_pcap_dir(),
-            srv_addr: SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
+            pcap_dir:  defaults::default_pcap_dir(),
+            srv_addr:  SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behaviors: Vec::<Behavior>::new(),
-            running: Arc::new(AtomicBool::new(false)),
+            running:   Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -70,8 +70,8 @@ impl Server {
 
         let handle;
 
+        // unsafe to allow  the thread to run anywhere the struct is valid.
         unsafe {
-
             handle = builder.spawn_unchecked(move || {
                 if let Err(err) = Server::handle_connections(&running_flag, srv_addr, pcap_dir) {
                     eprintln!("{}", err.to_string());
@@ -256,11 +256,11 @@ impl Server {
 
         while let Ok(packet) = capture.next() {
             match ProtocolPacket::try_from(packet.data) {
-                Ok(protocol_packet) => if let Err(err) =
-                collector.insert_packet(protocol_packet) {
-                    eprintln!("{}", err.to_string())
-                },
-                Err(err) => eprintln!("Error parsing packet: {}" , err.to_string())
+                Ok(protocol_packet) =>
+                    if let Err(err) = collector.insert_packet(protocol_packet) {
+                        eprintln!("{}", err.to_string())
+                    },
+                Err(err) => eprintln!("Error parsing packet: {}", err.to_string()),
             }
         }
 

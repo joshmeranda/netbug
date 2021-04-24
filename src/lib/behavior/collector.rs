@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use crate::behavior::evaluate::BehaviorReport;
 use crate::behavior::Behavior;
 use crate::error::{NbugError, Result};
-use crate::Addr;
 use crate::protocols::ProtocolPacket;
+use crate::Addr;
 
 /// A basic collector for [Behavior]s and their corresponding
 /// [ProtocolPackets].
@@ -40,12 +40,11 @@ impl<'a> BehaviorCollector<'a> {
     /// Err is returned.
     pub fn insert_packet(&mut self, packet: ProtocolPacket) -> Result<()> {
         let src = packet.source();
-        let dst =  packet.source();
+        let dst = packet.source();
 
         for (behavior, packets) in &mut self.behavior_map {
             if behavior.protocol == packet.header.protocol()
-                && (behavior.src == src && behavior.dst == dst
-                    || behavior.src == dst && behavior.dst == src)
+                && (behavior.src == src && behavior.dst == dst || behavior.src == dst && behavior.dst == src)
             {
                 packets.push(packet);
 
@@ -56,7 +55,8 @@ impl<'a> BehaviorCollector<'a> {
         Err(NbugError::Processing(String::from(format!(
             "no behavior matches header: {} src: {} and dst: {}",
             packet.header.protocol() as u8,
-            src.to_string(), dst.to_string()
+            src.to_string(),
+            dst.to_string()
         ))))
     }
 

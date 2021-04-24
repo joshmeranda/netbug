@@ -3,6 +3,7 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::thread::{Builder, JoinHandle};
@@ -14,7 +15,6 @@ use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::error::{NbugError, Result};
 use crate::{BUFFER_SIZE, HEADER_LENGTH, MESSAGE_VERSION};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The main Netbug client to capture network and dump network traffic to pcap
 /// files.

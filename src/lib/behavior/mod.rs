@@ -7,14 +7,14 @@ use std::time::Duration;
 use num_traits::FromPrimitive;
 
 use crate::behavior::evaluate::BehaviorEvaluation;
+use crate::config::defaults;
 use crate::error::{NbugError, Result};
 use crate::protocols::icmp::icmpv4::Icmpv4MessageKind;
 use crate::protocols::icmp::icmpv6::Icmpv6MessageKind;
 use crate::protocols::icmp::ICMP_KIND_KEY;
 use crate::protocols::tcp::{TcpControlBits, CONTROL_BITS_KEY};
-use crate::protocols::{ProtocolNumber, DST_PORT_KEY, SRC_PORT_KEY, ProtocolHeader, ProtocolPacket};
+use crate::protocols::{ProtocolHeader, ProtocolNumber, ProtocolPacket, DST_PORT_KEY, SRC_PORT_KEY};
 use crate::Addr;
-use crate::config::defaults;
 
 pub mod collector;
 pub mod evaluate;
@@ -140,7 +140,9 @@ impl<'a> Behavior {
         Ok(())
     }
 
-    /// Determine if a list off packets satisfies the expected behavior, and build a description of which steps of the behavior passed  and which failed.
+    /// Determine if a list off packets satisfies the expected behavior, and
+    /// build a description of which steps of the behavior passed  and which
+    /// failed.
     pub fn evaluate(&self, packets: Vec<ProtocolPacket>) -> BehaviorEvaluation {
         match self.protocol {
             ProtocolNumber::Icmp => self.evaluate_icmp(packets),
@@ -156,14 +158,17 @@ impl<'a> Behavior {
         let mut has_request = false;
         let mut has_reply = false;
 
-        for packet in packets.iter()
-            .filter(|p| p.header.protocol() == ProtocolNumber::Icmp)  {
-            let icmp = if let ProtocolHeader::Icmpv4(icmp) = &packet.header { icmp } else { unreachable!() };
+        for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Icmp) {
+            let icmp = if let ProtocolHeader::Icmpv4(icmp) = &packet.header {
+                icmp
+            } else {
+                unreachable!()
+            };
 
             match icmp.message_kind() {
                 Icmpv4MessageKind::EchoReply => has_request = true,
                 Icmpv4MessageKind::EchoRequest => has_reply = true,
-                _ => { },
+                _ => {},
             }
         }
 
@@ -175,14 +180,20 @@ impl<'a> Behavior {
         let mut has_request = false;
         let mut has_reply = false;
 
-        for packet in packets.iter()
-            .filter(|p| p.header.protocol() == ProtocolNumber::Ipv6Icmp)  {
-            let icmp = if let ProtocolHeader::Icmpv6(icmp) = &packet.header { icmp } else { unreachable!() };
+        for packet in packets
+            .iter()
+            .filter(|p| p.header.protocol() == ProtocolNumber::Ipv6Icmp)
+        {
+            let icmp = if let ProtocolHeader::Icmpv6(icmp) = &packet.header {
+                icmp
+            } else {
+                unreachable!()
+            };
 
             match icmp.message_kind() {
                 Icmpv6MessageKind::EchoReply => has_request = true,
                 Icmpv6MessageKind::EchoRequest => has_reply = true,
-                _ => { },
+                _ => {},
             }
         }
 
@@ -260,10 +271,12 @@ impl<'a> Behavior {
         let mut has_ack = false;
         let mut has_fin = false;
 
-        for packet in packets.iter()
-            .filter(|p| p.header.protocol() == ProtocolNumber::Tcp)  {
-
-            let tcp = if let ProtocolHeader::Tcp(tcp) = &packet.header { tcp } else { unreachable!() };
+        for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Tcp) {
+            let tcp = if let ProtocolHeader::Tcp(tcp) = &packet.header {
+                tcp
+            } else {
+                unreachable!()
+            };
             let control_bits = TcpControlBits::find_control_bits(tcp.control_bits);
 
             if TcpControlBits::is_syn(&control_bits) {
@@ -373,10 +386,12 @@ impl<'a> Behavior {
             0u16 // todo: consider failing or a better default source port
         };
 
-        for packet in packets.iter()
-            .filter(|p| p.header.protocol() == ProtocolNumber::Udp) {
-
-            let udp = if let ProtocolHeader::Udp(udp) = &packet.header { udp } else { unreachable!() };
+        for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Udp) {
+            let udp = if let ProtocolHeader::Udp(udp) = &packet.header {
+                udp
+            } else {
+                unreachable!()
+            };
 
             if udp.source_port == behavior_src && udp.destination_port == behavior_dst {
                 has_egress = true;

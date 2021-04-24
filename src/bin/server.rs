@@ -19,9 +19,7 @@ fn main() {
         println!("Starting server...");
     }
 
-    while server.is_running() {
-
-    }
+    while server.is_running() {}
 
     println!("Stopping server...");
 }

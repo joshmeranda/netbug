@@ -2,14 +2,15 @@
 /// will largely focus on packets headers, and will largely ignore any packet
 /// payloads, as they are largely irrelevant to this project.
 use std::collections::HashMap;
+use std::convert::TryFrom;
+
+use crate::error::NbugError;
 use crate::protocols::ethernet::IeeEthernetPacket;
-use crate::protocols::icmp::icmpv6::Icmpv6Packet;
-use crate::protocols::ip::{IpPacket, Ipv6Packet, Ipv4Packet};
 use crate::protocols::icmp::icmpv4::Icmpv4Packet;
+use crate::protocols::icmp::icmpv6::Icmpv6Packet;
+use crate::protocols::ip::{IpPacket, Ipv4Packet, Ipv6Packet};
 use crate::protocols::tcp::TcpPacket;
 use crate::protocols::udp::UdpPacket;
-use std::convert::TryFrom;
-use crate::error::NbugError;
 use crate::Addr;
 
 pub mod ethernet;
@@ -186,9 +187,7 @@ pub enum ProtocolHeader {
 }
 
 impl ProtocolHeader {
-    pub fn header_length(&self) -> usize {
-        todo!()
-    }
+    pub fn header_length(&self) -> usize { todo!() }
 
     /// Retrieve the [ProtocolNumber] for this header.
     pub fn protocol(&self) -> ProtocolNumber {
@@ -210,13 +209,9 @@ pub struct ProtocolPacket {
 }
 
 impl ProtocolPacket {
-    pub fn source(&self) -> Addr {
-        todo!()
-    }
+    pub fn source(&self) -> Addr { todo!() }
 
-    pub fn destination(&self) -> Addr {
-        todo!()
-    }
+    pub fn destination(&self) -> Addr { todo!() }
 }
 
 impl TryFrom<&[u8]> for ProtocolPacket {
@@ -242,10 +237,13 @@ impl TryFrom<&[u8]> for ProtocolPacket {
             ProtocolNumber::Ipv6Icmp => ProtocolHeader::Icmpv6(Icmpv6Packet::try_from(&data[offset..])?),
             ProtocolNumber::Tcp => ProtocolHeader::Tcp(TcpPacket::try_from(&data[offset..])?),
             ProtocolNumber::Udp => ProtocolHeader::Udp(UdpPacket::try_from(&data[offset..])?),
-            number => Err(NbugError::Packet(String::from(format!("Unsupported or invalid protocol number: {}", number as u8))))?
-            // number => return Err(NbugError::Packet(String::from(format!("Unsupported or invalid protocol number: {}", number as u8))))
+            number => Err(NbugError::Packet(String::from(format!(
+                "Unsupported or invalid protocol number: {}",
+                number as u8
+            ))))?, /* number => return Err(NbugError::Packet(String::from(format!("Unsupported or invalid protocol
+                    * number: {}", number as u8)))) */
         };
 
-        Ok(ProtocolPacket{ ether, ip, header })
+        Ok(ProtocolPacket { ether, ip, header })
     }
 }

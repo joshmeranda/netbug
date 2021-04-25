@@ -21,6 +21,52 @@ pub mod evaluate;
 
 use evaluate::PacketStatus;
 
+use crate::protocols::udp::UdpPacket;
+
+/// Simple macro to extract values from an enum struct variant. If only one
+/// value is requested only that value is returned, if multiple are requested,
+/// they are all returned as a tuple. This macro will panic if the supplied
+/// `var` and `variant` are of difering types.
+///
+/// # Examples
+/// ```
+/// #  #[macro_use] extern crate netbug;
+/// enum Sample {
+///     Variant(usize, usize)
+/// }
+///
+/// # fn main() {
+/// let sample = Sample::Variant(0, 1);
+/// assert_eq!(variant_extract!(sample, Sample::Variant(_, m), m), 1);
+/// # }
+/// ```
+///
+/// ```should_panic
+/// #  #[macro_use] extern crate netbug;
+/// enum Sample {
+///     Variant(usize, usize)
+/// }
+///
+/// # fn main() {
+/// let sample = Sample::Variant(0, 1);
+/// variant_extract!(sample, Some(n), m);
+/// # }
+/// ```
+macro_rules! variant_extract {
+    ($var:expr, $variant:pat, $data:ident) => {
+        match $var {
+            $variant => $data,
+            _ => panic!("no such variant exists"),
+        }
+    };
+    ($var:expr, $variant:pat, $($data:ident),+) => {
+        match $var {
+            $variant => ($($data),+),
+            _ => panic!("no such variant exists")
+        }
+    };
+}
+
 /// Specifies the direction traffic should be expected. When used in the client
 /// configuration, this field is ignored and will have no effect.
 ///
@@ -159,11 +205,7 @@ impl<'a> Behavior {
         let mut has_reply = false;
 
         for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Icmp) {
-            let icmp = if let ProtocolHeader::Icmpv4(icmp) = &packet.header {
-                icmp
-            } else {
-                unreachable!()
-            };
+            let icmp = variant_extract!(&packet.header, ProtocolHeader::Icmpv4(icmp), icmp);
 
             match icmp.message_kind() {
                 Icmpv4MessageKind::EchoReply => has_request = true,
@@ -184,11 +226,7 @@ impl<'a> Behavior {
             .iter()
             .filter(|p| p.header.protocol() == ProtocolNumber::Ipv6Icmp)
         {
-            let icmp = if let ProtocolHeader::Icmpv6(icmp) = &packet.header {
-                icmp
-            } else {
-                unreachable!()
-            };
+            let icmp = variant_extract!(&packet.header, ProtocolHeader::Icmpv6(icmp), icmp);
 
             match icmp.message_kind() {
                 Icmpv6MessageKind::EchoReply => has_request = true,
@@ -272,11 +310,7 @@ impl<'a> Behavior {
         let mut has_fin = false;
 
         for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Tcp) {
-            let tcp = if let ProtocolHeader::Tcp(tcp) = &packet.header {
-                tcp
-            } else {
-                unreachable!()
-            };
+            let tcp = variant_extract!(&packet.header, ProtocolHeader::Tcp(tcp), tcp);
             let control_bits = TcpControlBits::find_control_bits(tcp.control_bits);
 
             if TcpControlBits::is_syn(&control_bits) {
@@ -387,11 +421,8 @@ impl<'a> Behavior {
         };
 
         for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Udp) {
-            let udp = if let ProtocolHeader::Udp(udp) = &packet.header {
-                udp
-            } else {
-                unreachable!()
-            };
+            let header = &packet.header;
+            let udp: &UdpPacket = variant_extract!(header, ProtocolHeader::Udp(udp), udp);
 
             if udp.source_port == behavior_src && udp.destination_port == behavior_dst {
                 has_egress = true;

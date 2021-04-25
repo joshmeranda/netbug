@@ -87,8 +87,6 @@ impl Server {
 
     /// Handle accepting client connections.
     fn handle_connections(running_flag: &Arc<AtomicBool>, srv_addr: SocketAddr, pcap_dir: PathBuf) -> Result<()> {
-        println!("=== 000 {} ===", srv_addr.to_string());
-
         // todo: implement a clean shutdown (catch interrupts)
         let listener = TcpListener::bind(srv_addr)?;
 

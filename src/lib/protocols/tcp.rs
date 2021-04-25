@@ -76,9 +76,9 @@ impl TcpControlBits {
 
 /// The TCP Packet as specified in [RFC 793 3.1](https://tools.ietf.org/html/rfc793#section-3.1).
 pub struct TcpPacket {
-    source_port: u16,
+    pub source_port: u16,
 
-    destination_port: u16,
+    pub destination_port: u16,
 
     sequence_number: u32,
 

@@ -12,6 +12,7 @@ use crate::protocols::ip::{IpPacket, Ipv4Packet, Ipv6Packet};
 use crate::protocols::tcp::TcpPacket;
 use crate::protocols::udp::UdpPacket;
 use crate::Addr;
+use std::net::{IpAddr, SocketAddr};
 
 pub mod ethernet;
 pub mod icmp;
@@ -206,12 +207,49 @@ pub struct ProtocolPacket {
     pub ip: IpPacket,
 
     pub header: ProtocolHeader,
+
+    pub source: Addr,
+
+    pub destination: Addr,
 }
 
 impl ProtocolPacket {
-    pub fn source(&self) -> Addr { todo!() }
+    pub fn new(ether: IeeEthernetPacket, ip: IpPacket, header: ProtocolHeader) -> ProtocolPacket {
+        let (source, destination) = ProtocolPacket::make_addr(&ip, &header);
 
-    pub fn destination(&self) -> Addr { todo!() }
+        ProtocolPacket {
+            ether,
+            ip,
+            header,
+            source,
+            destination,
+        }
+    }
+
+    /// Utility to create the source and destination addresses from the given [IpPacket] and [ProtocolHeader].
+    fn make_addr(ip: &IpPacket, header: &ProtocolHeader) -> (Addr, Addr) {
+        let src_ip = match ip {
+            IpPacket::V4(packet) => IpAddr::V4(packet.source),
+            IpPacket::V6(packet) => IpAddr::V6(packet.source),
+        };
+        let src = match header {
+            ProtocolHeader::Icmpv4(_) | ProtocolHeader::Icmpv6(_) => Addr::Internet(src_ip),
+            ProtocolHeader::Tcp(header) => Addr::Socket(SocketAddr::new(src_ip, header.source_port)),
+            ProtocolHeader::Udp(header) => Addr::Socket(SocketAddr::new(src_ip, header.source_port)),
+        };
+
+        let dst_ip = match ip {
+            IpPacket::V4(packet) => IpAddr::V4(packet.destination),
+            IpPacket::V6(packet) => IpAddr::V6(packet.destination),
+        };
+        let dst = match header {
+            ProtocolHeader::Icmpv4(_) | ProtocolHeader::Icmpv6(_) => Addr::Internet(dst_ip),
+            ProtocolHeader::Tcp(header) => Addr::Socket(SocketAddr::new(src_ip, header.destination_port)),
+            ProtocolHeader::Udp(header) => Addr::Socket(SocketAddr::new(src_ip, header.destination_port)),
+        };
+
+        (src, dst)
+    }
 }
 
 impl TryFrom<&[u8]> for ProtocolPacket {
@@ -240,10 +278,9 @@ impl TryFrom<&[u8]> for ProtocolPacket {
             number => Err(NbugError::Packet(String::from(format!(
                 "Unsupported or invalid protocol number: {}",
                 number as u8
-            ))))?, /* number => return Err(NbugError::Packet(String::from(format!("Unsupported or invalid protocol
-                    * number: {}", number as u8)))) */
+            ))))?,
         };
 
-        Ok(ProtocolPacket { ether, ip, header })
+        Ok(ProtocolPacket::new(ether, ip, header))
     }
 }

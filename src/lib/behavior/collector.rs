@@ -39,8 +39,8 @@ impl<'a> BehaviorCollector<'a> {
     /// Insert a new header to the collector, if no matching behavior is found
     /// Err is returned.
     pub fn insert_packet(&mut self, packet: ProtocolPacket) -> Result<()> {
-        let src = packet.source();
-        let dst = packet.source();
+        let src = packet.source;
+        let dst = packet.source;
 
         for (behavior, packets) in &mut self.behavior_map {
             if behavior.protocol == packet.header.protocol()

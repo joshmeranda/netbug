@@ -1,5 +1,6 @@
 use netbug::config::server::ServerConfig;
 use netbug::server::Server;
+use std::time::Duration;
 
 fn main() {
     let server_cfg = match ServerConfig::from_path("examples/config/server.toml") {
@@ -12,16 +13,23 @@ fn main() {
 
     let server = Server::from_config(server_cfg);
 
-    // if let Err(err) = server.start() {
-    //     eprintln!("Could not start the server: {}", err.to_string());
-    //     return;
-    // } else {
-    //     println!("Starting server...");
-    // }
+    if let Err(err) = server.start() {
+        eprintln!("Could not start the server: {}", err.to_string());
+        return;
+    } else {
+        println!("Starting server...");
+    }
 
-    serde_json::to_string(&server.process().unwrap());
+    while server.is_running() {
+        let report = server.process();
 
-    while server.is_running() {}
+        match report {
+            Ok(report) => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
+            Err(err) => eprintln!("Error processing captures: {}", err.to_string())
+        }
+
+        std::thread::sleep(Duration::from_secs(5));
+    }
 
     println!("Stopping server...");
 }

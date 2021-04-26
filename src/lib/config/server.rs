@@ -17,6 +17,9 @@ pub struct ServerConfig {
     pub srv_addr: SocketAddr,
 
     pub behaviors: Vec<Behavior>,
+
+    #[serde(default = "defaults::server::default_n_workers")]
+    pub n_workers: usize,
 }
 
 impl ServerConfig {

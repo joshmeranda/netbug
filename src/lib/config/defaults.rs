@@ -49,3 +49,6 @@ pub mod client {
 }
 
 // Server Specific Values
+pub mod server {
+    pub fn default_n_workers() -> usize { 4 }
+}

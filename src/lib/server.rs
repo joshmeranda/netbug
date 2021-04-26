@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::thread::Builder;
 
 use pcap::Capture;
+use threadpool::ThreadPool;
 
 use crate::behavior::collector::BehaviorCollector;
 use crate::behavior::evaluate::BehaviorReport;
@@ -94,7 +95,8 @@ impl Server {
 
         // todo: make map of thread id to handle?
         //   currently handle vector will keep building until server is shutdown
-        let mut handles = vec![];
+        // let mut handles = vec![];
+        let pool = ThreadPool::new(4);
 
         // todo: consider polling for better performance
         while running_flag.load(Ordering::SeqCst) {
@@ -116,16 +118,24 @@ impl Server {
                 };
             }
 
-            handles.push(std::thread::spawn(|| match Server::receive_pcap(stream, pcap_dir) {
+            pool.execute(|| match Server::receive_pcap(stream, pcap_dir) {
                 Ok(_) => println!("Received pcaps"),
                 Err(err) => eprintln!("Server Error: {}", err.to_string()),
-            }));
+            });
+
+            // handles.push(std::thread::spawn(|| match Server::receive_pcap(stream, pcap_dir) {
+            //     Ok(_) => println!("Received pcaps"),
+            //     Err(err) => eprintln!("Server Error: {}", err.to_string()),
+            // }));
         }
 
-        while !handles.is_empty() {
-            let handle = handles.pop().unwrap();
-            handle.join().expect("error waiting for stream thead to exit");
-        }
+        // while !handles.is_empty() {
+        //     let handle = handles.pop().unwrap();
+        //     handle.join().expect("error waiting for stream thead to exit");
+        // }
+
+
+        pool.join();
 
         Ok(())
     }

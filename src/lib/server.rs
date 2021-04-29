@@ -24,41 +24,34 @@ use crate::protocols::tcp::TcpPacket;
 use crate::protocols::udp::UdpPacket;
 use crate::protocols::{ProtocolNumber, ProtocolPacket};
 use crate::{Addr, BUFFER_SIZE, HEADER_LENGTH};
+use std::default;
 
 pub struct Server {
-    pcap_dir: PathBuf,
-
-    srv_addr: SocketAddr,
-
-    behaviors: Vec<Behavior>,
+    addr: SocketAddr,
 
     n_workers: usize,
 
     running: Arc<AtomicBool>,
+
+    pcap_dir: PathBuf,
 }
 
 impl Default for Server {
     fn default() -> Server {
         Server {
-            pcap_dir:  defaults::default_pcap_dir(),
-            srv_addr:  SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
-            behaviors: Vec::<Behavior>::new(),
+            addr:  SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             n_workers: defaults::server::default_n_workers(),
             running:   Arc::new(AtomicBool::new(false)),
+            pcap_dir: defaults::default_pcap_dir()
         }
     }
 }
 
 impl Server {
-    pub fn new() -> Server { Server::default() }
-
-    /// Construct a server from a [ServerConfig] which is consumed.
-    pub fn from_config(cfg: ServerConfig) -> Server {
+    pub fn new(addr: SocketAddr, n_workers: usize, pcap_dir: PathBuf) -> Server {
         Server {
-            pcap_dir: cfg.pcap_dir,
-            srv_addr: cfg.srv_addr,
-            behaviors: cfg.behaviors,
-            n_workers: cfg.n_workers,
+            addr,
+            n_workers,
             ..Server::default()
         }
     }
@@ -68,7 +61,7 @@ impl Server {
         let builder = Builder::new().name(String::from("nbug_server"));
 
         let running_flag = Arc::clone(&self.running);
-        let srv_addr = self.srv_addr.clone();
+        let srv_addr = self.addr.clone();
         let pcap_dir = self.pcap_dir.clone();
 
         running_flag.store(true, Ordering::SeqCst);
@@ -201,67 +194,6 @@ impl Server {
             remaining_bytes -= byte_count;
 
             pcap_file.write(&buffer[0..byte_count])?;
-        }
-
-        Ok(())
-    }
-
-    /// Iterate over server capture directory. This method will traverse only
-    /// the children of the root pcap directory, and so any non-directory files
-    /// in the root pcap directory will be ignored.
-    pub fn process(&self) -> Result<BehaviorReport> {
-        let mut collector = BehaviorCollector::new();
-
-        for behavior in &self.behaviors {
-            collector.insert_behavior(&behavior);
-        }
-
-        for entry in fs::read_dir(&self.pcap_dir)? {
-            let child = match entry {
-                Ok(entry) => entry,
-                Err(_) => continue,
-            };
-
-            let file_type = match child.file_type() {
-                Ok(file_type) => file_type,
-                Err(_) => continue,
-            };
-
-            if file_type.is_dir() {
-                for sub_entry in fs::read_dir(child.path())? {
-                    let path = match sub_entry {
-                        Ok(sub_entry) => sub_entry.path(),
-                        Err(_) => continue,
-                    };
-
-                    match self.process_pcap(&path, &mut collector) {
-                        Ok(_) => {},
-                        Err(err) => eprintln!(
-                            "Error processing pcap '{}': {}",
-                            path.to_str().unwrap(),
-                            err.to_string()
-                        ),
-                    }
-                }
-            }
-        }
-
-        Ok(collector.evaluate())
-    }
-
-    /// Process a single pcap file, by adding the found [ProtocolPacket]s
-    /// into the given [BehaviorCollector].
-    fn process_pcap(&self, path: &PathBuf, collector: &mut BehaviorCollector) -> Result<()> {
-        let mut capture = Capture::from_file(path)?;
-
-        while let Ok(packet) = capture.next() {
-            match ProtocolPacket::try_from(packet.data) {
-                Ok(protocol_packet) =>
-                    if let Err(err) = collector.insert_packet(protocol_packet) {
-                        eprintln!("{}", err.to_string())
-                    },
-                Err(err) => eprintln!("Error parsing packet: {}", err.to_string()),
-            }
         }
 
         Ok(())

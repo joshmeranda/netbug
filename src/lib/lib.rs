@@ -7,6 +7,7 @@ pub mod error;
 pub mod message;
 pub mod protocols;
 pub mod server;
+pub mod process;
 
 #[macro_use]
 extern crate serde_derive;

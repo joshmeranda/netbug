@@ -1,5 +1,7 @@
 pcap_dir = "recv_pcap"
 
+report_path = "report.json"
+
 srv_addr = "0.0.0.0:8081"
 
 [[behaviors]]

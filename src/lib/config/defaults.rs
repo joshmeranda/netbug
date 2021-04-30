@@ -9,8 +9,9 @@ const NETBUG_PCAP_SUB_DIR_NAME: &str = "pcap";
 
 const NETBUG_SCRIPTS_SUB_DIR_NAME: &str = "scripts";
 
-// Common Values
+const NETBUG_REPORT_FILE_NAME: &str = "report.json";
 
+// Common Values
 pub fn default_config_file_path() -> PathBuf {
     let mut path = PathBuf::from(NETBUG_BASE_DIR);
     path.push(NETBUG_CONFIG_FILE_NAME);
@@ -32,10 +33,16 @@ pub fn default_pcap_dir() -> PathBuf {
     path
 }
 
+pub fn default_report_file_path() -> PathBuf {
+    let mut path = PathBuf::from(NETBUG_BASE_DIR);
+    path.push(NETBUG_REPORT_FILE_NAME);
+
+    path
+}
+
 pub fn default_server_port() -> u16 { 8081 }
 
 // Client Specific Values
-
 pub mod client {
     use std::net::{IpAddr, Ipv4Addr};
 
@@ -49,6 +56,7 @@ pub mod client {
 }
 
 // Server Specific Values
+// todo: calculate the number of sockets / cores / threads on the host machine
 pub mod server {
     pub fn default_n_workers() -> usize { 4 }
 }

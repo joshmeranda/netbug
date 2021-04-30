@@ -52,6 +52,7 @@ impl Server {
         Server {
             addr,
             n_workers,
+            pcap_dir,
             ..Server::default()
         }
     }
@@ -66,11 +67,9 @@ impl Server {
 
         running_flag.store(true, Ordering::SeqCst);
 
-        let handle;
-
         // unsafe to allow  the thread to run anywhere the struct is valid.
         unsafe {
-            handle = builder.spawn_unchecked(move || {
+            builder.spawn_unchecked(move || {
                 if let Err(err) = Server::handle_connections(&running_flag, srv_addr, pcap_dir) {
                     eprintln!("{}", err.to_string());
                 }

@@ -20,6 +20,9 @@ pub struct ServerConfig {
 
     #[serde(default = "defaults::server::default_n_workers")]
     pub n_workers: usize,
+
+    #[serde(default = "defaults::default_report_file_path")]
+    pub report_path: PathBuf,
 }
 
 impl ServerConfig {

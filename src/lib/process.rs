@@ -1,12 +1,14 @@
-use std::path::PathBuf;
-use crate::behavior::collector::BehaviorCollector;
+use std::convert::TryFrom;
 use std::fs;
+use std::path::PathBuf;
+
+use pcap::Capture;
+
+use crate::behavior::collector::BehaviorCollector;
 use crate::behavior::evaluate::BehaviorReport;
 use crate::behavior::Behavior;
 use crate::error::Result;
-use pcap::Capture;
 use crate::protocols::ProtocolPacket;
-use std::convert::TryFrom;
 
 pub struct PcapProcessor {
     behaviors: Vec<Behavior>,
@@ -15,12 +17,7 @@ pub struct PcapProcessor {
 }
 
 impl PcapProcessor {
-    pub fn new(behaviors: Vec<Behavior>, pcap_dir: PathBuf) -> PcapProcessor {
-        PcapProcessor {
-            behaviors,
-            pcap_dir
-        }
-    }
+    pub fn new(behaviors: Vec<Behavior>, pcap_dir: PathBuf) -> PcapProcessor { PcapProcessor { behaviors, pcap_dir } }
 
     /// Iterate over server capture directory. This method will traverse only
     /// the children of the root pcap directory, and so any non-directory files

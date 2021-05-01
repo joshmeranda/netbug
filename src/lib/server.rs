@@ -1,4 +1,5 @@
 use std::convert::{TryFrom, TryInto};
+use std::default;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
@@ -24,7 +25,6 @@ use crate::protocols::tcp::TcpPacket;
 use crate::protocols::udp::UdpPacket;
 use crate::protocols::{ProtocolNumber, ProtocolPacket};
 use crate::{Addr, BUFFER_SIZE, HEADER_LENGTH};
-use std::default;
 
 pub struct Server {
     addr: SocketAddr,
@@ -39,10 +39,10 @@ pub struct Server {
 impl Default for Server {
     fn default() -> Server {
         Server {
-            addr:  SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
+            addr:      SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             n_workers: defaults::server::default_n_workers(),
             running:   Arc::new(AtomicBool::new(false)),
-            pcap_dir: defaults::default_pcap_dir()
+            pcap_dir:  defaults::default_pcap_dir(),
         }
     }
 }

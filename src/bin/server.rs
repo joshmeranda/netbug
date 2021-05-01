@@ -1,10 +1,11 @@
-use netbug::config::server::ServerConfig;
-use netbug::server::Server;
-use std::time::Duration;
-use netbug::process::PcapProcessor;
+use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::fs;
+use std::time::Duration;
+
+use netbug::config::server::ServerConfig;
+use netbug::process::PcapProcessor;
+use netbug::server::Server;
 
 fn main() {
     let server_cfg = match ServerConfig::from_path("examples/config/server.toml") {
@@ -24,8 +25,8 @@ fn main() {
     } else {
         println!("Starting server...");
     }
-    
-     while server.is_running() {
+
+    while server.is_running() {
         let report = processor.process();
 
         match report {
@@ -34,7 +35,7 @@ fn main() {
                 let report_path = &server_cfg.report_path;
 
                 let dir = report_path.parent().unwrap();
-                if ! dir.exists() {
+                if !dir.exists() {
                     fs::create_dir_all(dir);
                 }
 
@@ -42,15 +43,15 @@ fn main() {
                     Ok(file) => file,
                     Err(err) => {
                         eprintln!("Error opening report file: {}", err.to_string());
-                        continue
-                    }
+                        continue;
+                    },
                 };
 
                 if let Err(err) = file.write(content.as_ref()) {
                     eprintln!("Error writing report {}", err.to_string())
                 }
             },
-            Err(err) => eprintln!("Error processing captures: {}", err.to_string())
+            Err(err) => eprintln!("Error processing captures: {}", err.to_string()),
         }
 
         std::thread::sleep(Duration::from_secs(5));

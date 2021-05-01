@@ -3,6 +3,7 @@
 /// payloads, as they are largely irrelevant to this project.
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::net::{IpAddr, SocketAddr};
 
 use crate::error::NbugError;
 use crate::protocols::ethernet::IeeEthernetPacket;
@@ -12,7 +13,6 @@ use crate::protocols::ip::{IpPacket, Ipv4Packet, Ipv6Packet};
 use crate::protocols::tcp::TcpPacket;
 use crate::protocols::udp::UdpPacket;
 use crate::Addr;
-use std::net::{IpAddr, SocketAddr};
 
 pub mod ethernet;
 pub mod icmp;
@@ -226,7 +226,8 @@ impl ProtocolPacket {
         }
     }
 
-    /// Utility to create the source and destination addresses from the given [IpPacket] and [ProtocolHeader].
+    /// Utility to create the source and destination addresses from the given
+    /// [IpPacket] and [ProtocolHeader].
     fn make_addr(ip: &IpPacket, header: &ProtocolHeader) -> (Addr, Addr) {
         let src_ip = match ip {
             IpPacket::V4(packet) => IpAddr::V4(packet.source),

@@ -4,6 +4,7 @@ use std::time::Duration;
 use netbug::process::PcapProcessor;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::fs;
 
 fn main() {
     let server_cfg = match ServerConfig::from_path("examples/config/server.toml") {
@@ -31,6 +32,11 @@ fn main() {
             Ok(report) => {
                 let content = serde_json::to_string_pretty(&report).unwrap();
                 let report_path = &server_cfg.report_path;
+
+                let dir = report_path.parent().unwrap();
+                if ! dir.exists() {
+                    fs::create_dir_all(dir);
+                }
 
                 let mut file = match File::create(report_path) {
                     Ok(file) => file,

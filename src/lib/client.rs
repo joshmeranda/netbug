@@ -124,7 +124,7 @@ impl Client {
 
         // ensure that the packet capture directory exists
         if !self.pcap_dir.exists() {
-            fs::create_dir(self.pcap_dir.clone())?;
+            fs::create_dir_all(self.pcap_dir.clone())?;
         }
 
         self.capturing.store(true, Ordering::SeqCst);

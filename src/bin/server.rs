@@ -6,6 +6,7 @@ use std::time::Duration;
 use netbug::config::server::ServerConfig;
 use netbug::process::PcapProcessor;
 use netbug::server::Server;
+use std::path::PathBuf;
 
 fn main() {
     let server_cfg = match ServerConfig::from_path("examples/config/server.toml") {
@@ -32,14 +33,17 @@ fn main() {
         match report {
             Ok(report) => {
                 let content = serde_json::to_string_pretty(&report).unwrap();
-                let report_path = &server_cfg.report_path;
+                let report_dir = &server_cfg.report_dir;
 
-                let dir = report_path.parent().unwrap();
-                if !dir.exists() {
-                    fs::create_dir_all(dir);
+                println!("=== report_dir: {}", report_dir.to_str().unwrap());
+                if ! report_dir.exists() {
+                    fs::create_dir_all(report_dir);
                 }
 
-                let mut file = match File::create(report_path) {
+                let mut report_file = PathBuf::from(report_dir);
+                report_file.push("report.json");
+
+                let mut file = match File::create(report_file) {
                     Ok(file) => file,
                     Err(err) => {
                         eprintln!("Error opening report file: {}", err.to_string());

@@ -1,6 +1,6 @@
-pcap_dir = "nbug.d/recv_pcap"
+pcap_dir = "nbug.d/recv_pcaps"
 
-report_path = "nbug.d/report.json"
+report_dir = "nbug.d/reports"
 
 srv_addr = "0.0.0.0:8081"
 

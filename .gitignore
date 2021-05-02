@@ -4,7 +4,7 @@
 # # # # # # # # # # # ## # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Generated pcap files and directories
-nbug.d
+nbug.d/
 *.pcap
 *.pcapng
 

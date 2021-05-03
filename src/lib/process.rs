@@ -10,14 +10,14 @@ use crate::behavior::Behavior;
 use crate::error::Result;
 use crate::protocols::ProtocolPacket;
 
-pub struct PcapProcessor {
-    behaviors: Vec<Behavior>,
+pub struct PcapProcessor<'a> {
+    behaviors: &'a [Behavior],
 
     pcap_dir: PathBuf,
 }
 
-impl PcapProcessor {
-    pub fn new(behaviors: Vec<Behavior>, pcap_dir: PathBuf) -> PcapProcessor { PcapProcessor { behaviors, pcap_dir } }
+impl PcapProcessor<'_> {
+    pub fn new(behaviors: &[Behavior], pcap_dir: PathBuf) -> PcapProcessor { PcapProcessor { behaviors, pcap_dir } }
 
     /// Iterate over server capture directory. This method will traverse only
     /// the children of the root pcap directory, and so any non-directory files
@@ -25,7 +25,7 @@ impl PcapProcessor {
     pub fn process(&self) -> Result<BehaviorReport> {
         let mut collector = BehaviorCollector::new();
 
-        for behavior in &self.behaviors {
+        for behavior in self.behaviors {
             collector.insert_behavior(&behavior);
         }
 

@@ -17,8 +17,8 @@ fn main() {
         },
     };
 
-    let server = Server::new(server_cfg.srv_addr, server_cfg.n_workers, server_cfg.pcap_dir.clone());
-    let processor = PcapProcessor::new(server_cfg.behaviors, server_cfg.pcap_dir);
+    let server = Server::new(server_cfg.srv_addr, server_cfg.n_workers, server_cfg.pcap_dir.clone(), server_cfg.behaviors.as_slice());
+    let processor = PcapProcessor::new(server_cfg.behaviors.as_slice(), server_cfg.pcap_dir);
 
     if let Err(err) = server.start() {
         eprintln!("Could not start the server: {}", err.to_string());
@@ -35,7 +35,6 @@ fn main() {
                 let content = serde_json::to_string_pretty(&report).unwrap();
                 let report_dir = &server_cfg.report_dir;
 
-                println!("=== report_dir: {}", report_dir.to_str().unwrap());
                 if ! report_dir.exists() {
                     fs::create_dir_all(report_dir);
                 }

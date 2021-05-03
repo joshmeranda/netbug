@@ -25,8 +25,9 @@ use crate::protocols::tcp::TcpPacket;
 use crate::protocols::udp::UdpPacket;
 use crate::protocols::{ProtocolNumber, ProtocolPacket};
 use crate::{Addr, BUFFER_SIZE, HEADER_LENGTH};
+use crate::process::PcapProcessor;
 
-pub struct Server {
+pub struct Server<'a> {
     addr: SocketAddr,
 
     n_workers: usize,
@@ -34,26 +35,32 @@ pub struct Server {
     running: Arc<AtomicBool>,
 
     pcap_dir: PathBuf,
+
+    report_dir: PathBuf,
+
+    behaviors: &'a [Behavior],
 }
 
-impl Default for Server {
-    fn default() -> Server {
-        Server {
-            addr:      SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
-            n_workers: defaults::server::default_n_workers(),
-            running:   Arc::new(AtomicBool::new(false)),
-            pcap_dir:  defaults::default_pcap_dir(),
-        }
-    }
-}
+// impl Default for Server {
+//     fn default() -> Server {
+//         Server {
+//             addr:      SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
+//             n_workers: defaults::server::default_n_workers(),
+//             running:   Arc::new(AtomicBool::new(false)),
+//             pcap_dir:  defaults::default_pcap_dir(),
+//         }
+//     }
+// }
 
-impl Server {
-    pub fn new(addr: SocketAddr, n_workers: usize, pcap_dir: PathBuf) -> Server {
+impl Server<'_> {
+    pub fn new(addr: SocketAddr, n_workers: usize, pcap_dir: PathBuf, report_dir: PathBuf, behaviors: &[Behavior]) -> Server {
         Server {
             addr,
             n_workers,
+            running: Arc::new(AtomicBool::new(false)),
             pcap_dir,
-            ..Server::default()
+            report_dir,
+            behaviors
         }
     }
 
@@ -70,9 +77,12 @@ impl Server {
         // unsafe to allow  the thread to run anywhere the struct is valid.
         unsafe {
             builder.spawn_unchecked(move || {
-                if let Err(err) = Server::handle_connections(&running_flag, srv_addr, pcap_dir) {
+                // if let Err(err) = Server::handle_connections(&running_flag, srv_addr, pcap_dir, self.behaviors) {
+                if let Err(err) = self.handle_connections() {
                     eprintln!("{}", err.to_string());
                 }
+
+                self.handle();
 
                 // once connections are not being handled stop the server
                 running_flag.store(false, Ordering::SeqCst);
@@ -82,10 +92,55 @@ impl Server {
         Ok(())
     }
 
+    fn handle(&self) { }
+
     /// Handle accepting client connections.
-    fn handle_connections(running_flag: &Arc<AtomicBool>, srv_addr: SocketAddr, pcap_dir: PathBuf) -> Result<()> {
+    // fn handle_connections(running_flag: &Arc<AtomicBool>, srv_addr: SocketAddr, pcap_dir: PathBuf, behaviors: &[Behavior]) -> Result<()> {
+    //     // todo: implement a clean shutdown (catch interrupts)
+    //     let listener = TcpListener::bind(srv_addr)?;
+    //
+    //     println!("Bound server to '{}'", listener.local_addr().unwrap().to_string());
+    //
+    //     // todo: make map of thread id to handle?
+    //     //   currently handle vector will keep building until server is shutdown
+    //     let pool = ThreadPool::new(4);
+    //
+    //     let processor = PcapProcessor::new(behaviors, pcap_dir.clone());
+    //
+    //     // todo: consider polling for better performance
+    //     while running_flag.load(Ordering::SeqCst) {
+    //         let (stream, addr) = match listener.accept() {
+    //             Ok((stream, addr)) => (stream, addr),
+    //             Err(_) => continue,
+    //         };
+    //
+    //         println!("Accepted connection from '{}'", addr.to_string());
+    //
+    //         // todo: support hostname rather than raw ip which can change
+    //         let mut pcap_dir = pcap_dir.clone();
+    //         pcap_dir.push(addr.to_string());
+    //
+    //         // ensure the host pcap directory exists
+    //         if !pcap_dir.exists() {
+    //             if let Err(err) = fs::create_dir_all(&pcap_dir) {
+    //                 eprintln!("Error creating pcap directory: {}", err.to_string());
+    //             };
+    //         }
+    //
+    //         pool.execute(|| match Server::receive_pcap(stream, pcap_dir) {
+    //             Ok(_) => println!("Received pcaps"),
+    //             Err(err) => eprintln!("Server Error: {}", err.to_string()),
+    //         });
+    //     }
+    //
+    //     pool.join();
+    //
+    //     Ok(())
+    // }
+
+    fn handle_connections(&self) -> Result<()> {
         // todo: implement a clean shutdown (catch interrupts)
-        let listener = TcpListener::bind(srv_addr)?;
+        let listener = TcpListener::bind(self.addr)?;
 
         println!("Bound server to '{}'", listener.local_addr().unwrap().to_string());
 
@@ -93,8 +148,10 @@ impl Server {
         //   currently handle vector will keep building until server is shutdown
         let pool = ThreadPool::new(4);
 
+        let processor = PcapProcessor::new(self.behaviors, self.pcap_dir.clone());
+
         // todo: consider polling for better performance
-        while running_flag.load(Ordering::SeqCst) {
+        while self.running.load(Ordering::SeqCst) {
             let (stream, addr) = match listener.accept() {
                 Ok((stream, addr)) => (stream, addr),
                 Err(_) => continue,
@@ -103,7 +160,7 @@ impl Server {
             println!("Accepted connection from '{}'", addr.to_string());
 
             // todo: support hostname rather than raw ip which can change
-            let mut pcap_dir = pcap_dir.clone();
+            let mut pcap_dir = self.pcap_dir.clone();
             pcap_dir.push(addr.to_string());
 
             // ensure the host pcap directory exists
@@ -113,8 +170,19 @@ impl Server {
                 };
             }
 
+            // todo: needs to spawn unchecked or move to static
             pool.execute(|| match Server::receive_pcap(stream, pcap_dir) {
-                Ok(_) => println!("Received pcaps"),
+                Ok(_) => {
+                    println!("Received pcaps");
+                    let report = processor.process();
+
+                    match report {
+                        Ok(report) => if let Err(err) = self.dump_report(report) {
+                            eprintln!("Error dumping behavior report: {}", err.to_string());
+                        },
+                        Err(err) => eprintln!("Error processing captures: {}", err.to_string()),
+                    }
+                },
                 Err(err) => eprintln!("Server Error: {}", err.to_string()),
             });
         }
@@ -194,6 +262,25 @@ impl Server {
 
             pcap_file.write(&buffer[0..byte_count])?;
         }
+
+        Ok(())
+    }
+
+    /// Dump the report to the configured location.
+    fn dump_report(&self, report: BehaviorReport ) -> Result<()> {
+        let content = serde_json::to_string_pretty(&report).unwrap();
+        let report_dir = &self.report_dir;
+
+        if ! report_dir.exists() {
+            fs::create_dir_all(report_dir);
+        }
+
+        let mut report_file = PathBuf::from(report_dir);
+        report_file.push("report.json");
+
+        let mut file = File::create(report_file)?;
+        file.write(content.as_ref())?;
+
 
         Ok(())
     }

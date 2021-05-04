@@ -5,20 +5,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::fs::File;
 use std::convert::TryInto;
-
-/// The total length og the PcapMessage header as raw bytes. The header is
-/// composed of the packet version number (u8), pcap name length (u8), and the
-/// total data length (u64).s
-pub const HEADER_LENGTH: usize = 10;
-
-/// This buffer size must be large enough to contain at least the header
-/// [HEADER_LENGTH] and interface file name which on most systems should be 16
-/// byte including the null byte.
-const BUFFER_SIZE: usize = 1024;
-
-/// The current message protocol version, will allow future iterations of the
-/// netbug server to be backwards compatible with stale clients.
-const MESSAGE_VERSION: u8 = 0;
+use crate::{BUFFER_SIZE, HEADER_LENGTH};
 
 pub struct Receiver {
     listener: TcpListener,

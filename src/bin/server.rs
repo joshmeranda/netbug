@@ -5,8 +5,41 @@ use std::time::Duration;
 
 use netbug::config::server::ServerConfig;
 use netbug::process::PcapProcessor;
-use netbug::server::Server;
+use netbug::error::Result;
 use std::path::PathBuf;
+use std::net::{TcpListener, SocketAddr, TcpStream};
+use threadpool::ThreadPool;
+use netbug::receiver::Receiver;
+
+fn run_server(cfg: ServerConfig) -> Result<()> {
+    let listener = TcpListener::bind(cfg.srv_addr)?;
+    let pool = ThreadPool::new(cfg.n_workers);
+
+    for conn in listener.incoming() {
+        let stream = match conn {
+            Ok(stream) => stream,
+            Err(err) => {
+                eprintln!("Error accepting connections: {}", err.to_string());
+                break;
+            }
+        };
+
+        println!("Accepted connection from '{}'", stream.peer_addr().unwrap().to_string());
+
+        // ensure the pcap directory exists before receiving pcaps from the peer
+        // todo: might be faster to push and pop the peer addresses from the same PathBuf rather than continuously cloning it
+        let mut pcap_dir = cfg.pcap_dir.clone();
+        pcap_dir.push(stream.peer_addr().unwrap().to_string());
+
+        if !pcap_dir.exists() {
+            if let Err(err) = fs::create_dir_all(&pcap_dir) {
+                eprintln!("Error creating pcap directory '{}': {}", pcap_dir.to_str().unwrap(), err.to_string());
+            }
+        }
+    }
+
+    Ok(())
+}
 
 fn main() {
     let server_cfg = match ServerConfig::from_path("examples/config/server.toml") {
@@ -17,47 +50,23 @@ fn main() {
         },
     };
 
-    let server = Server::new(server_cfg.srv_addr, server_cfg.n_workers, server_cfg.pcap_dir.clone(), server_cfg.behaviors.as_slice());
-    let processor = PcapProcessor::new(server_cfg.behaviors.as_slice(), server_cfg.pcap_dir);
+    // let mut server = Server::from(server_cfg);
 
-    if let Err(err) = server.start() {
-        eprintln!("Could not start the server: {}", err.to_string());
-        return;
-    } else {
-        println!("Starting server...");
-    }
+    println!("Starting server...");
 
-    while server.is_running() {
-        let report = processor.process();
-
-        match report {
-            Ok(report) => {
-                let content = serde_json::to_string_pretty(&report).unwrap();
-                let report_dir = &server_cfg.report_dir;
-
-                if ! report_dir.exists() {
-                    fs::create_dir_all(report_dir);
-                }
-
-                let mut report_file = PathBuf::from(report_dir);
-                report_file.push("report.json");
-
-                let mut file = match File::create(report_file) {
-                    Ok(file) => file,
-                    Err(err) => {
-                        eprintln!("Error opening report file: {}", err.to_string());
-                        continue;
-                    },
-                };
-
-                if let Err(err) = file.write(content.as_ref()) {
-                    eprintln!("Error writing report {}", err.to_string())
-                }
-            },
-            Err(err) => eprintln!("Error processing captures: {}", err.to_string()),
+    let mut receiver = match Receiver::new(server_cfg.srv_addr, server_cfg.pcap_dir) {
+        Ok(receiver) => receiver,
+        Err(err) => {
+            eprintln!("Error creating pcap receiver: {}", err.to_string());
+            return;
         }
+    };
 
-        std::thread::sleep(Duration::from_secs(5));
+    loop {
+        match receiver.receive() {
+            Ok(path) => println!("Received pcap -> {}", path.to_str().unwrap()),
+            Err(err) => eprintln!("Error receiving pcap: {}", err.to_string()),
+        }
     }
 
     println!("Stopping server...");

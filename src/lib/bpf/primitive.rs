@@ -1,15 +1,9 @@
 use std::net::IpAddr;
 use std::ops::Range;
-use std::collections::VecDeque;
 
 // todo: needs better NetMask type
 type NetMask = IpAddr;
 type Host = String;
-
-struct FilterBuilder {}
-
-impl FilterBuilder {
-}
 
 enum QualifierDirection {
     Src,
@@ -31,18 +25,36 @@ enum QualifierType {
     PortRange,
 }
 
-enum QualifierProtocol {
+pub enum Protocol {
     Ether,
     Fddi,
     Tr,
     Wlan,
     Ip,
     Ip6,
-    Aro,
+    Arp,
     Rarp,
     Decnet,
     Tcp,
     Udp,
+}
+
+impl AsRef<str> for Protocol {
+    fn as_ref(&self) -> &str {
+        match self {
+            Protocol::Ether => "ether",
+            Protocol::Fddi => "fddi",
+            Protocol::Tr => "tr",
+            Protocol::Wlan => "wlan",
+            Protocol::Ip => "ip",
+            Protocol::Ip6 => "ip6",
+            Protocol::Arp => "arp",
+            Protocol::Rarp => "rarp",
+            Protocol::Decnet => "decent",
+            Protocol::Tcp => "tcp",
+            Protocol::Udp => "udp",
+        }
+    }
 }
 
 enum EtherProtocol {
@@ -67,7 +79,7 @@ enum EtherProtocol {
 enum Qualifier {
     Type(QualifierType),
     Dir(QualifierDirection),
-    Proto(QualifierProtocol),
+    Proto(Protocol),
 }
 
 enum LlcType {
@@ -153,16 +165,16 @@ enum Primitive {
     Less(String),
     Greater(String),
 
-    IpProto(QualifierProtocol),
-    Ip6Proto(QualifierProtocol),
-    Proto(QualifierProtocol),
+    IpProto(Protocol),
+    Ip6Proto(Protocol),
+    Proto(Protocol),
     Tcp,
     Udp,
     Icmp,
 
-    IpProtoChain(QualifierProtocol),
-    Ip6ProtoChain(QualifierProtocol),
-    ProtoChain(QualifierProtocol),
+    IpProtoChain(Protocol),
+    Ip6ProtoChain(Protocol),
+    ProtoChain(Protocol),
 
     EtherBroadcast,
     IpBroadcast,
@@ -269,100 +281,4 @@ enum Primitive {
 
     // todo: requires users to manually build the expression string rather than building programmatic
     Comparison(String),
-}
-
-enum Operand {
-    Integer(usize),
-
-    PacketData(QualifierProtocol, usize, usize)
-}
-
-enum BinOp {
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-    Modulus,
-    And,
-    Or,
-    Exponent,
-    LeftShift,
-    RightShift,
-}
-
-struct ExpressionBuilder {
-    operands: VecDeque<Operand>,
-
-    operators: VecDeque<BinOp>
-}
-
-impl ExpressionBuilder {
-    pub fn new() -> ExpressionBuilder{
-        ExpressionBuilder {
-            operands: VecDeque::new(),
-            operators: VecDeque::new(),
-        }
-    }
-
-    pub fn operand(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push_front(operand);
-        self
-    }
-
-    pub fn number(mut self, n: usize) -> ExpressionBuilder {
-        let operand = Operand::Integer(n);
-        self.operands.push_front(operand);
-        self
-    }
-
-    pub fn packet_data(mut self, proto: QualifierProtocol, offset: usize, size: usize) -> ExpressionBuilder {
-        let operand = Operand::PacketData(proto, offset, size);
-        self.operands.push_front(operand);
-        self
-    }
-
-    pub fn operator(mut self, operator: BinOp) -> ExpressionBuilder {
-        self.operators.push_front(operator);
-        self
-    }
-
-    pub fn plus(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Plus)
-    }
-
-    pub fn minus(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Minus)
-    }
-
-    pub fn multiply(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Multiply)
-    }
-
-    pub fn divide(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Divide)
-    }
-
-    pub fn modulus(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Modulus)
-    }
-
-    pub fn and(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::And)
-    }
-
-    pub fn or(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Or)
-    }
-
-    pub fn exponent(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Exponent)
-    }
-
-    pub fn left_shift(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::LeftShift)
-    }
-
-    pub fn right_shift(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::RightShift)
-    }
 }

@@ -8,7 +8,7 @@ pub mod message;
 pub mod process;
 pub mod protocols;
 pub mod receiver;
-mod bpf;
+pub mod bpf;
 
 #[macro_use]
 extern crate serde_derive;

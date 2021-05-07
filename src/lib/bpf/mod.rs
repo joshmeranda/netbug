@@ -34,6 +34,4 @@ impl Error for BpfError {
 
 struct FilterBuilder { }
 
-impl FilterBuilder {
-}
-
+impl FilterBuilder { }

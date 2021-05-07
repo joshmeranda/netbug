@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
 use crate::bpf::BpfError;
 use crate::bpf::Result;
-use crate::bpf::primitive::Protocol;
+use crate::bpf::primitive::QualifyProtocol;
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
 #[derive(Debug, PartialEq)]
-pub struct Expression(String);
+pub struct Expression(pub String);
 
 impl Expression {
     /// No syntax checking is performed, any valid string can be passed here. For any real syntax checking, please use [ExpressionBuilder] to construct the [Expression].
@@ -21,7 +21,7 @@ pub enum Operand {
     /// Represents an [Expression] wrapped in parenthesis.
     Expr(Expression),
 
-    PacketData(Protocol, Expression, usize)
+    PacketData(QualifyProtocol, Expression, usize)
 }
 
 impl ToString for Operand {
@@ -69,7 +69,7 @@ impl AsRef<str> for BinOp {
     }
 }
 
-/// Allows for building an arithmetic expression as a string. Currently parenthesis are not supported.
+/// Allows for building an arithmetic expression as a string.
 ///
 /// # Examples
 ///
@@ -87,11 +87,12 @@ impl AsRef<str> for BinOp {
 /// ```
 ///
 /// or expressions containing a special data packet accessor (ie proto[offset:size])
+///
 /// ```
 /// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand};
-/// use netbug::bpf::primitive::Protocol;
+/// use netbug::bpf::primitive::QualifyProtocol;
 ///
-/// let expr = ExpressionBuilder::new(Operand::PacketData(Protocol::Ether, Expression::new(String::from("0")), 1 ))
+/// let expr = ExpressionBuilder::new(Operand::PacketData(QualifyProtocol::Ether, Expression::new(String::from("0")), 1 ))
 ///     .and(Operand::Integer(1))
 ///     .build();
 ///
@@ -100,7 +101,7 @@ impl AsRef<str> for BinOp {
 /// assert_eq!(expected, expr);
 /// ```
 ///
-/// There is a special operand for building parenthesized operands allowing to eperssions lke `(5 * 10) ^ 2`
+/// For grouping multiple operrands via parenthesis, use the [`Operand::Expr`] variant. Ideally the inner [`Expression`] should be build with this builder struct to ensure the end expression is valid..
 ///
 /// ```
 /// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand};
@@ -154,7 +155,6 @@ impl ExpressionBuilder {
         self
     }
 
-    /// Pub add a multiplication (eg 5 * 6).
     pub fn times(mut self, operand: Operand) -> ExpressionBuilder {
         self.operands.push(operand);
         self.operators.push(BinOp::Multiply);
@@ -185,7 +185,6 @@ impl ExpressionBuilder {
         self
     }
 
-    /// Raise to a power.
     pub fn raise(mut self, operand: Operand) -> ExpressionBuilder {
         self.operands.push(operand);
         self.operators.push(BinOp::Exponent);

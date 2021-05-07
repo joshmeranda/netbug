@@ -18,6 +18,9 @@ impl Expression {
 pub enum Operand {
     Integer(usize),
 
+    /// Represents an [Expression] wrapped in parenthesis.
+    Expr(Expression),
+
     PacketData(Protocol, Expression, usize)
 }
 
@@ -25,6 +28,8 @@ impl ToString for Operand {
     fn to_string(&self) -> String {
         match self {
             Operand::Integer(n) => n.to_string(),
+            Operand::Expr(expr) => format!("({})", expr.0),
+
             // todo: should handle the size being omitted if 1q (eg `ether[1]` points only to the first byte)
             Operand::PacketData(proto, offset, size) => {
                 format!("{}[{}:{}]", proto.as_ref(), offset.0, size.to_string())
@@ -70,14 +75,11 @@ impl AsRef<str> for BinOp {
 ///
 /// The builder can be used to construct simple numerical expressions
 /// ```
-/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression};
+/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand};
 ///
-/// let expr = ExpressionBuilder::new()
-///     .number(5)
-///     .operator(BinOp::Plus)
-///     .number(1)
-///     .build()
-///     .unwrap();
+/// let expr = ExpressionBuilder::new(Operand::Integer(5))
+///     .plus(Operand::Integer(1))
+///     .build();
 ///
 /// let expected = Expression::new(String::from("5+1"));
 ///
@@ -86,129 +88,124 @@ impl AsRef<str> for BinOp {
 ///
 /// or expressions containing a special data packet accessor (ie proto[offset:size])
 /// ```
-/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression};
+/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand};
 /// use netbug::bpf::primitive::Protocol;
 ///
-/// let expr = ExpressionBuilder::new()
-///     .packet_data(Protocol::Ether, Expression::new(String::from("0")), 1 )
-///     .and()
-///     .number(1)
-///     .build()
-///     .unwrap();
+/// let expr = ExpressionBuilder::new(Operand::PacketData(Protocol::Ether, Expression::new(String::from("0")), 1 ))
+///     .and(Operand::Integer(1))
+///     .build();
 ///
 /// let expected = Expression::new(String::from("ether[0:1]&1"));
 ///
 /// assert_eq!(expected, expr);
 /// ```
 ///
+/// There is a special operand for building parenthesized operands allowing to eperssions lke `(5 * 10) ^ 2`
+///
+/// ```
+/// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand};
+///
+/// let expr = ExpressionBuilder::new(Operand::Expr(ExpressionBuilder::new(Operand::Integer(5))
+///         .times(Operand::Integer(10))
+///         .build()))
+///     .raise(Operand::Integer(2))
+///     .build();
+///
+/// let expected = Expression::new(String::from("(5*10)^2"));
+///
+/// assert_eq!(expected, expr)
+/// ```
+///
 /// todo: add formatting options (eg whitespace)
-/// todo: shold support parentheses
 pub struct ExpressionBuilder {
-    operands: VecDeque<Operand>,
+    operands: Vec<Operand>,
 
-    operators: VecDeque<BinOp>
+    operators: Vec<BinOp>
 }
 
 impl ExpressionBuilder {
-    pub fn new() -> ExpressionBuilder{
+    /// Construct a new expression builder with `operand` as the initial value.
+    pub fn new(operand: Operand) -> ExpressionBuilder{
         ExpressionBuilder {
-            operands: VecDeque::new(),
-            operators: VecDeque::new(),
+            operands: vec![operand],
+            operators: vec![],
         }
     }
 
-    pub fn operand(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push_back(operand);
+    fn operand(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
         self
     }
 
-    pub fn number(mut self, n: usize) -> ExpressionBuilder {
-        self.operand(Operand::Integer(n))
-    }
-
-    pub fn packet_data(mut self, proto: Protocol, offset: Expression, size: usize) -> ExpressionBuilder {
-        self.operand(Operand::PacketData(proto, offset, size))
-    }
-
-    pub fn operator(mut self, operator: BinOp) -> ExpressionBuilder {
-        self.operators.push_back(operator);
+    fn operator(mut self, operator: BinOp) -> ExpressionBuilder {
+        self.operators.push(operator);
         self
     }
 
-    pub fn plus(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Plus)
+    pub fn plus(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::Plus);
+        self
     }
 
-    pub fn minus(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Minus)
+    pub fn minus(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::Minus);
+        self
     }
 
-    pub fn multiply(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Multiply)
+    /// Pub add a multiplication (eg 5 * 6).
+    pub fn times(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::Multiply);
+        self
     }
 
-    pub fn divide(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Divide)
+    pub fn divide(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::Divide);
+        self
     }
 
-    pub fn modulus(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Modulus)
+    pub fn modulus(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::Modulus);
+        self
     }
 
-    pub fn and(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::And)
+    pub fn and(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::And);
+        self
     }
 
-    pub fn or(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Or)
+    pub fn or(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::Or);
+        self
     }
 
-    pub fn exponent(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::Exponent)
+    /// Raise to a power.
+    pub fn raise(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::Exponent);
+        self
     }
 
-    pub fn left_shift(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::LeftShift)
+    pub fn left_shift(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::LeftShift);
+        self
     }
 
-    pub fn right_shift(mut self) -> ExpressionBuilder {
-        self.operator(BinOp::RightShift)
+    pub fn right_shift(mut self, operand: Operand) -> ExpressionBuilder {
+        self.operands.push(operand);
+        self.operators.push(BinOp::RightShift);
+        self
     }
 
     /// Build the expression and return a [String] representation of the constructed expression.
-    ///
-    /// # Errors
-    /// If the builder would construct an invalid expression (bad syntax, etc).
-    ///
-    /// ```
-    /// use netbug::bpf::expression::{ExpressionBuilder, BinOp};
-    ///
-    /// let missing_tail_operand = ExpressionBuilder::new()
-    ///     .number(5)
-    ///     .operator(BinOp::Plus)
-    ///     .build();
-    ///
-    /// assert!(missing_tail_operand.is_err());
-    ///
-    /// let unexpected_operand = ExpressionBuilder::new()
-    ///     .number(5)
-    ///     .number(10)
-    ///     .build();
-    ///
-    /// assert!(unexpected_operand.is_err());
-    ///
-    /// let unexpected_operator = ExpressionBuilder::new()
-    ///     .plus()
-    ///     .number(5)
-    ///     .build();
-    ///
-    /// assert!(unexpected_operator.is_err());
-    /// ```
-    pub fn build(&self) -> Result<Expression> {
-        if self.operands.is_empty() {
-            return Err(BpfError::ExpressionSyntax(String::from("Expected operand found none")));
-        }
-
+    pub fn build(&self) -> Expression {
         let mut operands = self.operands.iter();
         let mut operators = self.operators.iter();
 
@@ -227,14 +224,6 @@ impl ExpressionBuilder {
             operator = operators.next();
         }
 
-        if operand.is_none() && operator.is_none() {
-            Ok(Expression::new(expression))
-        } else if operand.is_some() {
-            Err(BpfError::ExpressionSyntax(String::from(format!("Expected end of expression or operator, found '{}'", operand.unwrap().to_string()))))
-        } else if operator.is_some() {
-            Err(BpfError::ExpressionSyntax(String::from(format!("Expected operand, found '{}'", operator.unwrap().as_ref()))))
-        } else {
-            unreachable!()
-        }
+        Expression::new(expression)
     }
 }

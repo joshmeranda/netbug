@@ -1,20 +1,24 @@
 use std::collections::VecDeque;
+use std::vec::IntoIter;
 use crate::bpf::BpfError;
 use crate::bpf::Result;
 use crate::bpf::primitive::QualifyProtocol;
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
-#[derive(Debug, PartialEq)]
-pub struct Expression(pub String);
+#[derive(Debug, PartialEq )]
+pub struct Expression {
+    tokens: Vec<ExprToken>
+}
 
 impl Expression {
     /// No syntax checking is performed, any valid string can be passed here. For any real syntax checking, please use [ExpressionBuilder] to construct the [Expression].
-    pub fn new(inner: String) -> Expression {
-        Expression(inner)
+    pub fn new(tokens: Vec<ExprToken>) -> Expression {
+        Expression { tokens }
     }
 }
 
 /// An operand, either an unsigned integer or packet data, in an expression.
+#[derive(Debug, PartialEq)]
 pub enum Operand {
     Integer(usize),
 
@@ -26,19 +30,22 @@ pub enum Operand {
 
 impl ToString for Operand {
     fn to_string(&self) -> String {
-        match self {
-            Operand::Integer(n) => n.to_string(),
-            Operand::Expr(expr) => format!("({})", expr.0),
+        // match self {
+        //     Operand::Integer(n) => n.to_string(),
+        //     Operand::Expr(expr) => format!("({})", expr.0),
+        //
+        //     // todo: should handle the size being omitted if 1q (eg `ether[1]` points only to the first byte)
+        //     Operand::PacketData(proto, offset, size) => {
+        //         format!("{}[{}:{}]", proto.as_ref(), offset.0, size.to_string())
+        //     }
+        // }
 
-            // todo: should handle the size being omitted if 1q (eg `ether[1]` points only to the first byte)
-            Operand::PacketData(proto, offset, size) => {
-                format!("{}[{}:{}]", proto.as_ref(), offset.0, size.to_string())
-            }
-        }
+        String::new()
     }
 }
 
 /// Any of the typical binary operators.
+#[derive(Debug, PartialEq)]
 pub enum BinOp {
     Plus,
     Minus,
@@ -69,19 +76,38 @@ impl AsRef<str> for BinOp {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ExprToken {
+    Operand(Operand),
+    Operator(BinOp),
+}
+
+impl ToString for ExprToken {
+    fn to_string(&self) -> String {
+        match self {
+            ExprToken::Operand(op) => op.to_string(),
+            ExprToken::Operator(op) => op.as_ref().to_owned()
+        }
+    }
+}
+
 /// Allows for building an arithmetic expression as a string.
 ///
 /// # Examples
 ///
 /// The builder can be used to construct simple numerical expressions
 /// ```
-/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand};
+/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand, ExprToken};
 ///
 /// let expr = ExpressionBuilder::new(Operand::Integer(5))
 ///     .plus(Operand::Integer(1))
 ///     .build();
 ///
-/// let expected = Expression::new(String::from("5+1"));
+/// let expected = Expression::new(vec![
+///         ExprToken::Operand(Operand::Integer(5)),
+///         ExprToken::Operator(BinOp::Plus),
+///         ExprToken::Operand(Operand::Integer(1)),
+///     ]);
 ///
 /// assert_eq!(expected, expr);
 /// ```
@@ -89,14 +115,18 @@ impl AsRef<str> for BinOp {
 /// or expressions containing a special data packet accessor (ie proto[offset:size])
 ///
 /// ```
-/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand};
+/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand, ExprToken};
 /// use netbug::bpf::primitive::QualifyProtocol;
 ///
-/// let expr = ExpressionBuilder::new(Operand::PacketData(QualifyProtocol::Ether, Expression::new(String::from("0")), 1 ))
+/// let expr = ExpressionBuilder::new(Operand::PacketData(QualifyProtocol::Ether, Expression::new(vec![ExprToken::Operand(Operand::Integer(0))]), 1))
 ///     .and(Operand::Integer(1))
 ///     .build();
 ///
-/// let expected = Expression::new(String::from("ether[0:1]&1"));
+/// let expected = Expression::new(vec![
+///         ExprToken::Operand(Operand::PacketData(QualifyProtocol::Ether, Expression::new(vec![ExprToken::Operand(Operand::Integer(0))]), 1)),
+///         ExprToken::Operator(BinOp::And),
+///         ExprToken::Operand(Operand::Integer(1))
+///     ]);
 ///
 /// assert_eq!(expected, expr);
 /// ```
@@ -104,7 +134,7 @@ impl AsRef<str> for BinOp {
 /// For grouping multiple operrands via parenthesis, use the [`Operand::Expr`] variant. Ideally the inner [`Expression`] should be build with this builder struct to ensure the end expression is valid..
 ///
 /// ```
-/// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand};
+/// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, ExprToken, BinOp};
 ///
 /// let expr = ExpressionBuilder::new(Operand::Expr(ExpressionBuilder::new(Operand::Integer(5))
 ///         .times(Operand::Integer(10))
@@ -112,117 +142,92 @@ impl AsRef<str> for BinOp {
 ///     .raise(Operand::Integer(2))
 ///     .build();
 ///
-/// let expected = Expression::new(String::from("(5*10)^2"));
+/// let expected = Expression::new(vec![
+///         ExprToken::Operand(Operand::Expr(Expression::new(vec![
+///             ExprToken::Operand(Operand::Integer(5)),
+///             ExprToken::Operator(BinOp::Multiply),
+///             ExprToken::Operand(Operand::Integer(10))
+///         ]))),
+///         ExprToken::Operator(BinOp::Exponent),
+///         ExprToken::Operand(Operand::Integer(2))
+///     ]);
 ///
 /// assert_eq!(expected, expr)
 /// ```
-///
-/// todo: add formatting options (eg whitespace)
 pub struct ExpressionBuilder {
-    operands: Vec<Operand>,
-
-    operators: Vec<BinOp>
+    tokens: Vec<ExprToken>,
 }
 
 impl ExpressionBuilder {
     /// Construct a new expression builder with `operand` as the initial value.
-    pub fn new(operand: Operand) -> ExpressionBuilder{
+    pub fn new(operand: Operand) -> ExpressionBuilder {
         ExpressionBuilder {
-            operands: vec![operand],
-            operators: vec![],
+            tokens: vec![ExprToken::Operand(operand)]
         }
     }
 
-    fn operand(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self
-    }
-
-    fn operator(mut self, operator: BinOp) -> ExpressionBuilder {
-        self.operators.push(operator);
-        self
-    }
-
     pub fn plus(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::Plus);
+        self.tokens.push(ExprToken::Operator(BinOp::Plus));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn minus(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::Minus);
+        self.tokens.push(ExprToken::Operator(BinOp::Minus));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn times(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::Multiply);
+        self.tokens.push(ExprToken::Operator(BinOp::Multiply));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn divide(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::Divide);
+        self.tokens.push(ExprToken::Operator(BinOp::Divide));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn modulus(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::Modulus);
+        self.tokens.push(ExprToken::Operator(BinOp::Modulus));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn and(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::And);
+        self.tokens.push(ExprToken::Operator(BinOp::And));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn or(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::Or);
+        self.tokens.push(ExprToken::Operator(BinOp::Or));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn raise(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::Exponent);
+        self.tokens.push(ExprToken::Operator(BinOp::Exponent));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn left_shift(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::LeftShift);
+        self.tokens.push(ExprToken::Operator(BinOp::LeftShift));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     pub fn right_shift(mut self, operand: Operand) -> ExpressionBuilder {
-        self.operands.push(operand);
-        self.operators.push(BinOp::RightShift);
+        self.tokens.push(ExprToken::Operator(BinOp::RightShift));
+        self.tokens.push(ExprToken::Operand(operand));
         self
     }
 
     /// Build the expression and return a [String] representation of the constructed expression.
-    pub fn build(&self) -> Expression {
-        let mut operands = self.operands.iter();
-        let mut operators = self.operators.iter();
-
-        let mut expression = String::new();
-        expression.push_str(operands.next().unwrap().to_string().as_str());
-
-        let mut operand = operands.next();
-        let mut operator = operators.next();
-
-        // while ! operands. && ! self.operators.is_empty() {
-        while operand.is_some() && operator.is_some() {
-            expression.push_str(operator.unwrap().as_ref());
-            expression.push_str(operand.unwrap().to_string().as_str());
-
-            operand = operands.next();
-            operator = operators.next();
-        }
-
-        Expression::new(expression)
+    pub fn build(self) -> Expression {
+        Expression::new(self.tokens)
     }
 }

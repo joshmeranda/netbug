@@ -56,6 +56,7 @@ impl AsRef<str> for QualifierType {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum QualifyProtocol {
     Ether,
     Fddi,
@@ -662,7 +663,8 @@ impl ToString for Primitive {
             Primitive::Ilmic => "ilmic".to_owned(),
             Primitive::ConnectMsg => "connectmsg".to_owned(),
             Primitive::MetaConnect => "metaconnect".to_owned(),
-            Primitive::Comparison(left, relop, right) => String::from(format!("{} {} {}", left.0, relop.as_ref(), right.0)),
+            // Primitive::Comparison(left, relop, right) => String::from(format!("{} {} {}", left.0, relop.as_ref(), right.0)),
+            Primitive::Comparison(left, relop, right) => String::from(format!("{} {} {}", "EXPR", relop.as_ref(), "EXPR")),
         }
     }
 }

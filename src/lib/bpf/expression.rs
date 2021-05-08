@@ -5,7 +5,7 @@ use crate::bpf::primitive::QualifyProtocol;
 use crate::bpf::{BpfError, Result};
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Expression {
     tokens: Vec<ExprToken>,
 }
@@ -18,12 +18,9 @@ impl Expression {
 }
 
 /// An operand, either an unsigned integer or packet data, in an expression.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Operand {
     Integer(usize),
-
-    /// Represents an [Expression] wrapped in parenthesis.
-    Expr(Expression),
 
     PacketData(QualifyProtocol, Expression, usize),
 }
@@ -33,7 +30,7 @@ impl ToString for Operand {
 }
 
 /// Any of the typical binary operators.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {
     Plus,
     Minus,
@@ -64,8 +61,10 @@ impl AsRef<str> for BinOp {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExprToken {
+    OpenParentheses,
+    CloseParentheses,
     Operand(Operand),
     Operator(BinOp),
 }
@@ -73,6 +72,8 @@ pub enum ExprToken {
 impl ToString for ExprToken {
     fn to_string(&self) -> String {
         match self {
+            ExprToken::OpenParentheses => "{".to_owned(),
+            ExprToken::CloseParentheses => "}".to_owned(),
             ExprToken::Operand(op) => op.to_string(),
             ExprToken::Operator(op) => op.as_ref().to_owned(),
         }
@@ -97,7 +98,7 @@ impl ToString for ExprToken {
 ///         ExprToken::Operand(Operand::Integer(1)),
 ///     ]);
 ///
-/// assert_eq!(expected, expr);
+/// assert_eq!(expr, expected)
 /// ```
 ///
 /// or expressions containing a special data packet accessor (ie
@@ -117,33 +118,35 @@ impl ToString for ExprToken {
 ///         ExprToken::Operand(Operand::Integer(1))
 ///     ]);
 ///
-/// assert_eq!(expected, expr);
+/// assert_eq!(expr, expected)
 /// ```
+/// For goruping values in parentheses (sub expressions) there are 2 options:
 ///
-/// For grouping multiple operrands via parenthesis, use the [`Operand::Expr`]
-/// variant. Ideally the inner [`Expression`] should be build with this builder
-/// struct to ensure the end expression is valid..
+/// 1 ) Construct the builder with [`from_expr`], used when the expression starts of the larger expresison
+/// 2 ) Adding the expressions vie [`expr`]
+///
+/// Both of the methods above take a `parentheses` arguments which specifies whether the axpression being added should be wrapped in parethesises. If the given expression is composed of only a single operand, parentheses will not be added regardless of the value of `parentheses`.
 ///
 /// ```
 /// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, ExprToken, BinOp};
 ///
-/// let expr = ExpressionBuilder::new(Operand::Expr(ExpressionBuilder::new(Operand::Integer(5))
+/// let expr = ExpressionBuilder::from_expr(ExpressionBuilder::new(Operand::Integer(5))
 ///         .times(Operand::Integer(10))
-///         .build()))
+///         .build(), true)
 ///     .raise(Operand::Integer(2))
 ///     .build();
 ///
 /// let expected = Expression::new(vec![
-///         ExprToken::Operand(Operand::Expr(Expression::new(vec![
-///             ExprToken::Operand(Operand::Integer(5)),
-///             ExprToken::Operator(BinOp::Multiply),
-///             ExprToken::Operand(Operand::Integer(10))
-///         ]))),
+///         ExprToken::OpenParentheses,
+///         ExprToken::Operand(Operand::Integer(5)),
+///         ExprToken::Operator(BinOp::Multiply),
+///         ExprToken::Operand(Operand::Integer(10)),
+///         ExprToken::CloseParentheses,
 ///         ExprToken::Operator(BinOp::Exponent),
 ///         ExprToken::Operand(Operand::Integer(2))
 ///     ]);
 ///
-/// assert_eq!(expected, expr)
+/// assert_eq!(expr, expected)
 /// ```
 pub struct ExpressionBuilder {
     tokens: Vec<ExprToken>,
@@ -155,6 +158,13 @@ impl ExpressionBuilder {
         ExpressionBuilder {
             tokens: vec![ExprToken::Operand(operand)],
         }
+    }
+
+    /// Construct a new [`ExpressionBuilder`] using `expr` as the first value(s) in the expression, with optional parentheses.
+    pub fn from_expr(expr: Expression, parentheses: bool) -> ExpressionBuilder {
+        let builder = ExpressionBuilder { tokens: vec![] };
+
+        builder.expr(expr, parentheses)
     }
 
     pub fn plus(mut self, operand: Operand) -> ExpressionBuilder {
@@ -214,6 +224,22 @@ impl ExpressionBuilder {
     pub fn right_shift(mut self, operand: Operand) -> ExpressionBuilder {
         self.tokens.push(ExprToken::Operator(BinOp::RightShift));
         self.tokens.push(ExprToken::Operand(operand));
+        self
+    }
+
+    /// Add the tokens from one expression to the current one, with optional parentheses.
+    pub fn expr(mut self, expr: Expression, parentheses: bool) -> ExpressionBuilder {
+        if parentheses && expr.tokens.len() > 1 {
+            self.tokens.push(ExprToken::OpenParentheses);
+        }
+
+        expr.tokens.iter()
+            .for_each(|token| self.tokens.push(token.clone()));
+
+        if parentheses && expr.tokens.len() > 1 {
+            self.tokens.push(ExprToken::CloseParentheses);
+        }
+
         self
     }
 

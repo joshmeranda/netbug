@@ -57,7 +57,7 @@ impl AsRef<str> for QualifierType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum QualifyProtocol {
     Ether,
     Fddi,

@@ -1,10 +1,11 @@
-use std::net::{TcpListener, TcpStream, SocketAddr};
-use crate::error::{Result, NbugError};
-use std::path::{PathBuf, Path};
-use std::fs;
-use std::io::{Read, Write};
-use std::fs::File;
 use std::convert::TryInto;
+use std::fs;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::path::{Path, PathBuf};
+
+use crate::error::{NbugError, Result};
 use crate::{BUFFER_SIZE, HEADER_LENGTH};
 
 pub struct Receiver {
@@ -14,16 +15,19 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    /// Construct a new [Receiver] from a [SocketAddr] and a [PathBuf] to the  root pcap directory.
+    /// Construct a new [Receiver] from a [SocketAddr] and a [PathBuf] to the
+    /// root pcap directory.
     pub fn new(addr: SocketAddr, pcap_dir: PathBuf) -> Result<Receiver> {
         Ok(Receiver {
             listener: TcpListener::bind(addr)?,
-            pcap_dir
+            pcap_dir,
         })
     }
 
-    /// Receive a pcap from a client and return the file the data was dumped to. The receiver blocks until either a pcap is receiver from the client, or an error occurs.
-    pub fn receive(& mut self) -> Result<PathBuf> {
+    /// Receive a pcap from a client and return the file the data was dumped to.
+    /// The receiver blocks until either a pcap is receiver from the client, or
+    /// an error occurs.
+    pub fn receive(&mut self) -> Result<PathBuf> {
         let (stream, peer) = self.listener.accept()?;
 
         // ensure that a pcap directory for the peer exists

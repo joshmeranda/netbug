@@ -1,15 +1,15 @@
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use netbug::config::server::ServerConfig;
-use netbug::process::PcapProcessor;
 use netbug::error::Result;
-use std::path::PathBuf;
-use std::net::{TcpListener, SocketAddr, TcpStream};
-use threadpool::ThreadPool;
+use netbug::process::PcapProcessor;
 use netbug::receiver::Receiver;
+use threadpool::ThreadPool;
 
 fn run_server(cfg: ServerConfig) -> Result<()> {
     let listener = TcpListener::bind(cfg.srv_addr)?;
@@ -21,19 +21,24 @@ fn run_server(cfg: ServerConfig) -> Result<()> {
             Err(err) => {
                 eprintln!("Error accepting connections: {}", err.to_string());
                 break;
-            }
+            },
         };
 
         println!("Accepted connection from '{}'", stream.peer_addr().unwrap().to_string());
 
         // ensure the pcap directory exists before receiving pcaps from the peer
-        // todo: might be faster to push and pop the peer addresses from the same PathBuf rather than continuously cloning it
+        // todo: might be faster to push and pop the peer addresses from the same
+        //   PathBuf rather than continuously cloning it
         let mut pcap_dir = cfg.pcap_dir.clone();
         pcap_dir.push(stream.peer_addr().unwrap().to_string());
 
         if !pcap_dir.exists() {
             if let Err(err) = fs::create_dir_all(&pcap_dir) {
-                eprintln!("Error creating pcap directory '{}': {}", pcap_dir.to_str().unwrap(), err.to_string());
+                eprintln!(
+                    "Error creating pcap directory '{}': {}",
+                    pcap_dir.to_str().unwrap(),
+                    err.to_string()
+                );
             }
         }
     }
@@ -50,8 +55,6 @@ fn main() {
         },
     };
 
-    // let mut server = Server::from(server_cfg);
-
     println!("Starting server...");
 
     let mut receiver = match Receiver::new(server_cfg.srv_addr, server_cfg.pcap_dir) {
@@ -59,7 +62,7 @@ fn main() {
         Err(err) => {
             eprintln!("Error creating pcap receiver: {}", err.to_string());
             return;
-        }
+        },
     };
 
     loop {

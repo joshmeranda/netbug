@@ -1,20 +1,20 @@
 use std::collections::VecDeque;
 use std::vec::IntoIter;
-use crate::bpf::BpfError;
-use crate::bpf::Result;
+
 use crate::bpf::primitive::QualifyProtocol;
+use crate::bpf::{BpfError, Result};
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
-#[derive(Debug, PartialEq )]
+#[derive(Debug, PartialEq)]
 pub struct Expression {
-    tokens: Vec<ExprToken>
+    tokens: Vec<ExprToken>,
 }
 
 impl Expression {
-    /// No syntax checking is performed, any valid string can be passed here. For any real syntax checking, please use [ExpressionBuilder] to construct the [Expression].
-    pub fn new(tokens: Vec<ExprToken>) -> Expression {
-        Expression { tokens }
-    }
+    /// No syntax checking is performed, any valid string can be passed here.
+    /// For any real syntax checking, please use [ExpressionBuilder] to
+    /// construct the [Expression].
+    pub fn new(tokens: Vec<ExprToken>) -> Expression { Expression { tokens } }
 }
 
 /// An operand, either an unsigned integer or packet data, in an expression.
@@ -25,23 +25,11 @@ pub enum Operand {
     /// Represents an [Expression] wrapped in parenthesis.
     Expr(Expression),
 
-    PacketData(QualifyProtocol, Expression, usize)
+    PacketData(QualifyProtocol, Expression, usize),
 }
 
 impl ToString for Operand {
-    fn to_string(&self) -> String {
-        // match self {
-        //     Operand::Integer(n) => n.to_string(),
-        //     Operand::Expr(expr) => format!("({})", expr.0),
-        //
-        //     // todo: should handle the size being omitted if 1q (eg `ether[1]` points only to the first byte)
-        //     Operand::PacketData(proto, offset, size) => {
-        //         format!("{}[{}:{}]", proto.as_ref(), offset.0, size.to_string())
-        //     }
-        // }
-
-        String::new()
-    }
+    fn to_string(&self) -> String { todo!() }
 }
 
 /// Any of the typical binary operators.
@@ -86,7 +74,7 @@ impl ToString for ExprToken {
     fn to_string(&self) -> String {
         match self {
             ExprToken::Operand(op) => op.to_string(),
-            ExprToken::Operator(op) => op.as_ref().to_owned()
+            ExprToken::Operator(op) => op.as_ref().to_owned(),
         }
     }
 }
@@ -112,7 +100,8 @@ impl ToString for ExprToken {
 /// assert_eq!(expected, expr);
 /// ```
 ///
-/// or expressions containing a special data packet accessor (ie proto[offset:size])
+/// or expressions containing a special data packet accessor (ie
+/// proto[offset:size])
 ///
 /// ```
 /// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand, ExprToken};
@@ -131,7 +120,9 @@ impl ToString for ExprToken {
 /// assert_eq!(expected, expr);
 /// ```
 ///
-/// For grouping multiple operrands via parenthesis, use the [`Operand::Expr`] variant. Ideally the inner [`Expression`] should be build with this builder struct to ensure the end expression is valid..
+/// For grouping multiple operrands via parenthesis, use the [`Operand::Expr`]
+/// variant. Ideally the inner [`Expression`] should be build with this builder
+/// struct to ensure the end expression is valid..
 ///
 /// ```
 /// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, ExprToken, BinOp};
@@ -162,7 +153,7 @@ impl ExpressionBuilder {
     /// Construct a new expression builder with `operand` as the initial value.
     pub fn new(operand: Operand) -> ExpressionBuilder {
         ExpressionBuilder {
-            tokens: vec![ExprToken::Operand(operand)]
+            tokens: vec![ExprToken::Operand(operand)],
         }
     }
 
@@ -226,8 +217,7 @@ impl ExpressionBuilder {
         self
     }
 
-    /// Build the expression and return a [String] representation of the constructed expression.
-    pub fn build(self) -> Expression {
-        Expression::new(self.tokens)
-    }
+    /// Build the expression and return a [String] representation of the
+    /// constructed expression.
+    pub fn build(self) -> Expression { Expression::new(self.tokens) }
 }

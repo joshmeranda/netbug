@@ -1,6 +1,7 @@
 #![feature(thread_spawn_unchecked)]
 
 pub mod behavior;
+pub mod bpf;
 pub mod client;
 pub mod config;
 pub mod error;
@@ -8,7 +9,6 @@ pub mod message;
 pub mod process;
 pub mod protocols;
 pub mod receiver;
-pub mod bpf;
 
 #[macro_use]
 extern crate serde_derive;

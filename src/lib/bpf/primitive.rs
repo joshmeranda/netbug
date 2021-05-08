@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 use std::ops::Range;
+
 use crate::bpf::expression::Expression;
 
 // todo: use something like https://docs.rs/strum/0.20.0/strum/index.html to generate enum names as str
@@ -241,7 +242,7 @@ enum Action {
     Nat,
     Rdr,
     Binat,
-    Scrub
+    Scrub,
 }
 
 impl AsRef<str> for Action {
@@ -260,7 +261,7 @@ impl AsRef<str> for Action {
 enum WlanType {
     Mgt,
     Ctl,
-    Data
+    Data,
 }
 
 impl AsRef<str> for WlanType {
@@ -275,13 +276,41 @@ impl AsRef<str> for WlanType {
 
 enum WlanSubType {
     // mgt
-    AssocReq, AssocResp, ReAssocReq, ReAssocResp, ProbeReq, ProbeResp, Beacon, Atim, DisAssoc, Auth, DeAuth,
+    AssocReq,
+    AssocResp,
+    ReAssocReq,
+    ReAssocResp,
+    ProbeReq,
+    ProbeResp,
+    Beacon,
+    Atim,
+    DisAssoc,
+    Auth,
+    DeAuth,
 
     // ctl
-    PsPoll, Rts, Cts, Ack, CfEnd, CfEndAck,
+    PsPoll,
+    Rts,
+    Cts,
+    Ack,
+    CfEnd,
+    CfEndAck,
 
     // data
-    Data, DataCfAck, DataCfPoll, DataCfAckPoll, Null, CfAck, CfPoll, CfAckPoll, QosData, QosDataCfPoll, QosDataCfAckPoll, Qos, QosCfPoll, QosCfAckPoll,
+    Data,
+    DataCfAck,
+    DataCfPoll,
+    DataCfAckPoll,
+    Null,
+    CfAck,
+    CfPoll,
+    CfAckPoll,
+    QosData,
+    QosDataCfPoll,
+    QosDataCfAckPoll,
+    Qos,
+    QosCfPoll,
+    QosCfAckPoll,
 }
 
 impl AsRef<str> for WlanSubType {
@@ -325,7 +354,7 @@ impl AsRef<str> for WlanSubType {
 enum IsoProtocol {
     Clnp,
     Esis,
-    Isis
+    Isis,
 }
 
 impl AsRef<str> for IsoProtocol {
@@ -477,9 +506,17 @@ enum Primitive {
     Geneve(Option<usize>),
 
     IsoProto(IsoProtocol),
-    Clnp, Esis, Isis,
+    Clnp,
+    Esis,
+    Isis,
 
-    L1, L2, Iih, Lsp, Snp, Csnp, Psnp,
+    L1,
+    L2,
+    Iih,
+    Lsp,
+    Snp,
+    Csnp,
+    Psnp,
 
     Vpi(usize),
 
@@ -522,51 +559,57 @@ impl ToString for Primitive {
                 s.push_str(id.as_ref());
 
                 s
-            }
+            },
             Primitive::Gateway(addr) => format!("gateway {}", addr.to_string()),
             Primitive::Net(addr, dir) => match dir {
                 Some(dir) => String::from(format!("{} net {}", dir.as_ref(), addr.to_string())),
                 None => String::from(format!("net {}", addr.to_string())),
-            }
+            },
             Primitive::Netmask(addr, mask) => String::from(format!("net {} mask {}", addr.to_string(), mask)),
             Primitive::NetLen(addr, len) => String::from(format!("net{}/{}", addr.to_string(), len)),
             Primitive::Port(port, dir) => match dir {
                 Some(dir) => String::from(format!("{} port {}", dir.as_ref(), port)),
                 None => String::from(format!("port {}", port)),
-            }
+            },
             Primitive::PortRange(range, dir) => match dir {
                 Some(dir) => String::from(format!("{} portrange {}-{}", dir.as_ref(), range.start, range.end)),
                 None => String::from(format!("portrange {}-{}", range.start, range.end)),
-            }
+            },
             Primitive::Less(size) => String::from(format!("less {}", size)),
             Primitive::Greater(size) => String::from(format!("greater {}", size)),
             Primitive::IpProto(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp => String::from(format!("ip proto \\{}", proto.as_ref())),
+                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                    String::from(format!("ip proto \\{}", proto.as_ref())),
                 _ => String::from(format!("ip proto {}", proto.as_ref())),
-            }
+            },
             Primitive::Ip6Proto(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp => String::from(format!("ip proto \\{}", proto.as_ref())),
+                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                    String::from(format!("ip proto \\{}", proto.as_ref())),
                 _ => String::from(format!("ip6 proto {}", proto.as_ref())),
-            }
+            },
             Primitive::Proto(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp => String::from(format!("ip proto \\{}", proto.as_ref())),
+                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                    String::from(format!("ip proto \\{}", proto.as_ref())),
                 _ => String::from(format!("proto {}", proto.as_ref())),
-            }
+            },
             Primitive::Tcp => "tcp".to_owned(),
             Primitive::Udp => "udp".to_owned(),
             Primitive::Icmp => "icmp".to_owned(),
             Primitive::IpProtoChain(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp => String::from(format!("ip protochain \\{}", proto.as_ref())),
+                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                    String::from(format!("ip protochain \\{}", proto.as_ref())),
                 _ => String::from(format!("ip protochain {}", proto.as_ref())),
-            }
+            },
             Primitive::Ip6ProtoChain(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp => String::from(format!("ip6 protochain \\{}", proto.as_ref())),
+                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                    String::from(format!("ip6 protochain \\{}", proto.as_ref())),
                 _ => String::from(format!("ip6 protochain {}", proto.as_ref())),
-            }
+            },
             Primitive::ProtoChain(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp => String::from(format!("protochain \\{}", proto.as_ref())),
+                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                    String::from(format!("protochain \\{}", proto.as_ref())),
                 _ => String::from(format!("protochain {}", proto.as_ref())),
-            }
+            },
             Primitive::EtherBroadcast => "ether broadcast".to_owned(),
             Primitive::IpBroadcast => "ip broadcast".to_owned(),
             Primitive::EtherMulticast => "ether multicast".to_owned(),
@@ -575,7 +618,7 @@ impl ToString for Primitive {
             Primitive::EtherProto(proto) => match proto {
                 EtherProtocol::Loopback => String::from(format!("ether proto loopback")),
                 _ => String::from(format!("ether proto \\{}", proto.as_ref())),
-            }
+            },
             Primitive::Ip => "ip".to_owned(),
             Primitive::Ip6 => "ip6".to_owned(),
             Primitive::Arp => "arp".to_owned(),
@@ -593,13 +636,13 @@ impl ToString for Primitive {
             Primitive::DecnetHost(host, dir) => match dir {
                 Some(dir) => String::from(format!("decnet {} {}", dir.as_ref(), host)),
                 None => String::from(format!("decnet host {}", host)),
-            }
+            },
             Primitive::Llc(llc_type) => match llc_type {
                 Some(llc) => String::from(format!("llc {}", llc.as_ref())),
                 None => "llc".to_owned(),
-            }
+            },
             Primitive::Inbound => "inbound".to_owned(),
-            Primitive::Outbound => "outbound".to_owned()    ,
+            Primitive::Outbound => "outbound".to_owned(),
             Primitive::Ifname(name) => String::from(format!("ifname {}", name)),
             Primitive::On(name) => String::from(format!("on {}", name)),
             Primitive::Rnr(num) => String::from(format!("rnr {}", num)),
@@ -619,26 +662,26 @@ impl ToString for Primitive {
             Primitive::WlanType(wlan_type, sub_type) => match sub_type {
                 Some(sub) => String::from(format!("type {} subtype {}", wlan_type.as_ref(), sub.as_ref())),
                 None => String::from(format!("type {}", wlan_type.as_ref())),
-            }
+            },
             Primitive::SubType(sub_type) => String::from(format!("subtype {}", sub_type.as_ref())),
-            Primitive::Direction(dir) => String::from(format!("dir {}",  dir.as_ref())),
+            Primitive::Direction(dir) => String::from(format!("dir {}", dir.as_ref())),
             Primitive::Vlan(id) => match id {
                 Some(id) => String::from(format!("vlan {}", id)),
                 None => "vlan".to_owned(),
-            }
+            },
             Primitive::Mpls(num) => match num {
                 Some(num) => String::from(format!("mpls {}", num)),
                 None => "mpls".to_owned(),
-            }
+            },
             Primitive::Pppoed => "pppoed".to_owned(),
             Primitive::Pppoes(id) => match id {
                 Some(id) => String::from(format!("pppoes {}", id)),
                 None => "pppoes".to_owned(),
-            }
+            },
             Primitive::Geneve(vni) => match vni {
                 Some(vni) => String::from(format!("geneve {}", vni)),
                 None => "geneve".to_owned(),
-            }
+            },
             Primitive::IsoProto(proto) => String::from(format!("iso proto \\{}", proto.as_ref())),
             Primitive::Clnp => "clnp".to_owned(),
             Primitive::Esis => "esis".to_owned(),
@@ -663,8 +706,10 @@ impl ToString for Primitive {
             Primitive::Ilmic => "ilmic".to_owned(),
             Primitive::ConnectMsg => "connectmsg".to_owned(),
             Primitive::MetaConnect => "metaconnect".to_owned(),
-            // Primitive::Comparison(left, relop, right) => String::from(format!("{} {} {}", left.0, relop.as_ref(), right.0)),
-            Primitive::Comparison(left, relop, right) => String::from(format!("{} {} {}", "EXPR", relop.as_ref(), "EXPR")),
+            // Primitive::Comparison(left, relop, right) => String::from(format!("{} {} {}", left.0, relop.as_ref(),
+            // right.0)),
+            Primitive::Comparison(left, relop, right) =>
+                String::from(format!("{} {} {}", "EXPR", relop.as_ref(), "EXPR")),
         }
     }
 }

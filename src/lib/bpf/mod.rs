@@ -1,13 +1,14 @@
 pub mod expression;
 pub mod primitive;
 
+use std::collections::VecDeque;
+use std::error::Error;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
 use std::ops::Range;
-use std::collections::VecDeque;
+
 use crate::bpf::expression::{BinOp, Operand};
-use std::error::Error;
-use std::fmt::{Display, Formatter};
-use std::fmt;
 
 pub type Result<T> = std::result::Result<T, BpfError>;
 
@@ -32,6 +33,6 @@ impl Error for BpfError {
     }
 }
 
-struct FilterBuilder { }
+struct FilterBuilder {}
 
-impl FilterBuilder { }
+impl FilterBuilder {}

@@ -9,175 +9,6 @@ use crate::bpf::expression::Expression;
 type NetMask = IpAddr;
 type Host = String;
 
-enum QualifierDirection {
-    Src,
-    Dst,
-    SrcOrDst,
-    SrcAndDst,
-    Ra,
-    Ta,
-    Addr1,
-    Addr2,
-    Addr3,
-    Addr4,
-}
-
-impl AsRef<str> for QualifierDirection {
-    fn as_ref(&self) -> &str {
-        match self {
-            QualifierDirection::Src => "src",
-            QualifierDirection::Dst => "dst",
-            QualifierDirection::SrcOrDst => "src or dst",
-            QualifierDirection::SrcAndDst => "src and dst",
-            QualifierDirection::Ra => "ra",
-            QualifierDirection::Ta => "ta",
-            QualifierDirection::Addr1 => "addr1",
-            QualifierDirection::Addr2 => "addr2",
-            QualifierDirection::Addr3 => "addr3",
-            QualifierDirection::Addr4 => "addr4",
-        }
-    }
-}
-
-enum QualifierType {
-    Host,
-    Net,
-    Port,
-    PortRange,
-}
-
-impl AsRef<str> for QualifierType {
-    fn as_ref(&self) -> &str {
-        match self {
-            QualifierType::Host => "host",
-            QualifierType::Net => "net",
-            QualifierType::Port => "port",
-            QualifierType::PortRange => "portsrange",
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum QualifyProtocol {
-    Ether,
-    Fddi,
-    Tr,
-    Wlan,
-    Ip,
-    Ip6,
-    Arp,
-    Rarp,
-    Decnet,
-    Tcp,
-    Udp,
-}
-
-impl AsRef<str> for QualifyProtocol {
-    fn as_ref(&self) -> &str {
-        match self {
-            QualifyProtocol::Ether => "ether",
-            QualifyProtocol::Fddi => "fddi",
-            QualifyProtocol::Tr => "tr",
-            QualifyProtocol::Wlan => "wlan",
-            QualifyProtocol::Ip => "ip",
-            QualifyProtocol::Ip6 => "ip6",
-            QualifyProtocol::Arp => "arp",
-            QualifyProtocol::Rarp => "rarp",
-            QualifyProtocol::Decnet => "decent",
-            QualifyProtocol::Tcp => "tcp",
-            QualifyProtocol::Udp => "udp",
-        }
-    }
-}
-
-enum PrimitiveProtocol {
-    Icmp,
-    Icmp6,
-    Igmp,
-    Igrp,
-    Pim,
-    Ah,
-    Esp,
-    Vrrp,
-    Udp,
-    Tcp,
-}
-
-impl AsRef<str> for PrimitiveProtocol {
-    fn as_ref(&self) -> &str {
-        match self {
-            PrimitiveProtocol::Icmp => "icmp",
-            PrimitiveProtocol::Icmp6 => "icmp6",
-            PrimitiveProtocol::Igmp => "igmp",
-            PrimitiveProtocol::Igrp => "igrp",
-            PrimitiveProtocol::Pim => "pim",
-            PrimitiveProtocol::Ah => "ah",
-            PrimitiveProtocol::Esp => "esp",
-            PrimitiveProtocol::Vrrp => "vrrp",
-            PrimitiveProtocol::Udp => "udp",
-            PrimitiveProtocol::Tcp => "tcp",
-        }
-    }
-}
-
-enum Qualifier {
-    Type(QualifierType),
-    Dir(QualifierDirection),
-    Proto(QualifyProtocol),
-}
-
-impl AsRef<str> for Qualifier {
-    fn as_ref(&self) -> &str {
-        match self {
-            Qualifier::Type(t) => t.as_ref(),
-            Qualifier::Dir(dir) => dir.as_ref(),
-            Qualifier::Proto(proto) => proto.as_ref(),
-        }
-    }
-}
-
-enum EtherProtocol {
-    Aarp,
-    Arp,
-    Atalk,
-    Decnet,
-    Ip,
-    Ip6,
-    Ipx,
-    Iso,
-    Lat,
-    Loopback,
-    Mopdl,
-    Moprc,
-    Netbeui,
-    Rarp,
-    Sca,
-    Stp,
-}
-
-impl AsRef<str> for EtherProtocol {
-    fn as_ref(&self) -> &str {
-        match self {
-            EtherProtocol::Aarp => "aarp",
-            EtherProtocol::Arp => "arp",
-            EtherProtocol::Atalk => "atalk",
-            EtherProtocol::Decnet => "decnet",
-            EtherProtocol::Ip => "ip",
-            EtherProtocol::Ip6 => "ip6",
-            EtherProtocol::Ipx => "ipx",
-            EtherProtocol::Iso => "iso",
-            EtherProtocol::Lat => "lat",
-            EtherProtocol::Loopback => "loopback",
-            EtherProtocol::Mopdl => "mopdl",
-            EtherProtocol::Moprc => "moprc",
-            EtherProtocol::Netbeui => "netbeui",
-            EtherProtocol::Rarp => "rarp",
-            EtherProtocol::Sca => "sca",
-            EtherProtocol::Stp => "stp",
-        }
-    }
-}
-
 enum LlcType {
     I,
     S,
@@ -214,6 +45,8 @@ impl AsRef<str> for LlcType {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 enum ReasonCode {
     Match,
     BadOffset,
@@ -236,6 +69,8 @@ impl AsRef<str> for ReasonCode {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 enum Action {
     Pass,
     Block,
@@ -257,6 +92,8 @@ impl AsRef<str> for Action {
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 enum WlanType {
     Mgt,
@@ -351,39 +188,9 @@ impl AsRef<str> for WlanSubType {
     }
 }
 
-enum IsoProtocol {
-    Clnp,
-    Esis,
-    Isis,
-}
+///////////////////////////////////////////////////////////////////////////////
 
-impl AsRef<str> for IsoProtocol {
-    fn as_ref(&self) -> &str {
-        match self {
-            IsoProtocol::Clnp => "clnp",
-            IsoProtocol::Esis => "esis",
-            IsoProtocol::Isis => "isis",
-        }
-    }
-}
-
-enum PrimitiveId {
-    Broadcast,
-    Multicast,
-    Else(String),
-}
-
-impl AsRef<str> for PrimitiveId {
-    fn as_ref(&self) -> &str {
-        match self {
-            PrimitiveId::Broadcast => "broadcast",
-            PrimitiveId::Multicast => "multicast",
-            PrimitiveId::Else(s) => s.as_str(),
-        }
-    }
-}
-
-enum RelOp {
+pub enum RelOp {
     Gt,
     Lt,
     Gte,
@@ -405,8 +212,216 @@ impl AsRef<str> for RelOp {
     }
 }
 
-enum Primitive {
-    Generic(Vec<Qualifier>, PrimitiveId),
+///////////////////////////////////////////////////////////////////////////////
+
+enum Qualifier {
+    Type(QualifierType),
+    Dir(QualifierDirection),
+    Proto(QualifierProtocol),
+}
+
+enum QualifierType {
+    Host,
+    Net,
+    Port,
+    PortRange,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum QualifierProtocol {
+    Ether,
+    Fddi,
+    Tr,
+    Wlan,
+    Ip,
+    Ip6,
+    Arp,
+    Rarp,
+    Decnet,
+    Tcp,
+    Udp,
+}
+
+enum QualifierDirection {
+    Src,
+    Dst,
+    SrcOrDst,
+    SrcAndDst,
+    Ra,
+    Ta,
+    Addr1,
+    Addr2,
+    Addr3,
+    Addr4,
+}
+
+impl AsRef<str> for Qualifier {
+    fn as_ref(&self) -> &str {
+        match self {
+            Qualifier::Type(t) => t.as_ref(),
+            Qualifier::Dir(dir) => dir.as_ref(),
+            Qualifier::Proto(proto) => proto.as_ref(),
+        }
+    }
+}
+
+impl AsRef<str> for QualifierType {
+    fn as_ref(&self) -> &str {
+        match self {
+            QualifierType::Host => "host",
+            QualifierType::Net => "net",
+            QualifierType::Port => "port",
+            QualifierType::PortRange => "portsrange",
+        }
+    }
+}
+
+impl AsRef<str> for QualifierDirection {
+    fn as_ref(&self) -> &str {
+        match self {
+            QualifierDirection::Src => "src",
+            QualifierDirection::Dst => "dst",
+            QualifierDirection::SrcOrDst => "src or dst",
+            QualifierDirection::SrcAndDst => "src and dst",
+            QualifierDirection::Ra => "ra",
+            QualifierDirection::Ta => "ta",
+            QualifierDirection::Addr1 => "addr1",
+            QualifierDirection::Addr2 => "addr2",
+            QualifierDirection::Addr3 => "addr3",
+            QualifierDirection::Addr4 => "addr4",
+        }
+    }
+}
+
+impl AsRef<str> for QualifierProtocol {
+    fn as_ref(&self) -> &str {
+        match self {
+            QualifierProtocol::Ether => "ether",
+            QualifierProtocol::Fddi => "fddi",
+            QualifierProtocol::Tr => "tr",
+            QualifierProtocol::Wlan => "wlan",
+            QualifierProtocol::Ip => "ip",
+            QualifierProtocol::Ip6 => "ip6",
+            QualifierProtocol::Arp => "arp",
+            QualifierProtocol::Rarp => "rarp",
+            QualifierProtocol::Decnet => "decent",
+            QualifierProtocol::Tcp => "tcp",
+            QualifierProtocol::Udp => "udp",
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Parent enum for al sub enums allowing for expressing all protocol types as a [`Token`].
+enum Protocol {
+    Iso(IsoProtocol),
+    Ether(EtherProtocol),
+    Primitive(NetProtocol),
+}
+
+enum IsoProtocol {
+    Clnp,
+    Esis,
+    Isis,
+}
+
+enum EtherProtocol {
+    Aarp,
+    Arp,
+    Atalk,
+    Decnet,
+    Ip,
+    Ip6,
+    Ipx,
+    Iso,
+    Lat,
+    Loopback,
+    Mopdl,
+    Moprc,
+    Netbeui,
+    Rarp,
+    Sca,
+    Stp,
+}
+
+enum NetProtocol {
+    Icmp,
+    Icmp6,
+    Igmp,
+    Igrp,
+    Pim,
+    Ah,
+    Esp,
+    Vrrp,
+    Udp,
+    Tcp,
+}
+
+impl AsRef<str> for Protocol {
+    fn as_ref(&self) -> &str {
+        match self {
+            Protocol::Iso(proto) => proto.as_ref(),
+            Protocol::Ether(proto) => proto.as_ref(),
+            Protocol::Qualifier(proto) => proto.as_ref(),
+            Protocol::Primitive(proto) => proto.as_ref(),
+        }
+    }
+}
+
+impl AsRef<str> for IsoProtocol {
+    fn as_ref(&self) -> &str {
+        match self {
+            IsoProtocol::Clnp => "clnp",
+            IsoProtocol::Esis => "esis",
+            IsoProtocol::Isis => "isis",
+        }
+    }
+}
+
+impl AsRef<str> for EtherProtocol {
+    fn as_ref(&self) -> &str {
+        match self {
+            EtherProtocol::Aarp => "aarp",
+            EtherProtocol::Arp => "arp",
+            EtherProtocol::Atalk => "atalk",
+            EtherProtocol::Decnet => "decnet",
+            EtherProtocol::Ip => "ip",
+            EtherProtocol::Ip6 => "ip6",
+            EtherProtocol::Ipx => "ipx",
+            EtherProtocol::Iso => "iso",
+            EtherProtocol::Lat => "lat",
+            EtherProtocol::Loopback => "loopback",
+            EtherProtocol::Mopdl => "mopdl",
+            EtherProtocol::Moprc => "moprc",
+            EtherProtocol::Netbeui => "netbeui",
+            EtherProtocol::Rarp => "rarp",
+            EtherProtocol::Sca => "sca",
+            EtherProtocol::Stp => "stp",
+        }
+    }
+}
+
+impl AsRef<str> for NetProtocol {
+    fn as_ref(&self) -> &str {
+        match self {
+            NetProtocol::Icmp => "icmp",
+            NetProtocol::Icmp6 => "icmp6",
+            NetProtocol::Igmp => "igmp",
+            NetProtocol::Igrp => "igrp",
+            NetProtocol::Pim => "pim",
+            NetProtocol::Ah => "ah",
+            NetProtocol::Esp => "esp",
+            NetProtocol::Vrrp => "vrrp",
+            NetProtocol::Udp => "udp",
+            NetProtocol::Tcp => "tcp",
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub enum Primitive {
     Gateway(IpAddr),
 
     // todo: handle special `net net/len` case
@@ -419,16 +434,16 @@ enum Primitive {
     Less(usize),
     Greater(usize),
 
-    IpProto(PrimitiveProtocol),
-    Ip6Proto(PrimitiveProtocol),
-    Proto(PrimitiveProtocol),
+    IpProto(NetProtocol),
+    Ip6Proto(NetProtocol),
+    Proto(NetProtocol),
     Tcp,
     Udp,
     Icmp,
 
-    IpProtoChain(PrimitiveProtocol),
-    Ip6ProtoChain(PrimitiveProtocol),
-    ProtoChain(PrimitiveProtocol),
+    IpProtoChain(NetProtocol),
+    Ip6ProtoChain(NetProtocol),
+    ProtoChain(NetProtocol),
 
     EtherBroadcast,
     IpBroadcast,
@@ -578,17 +593,17 @@ impl ToString for Primitive {
             Primitive::Less(size) => String::from(format!("less {}", size)),
             Primitive::Greater(size) => String::from(format!("greater {}", size)),
             Primitive::IpProto(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                NetProtocol::Tcp | NetProtocol::Udp | NetProtocol::Icmp =>
                     String::from(format!("ip proto \\{}", proto.as_ref())),
                 _ => String::from(format!("ip proto {}", proto.as_ref())),
             },
             Primitive::Ip6Proto(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                NetProtocol::Tcp | NetProtocol::Udp | NetProtocol::Icmp =>
                     String::from(format!("ip proto \\{}", proto.as_ref())),
                 _ => String::from(format!("ip6 proto {}", proto.as_ref())),
             },
             Primitive::Proto(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                NetProtocol::Tcp | NetProtocol::Udp | NetProtocol::Icmp =>
                     String::from(format!("ip proto \\{}", proto.as_ref())),
                 _ => String::from(format!("proto {}", proto.as_ref())),
             },
@@ -596,17 +611,17 @@ impl ToString for Primitive {
             Primitive::Udp => "udp".to_owned(),
             Primitive::Icmp => "icmp".to_owned(),
             Primitive::IpProtoChain(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                NetProtocol::Tcp | NetProtocol::Udp | NetProtocol::Icmp =>
                     String::from(format!("ip protochain \\{}", proto.as_ref())),
                 _ => String::from(format!("ip protochain {}", proto.as_ref())),
             },
             Primitive::Ip6ProtoChain(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                NetProtocol::Tcp | NetProtocol::Udp | NetProtocol::Icmp =>
                     String::from(format!("ip6 protochain \\{}", proto.as_ref())),
                 _ => String::from(format!("ip6 protochain {}", proto.as_ref())),
             },
             Primitive::ProtoChain(proto) => match proto {
-                PrimitiveProtocol::Tcp | PrimitiveProtocol::Udp | PrimitiveProtocol::Icmp =>
+                NetProtocol::Tcp | NetProtocol::Udp | NetProtocol::Icmp =>
                     String::from(format!("protochain \\{}", proto.as_ref())),
                 _ => String::from(format!("protochain {}", proto.as_ref())),
             },

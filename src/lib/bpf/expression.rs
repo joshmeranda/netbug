@@ -1,20 +1,20 @@
 use std::collections::VecDeque;
 use std::vec::IntoIter;
 
-use crate::bpf::primitive::QualifyProtocol;
-use crate::bpf::{BpfError, Result};
+use crate::bpf::primitive::QualifierProtocol;
+use crate::bpf::{BpfError, Result, Token};
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expression {
-    tokens: Vec<ExprToken>,
+    tokens: Vec<Token>,
 }
 
 impl Expression {
     /// No syntax checking is performed, any valid string can be passed here.
     /// For any real syntax checking, please use [ExpressionBuilder] to
     /// construct the [Expression].
-    pub fn new(tokens: Vec<ExprToken>) -> Expression { Expression { tokens } }
+    pub fn new(tokens: Vec<Token>) -> Expression { Expression { tokens } }
 }
 
 /// An operand, either an unsigned integer or packet data, in an expression.
@@ -22,7 +22,7 @@ impl Expression {
 pub enum Operand {
     Integer(usize),
 
-    PacketData(QualifyProtocol, Expression, usize),
+    PacketData(QualifierProtocol, Expression, usize),
 }
 
 impl ToString for Operand {
@@ -61,41 +61,23 @@ impl AsRef<str> for BinOp {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum ExprToken {
-    OpenParentheses,
-    CloseParentheses,
-    Operand(Operand),
-    Operator(BinOp),
-}
-
-impl ToString for ExprToken {
-    fn to_string(&self) -> String {
-        match self {
-            ExprToken::OpenParentheses => "{".to_owned(),
-            ExprToken::CloseParentheses => "}".to_owned(),
-            ExprToken::Operand(op) => op.to_string(),
-            ExprToken::Operator(op) => op.as_ref().to_owned(),
-        }
-    }
-}
-
 /// Allows for building an arithmetic expression as a string.
 ///
 /// # Examples
 ///
 /// The builder can be used to construct simple numerical expressions
 /// ```
-/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand, ExprToken};
+/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand, Token};
+/// use netbug::bpf::Token;
 ///
 /// let expr = ExpressionBuilder::new(Operand::Integer(5))
 ///     .plus(Operand::Integer(1))
 ///     .build();
 ///
 /// let expected = Expression::new(vec![
-///         ExprToken::Operand(Operand::Integer(5)),
-///         ExprToken::Operator(BinOp::Plus),
-///         ExprToken::Operand(Operand::Integer(1)),
+///         Token::Operand(Operand::Integer(5)),
+///         Token::Operator(BinOp::Plus),
+///         Token::Operand(Operand::Integer(1)),
 ///     ]);
 ///
 /// assert_eq!(expr, expected)
@@ -105,17 +87,18 @@ impl ToString for ExprToken {
 /// proto[offset:size])
 ///
 /// ```
-/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand, ExprToken};
-/// use netbug::bpf::primitive::QualifyProtocol;
+/// use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand, Token};
+/// use netbug::bpf::primitive::QualifierProtocol;
+/// use netbug::bpf::Token;
 ///
-/// let expr = ExpressionBuilder::new(Operand::PacketData(QualifyProtocol::Ether, Expression::new(vec![ExprToken::Operand(Operand::Integer(0))]), 1))
+/// let expr = ExpressionBuilder::new(Operand::PacketData(QualifierProtocol::Ether, Expression::new(vec![Token::Operand(Operand::Integer(0))]), 1))
 ///     .and(Operand::Integer(1))
 ///     .build();
 ///
 /// let expected = Expression::new(vec![
-///         ExprToken::Operand(Operand::PacketData(QualifyProtocol::Ether, Expression::new(vec![ExprToken::Operand(Operand::Integer(0))]), 1)),
-///         ExprToken::Operator(BinOp::And),
-///         ExprToken::Operand(Operand::Integer(1))
+///         Token::Operand(Operand::PacketData(QualifierProtocol::Ether, Expression::new(vec![Token::Operand(Operand::Integer(0))]), 1)),
+///         Token::Operator(BinOp::And),
+///         Token::Operand(Operand::Integer(1))
 ///     ]);
 ///
 /// assert_eq!(expr, expected)
@@ -128,7 +111,8 @@ impl ToString for ExprToken {
 /// Both of the methods above take a `parentheses` arguments which specifies whether the axpression being added should be wrapped in parethesises. If the given expression is composed of only a single operand, parentheses will not be added regardless of the value of `parentheses`.
 ///
 /// ```
-/// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, ExprToken, BinOp};
+/// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, Token, BinOp};
+/// use netbug::bpf::Token;
 ///
 /// let expr = ExpressionBuilder::from_expr(ExpressionBuilder::new(Operand::Integer(5))
 ///         .times(Operand::Integer(10))
@@ -137,26 +121,26 @@ impl ToString for ExprToken {
 ///     .build();
 ///
 /// let expected = Expression::new(vec![
-///         ExprToken::OpenParentheses,
-///         ExprToken::Operand(Operand::Integer(5)),
-///         ExprToken::Operator(BinOp::Multiply),
-///         ExprToken::Operand(Operand::Integer(10)),
-///         ExprToken::CloseParentheses,
-///         ExprToken::Operator(BinOp::Exponent),
-///         ExprToken::Operand(Operand::Integer(2))
+///         Token::OpenParentheses,
+///         Token::Operand(Operand::Integer(5)),
+///         Token::Operator(BinOp::Multiply),
+///         Token::Operand(Operand::Integer(10)),
+///         Token::CloseParentheses,
+///         Token::Operator(BinOp::Exponent),
+///         Token::Operand(Operand::Integer(2))
 ///     ]);
 ///
 /// assert_eq!(expr, expected)
 /// ```
 pub struct ExpressionBuilder {
-    tokens: Vec<ExprToken>,
+    tokens: Vec<Token>,
 }
 
 impl ExpressionBuilder {
     /// Construct a new expression builder with `operand` as the initial value.
     pub fn new(operand: Operand) -> ExpressionBuilder {
         ExpressionBuilder {
-            tokens: vec![ExprToken::Operand(operand)],
+            tokens: vec![Token::Operand(operand)],
         }
     }
 
@@ -168,76 +152,76 @@ impl ExpressionBuilder {
     }
 
     pub fn plus(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::Plus));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::Plus));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn minus(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::Minus));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::Minus));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn times(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::Multiply));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::Multiply));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn divide(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::Divide));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::Divide));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn modulus(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::Modulus));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::Modulus));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn and(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::And));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::And));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn or(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::Or));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::Or));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn raise(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::Exponent));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::Exponent));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn left_shift(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::LeftShift));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::LeftShift));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     pub fn right_shift(mut self, operand: Operand) -> ExpressionBuilder {
-        self.tokens.push(ExprToken::Operator(BinOp::RightShift));
-        self.tokens.push(ExprToken::Operand(operand));
+        self.tokens.push(Token::Operator(BinOp::RightShift));
+        self.tokens.push(Token::Operand(operand));
         self
     }
 
     /// Add the tokens from one expression to the current one, with optional parentheses.
     pub fn expr(mut self, expr: Expression, parentheses: bool) -> ExpressionBuilder {
         if parentheses && expr.tokens.len() > 1 {
-            self.tokens.push(ExprToken::OpenParentheses);
+            self.tokens.push(Token::OpenParentheses);
         }
 
         expr.tokens.iter()
             .for_each(|token| self.tokens.push(token.clone()));
 
         if parentheses && expr.tokens.len() > 1 {
-            self.tokens.push(ExprToken::CloseParentheses);
+            self.tokens.push(Token::CloseParentheses);
         }
 
         self

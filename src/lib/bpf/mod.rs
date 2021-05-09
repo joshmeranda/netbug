@@ -33,6 +33,21 @@ impl Error for BpfError {
     }
 }
 
-struct FilterBuilder {}
+#[derive(Clone, Debug, PartialEq)]
+pub enum Token {
+    OpenParentheses,
+    CloseParentheses,
+    And,
+    Or,
+    Not,
+    Operand(Operand),
+    Operator(BinOp),
+    Qualifier,
+    Primitive(Primtitive),
+}
 
-impl FilterBuilder {}
+struct FilterBuilder {
+    tokens: Vec<Token>,
+}
+
+impl FilterBuilder { }

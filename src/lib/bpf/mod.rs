@@ -1,4 +1,5 @@
 pub mod expression;
+mod filter;
 pub mod primitive;
 
 use std::collections::VecDeque;
@@ -9,6 +10,7 @@ use std::net::IpAddr;
 use std::ops::Range;
 
 use crate::bpf::expression::{BinOp, Operand};
+use crate::bpf::primitive::{Primitive, Qualifier, Host};
 
 pub type Result<T> = std::result::Result<T, BpfError>;
 
@@ -40,14 +42,10 @@ pub enum Token {
     And,
     Or,
     Not,
+    Host(IpAddr),
+    Port(u16),
     Operand(Operand),
     Operator(BinOp),
-    Qualifier,
-    Primitive(Primtitive),
+    Qualifier(Qualifier),
+    Primitive(Primitive),
 }
-
-struct FilterBuilder {
-    tokens: Vec<Token>,
-}
-
-impl FilterBuilder { }

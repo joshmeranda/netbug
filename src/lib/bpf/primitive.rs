@@ -6,9 +6,10 @@ use crate::bpf::expression::Expression;
 // todo: use something like https://docs.rs/strum/0.20.0/strum/index.html to generate enum names as str
 
 // todo: needs better NetMask type
-type NetMask = IpAddr;
-type Host = String;
+pub type NetMask = IpAddr;
+pub type Host = String;
 
+#[derive(Clone, Debug, PartialEq)]
 enum LlcType {
     I,
     S,
@@ -47,6 +48,7 @@ impl AsRef<str> for LlcType {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Debug, PartialEq)]
 enum ReasonCode {
     Match,
     BadOffset,
@@ -71,6 +73,7 @@ impl AsRef<str> for ReasonCode {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Debug, PartialEq)]
 enum Action {
     Pass,
     Block,
@@ -95,22 +98,14 @@ impl AsRef<str> for Action {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Debug, PartialEq)]
 enum WlanType {
     Mgt,
     Ctl,
     Data,
 }
 
-impl AsRef<str> for WlanType {
-    fn as_ref(&self) -> &str {
-        match self {
-            WlanType::Mgt => "mgt",
-            WlanType::Ctl => "ctl",
-            WlanType::Data => "data",
-        }
-    }
-}
-
+#[derive(Clone, Debug, PartialEq)]
 enum WlanSubType {
     // mgt
     AssocReq,
@@ -148,6 +143,16 @@ enum WlanSubType {
     Qos,
     QosCfPoll,
     QosCfAckPoll,
+}
+
+impl AsRef<str> for WlanType {
+    fn as_ref(&self) -> &str {
+        match self {
+            WlanType::Mgt => "mgt",
+            WlanType::Ctl => "ctl",
+            WlanType::Data => "data",
+        }
+    }
 }
 
 impl AsRef<str> for WlanSubType {
@@ -190,6 +195,7 @@ impl AsRef<str> for WlanSubType {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum RelOp {
     Gt,
     Lt,
@@ -214,12 +220,15 @@ impl AsRef<str> for RelOp {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-enum Qualifier {
+#[derive(Clone, Debug, PartialEq)]
+pub enum Qualifier {
+    Gateway,
     Type(QualifierType),
     Dir(QualifierDirection),
     Proto(QualifierProtocol),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 enum QualifierType {
     Host,
     Net,
@@ -242,17 +251,10 @@ pub enum QualifierProtocol {
     Udp,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 enum QualifierDirection {
-    Src,
-    Dst,
-    SrcOrDst,
-    SrcAndDst,
-    Ra,
-    Ta,
-    Addr1,
-    Addr2,
-    Addr3,
-    Addr4,
+    General(Direction),
+    Wlan(WlanDirection),
 }
 
 impl AsRef<str> for Qualifier {
@@ -279,16 +281,8 @@ impl AsRef<str> for QualifierType {
 impl AsRef<str> for QualifierDirection {
     fn as_ref(&self) -> &str {
         match self {
-            QualifierDirection::Src => "src",
-            QualifierDirection::Dst => "dst",
-            QualifierDirection::SrcOrDst => "src or dst",
-            QualifierDirection::SrcAndDst => "src and dst",
-            QualifierDirection::Ra => "ra",
-            QualifierDirection::Ta => "ta",
-            QualifierDirection::Addr1 => "addr1",
-            QualifierDirection::Addr2 => "addr2",
-            QualifierDirection::Addr3 => "addr3",
-            QualifierDirection::Addr4 => "addr4",
+            QualifierDirection::General(dir) => dir.as_ref(),
+            QualifierDirection::Wlan(dir) => dir.as_ref(),
         }
     }
 }
@@ -313,19 +307,67 @@ impl AsRef<str> for QualifierProtocol {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Parent enum for al sub enums allowing for expressing all protocol types as a [`Token`].
+#[derive(Clone, Debug, PartialEq)]
+pub enum Direction {
+    Src,
+    Dst,
+    SrcOrDst,
+    SrcAndDst,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum WlanDirection {
+    Ra,
+    Ta,
+    Addr1,
+    Addr2,
+    Addr3,
+    Addr4,
+}
+
+impl AsRef<str> for Direction {
+    fn as_ref(&self) -> &str {
+        match self {
+            Direction::Src => "src",
+            Direction::Dst => "dst",
+            Direction::SrcOrDst => "src or dst",
+            Direction::SrcAndDst => "src and dst",
+        }
+    }
+}
+
+impl AsRef<str> for WlanDirection {
+    fn as_ref(&self) -> &str {
+        match self {
+            WlanDirection::Ra => "ra",
+            WlanDirection::Ta => "ta",
+            WlanDirection::Addr1 => "addr1",
+            WlanDirection::Addr2 => "addr2",
+            WlanDirection::Addr3 => "addr3",
+            WlanDirection::Addr4 => "add41",
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// Parent enum for al sub enums allowing for expressing all protocol types as a
+/// [`Token`].
+#[derive(Clone, Debug, PartialEq)]
 enum Protocol {
     Iso(IsoProtocol),
     Ether(EtherProtocol),
     Primitive(NetProtocol),
 }
 
+#[derive(Clone, Debug, PartialEq)]
 enum IsoProtocol {
     Clnp,
     Esis,
     Isis,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 enum EtherProtocol {
     Aarp,
     Arp,
@@ -345,6 +387,7 @@ enum EtherProtocol {
     Stp,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 enum NetProtocol {
     Icmp,
     Icmp6,
@@ -363,7 +406,6 @@ impl AsRef<str> for Protocol {
         match self {
             Protocol::Iso(proto) => proto.as_ref(),
             Protocol::Ether(proto) => proto.as_ref(),
-            Protocol::Qualifier(proto) => proto.as_ref(),
             Protocol::Primitive(proto) => proto.as_ref(),
         }
     }
@@ -421,6 +463,7 @@ impl AsRef<str> for NetProtocol {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum Primitive {
     Gateway(IpAddr),
 

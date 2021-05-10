@@ -105,10 +105,13 @@ impl AsRef<str> for BinOp {
 /// ```
 /// For goruping values in parentheses (sub expressions) there are 2 options:
 ///
-/// 1 ) Construct the builder with [`from_expr`], used when the expression starts of the larger expresison
-/// 2 ) Adding the expressions vie [`expr`]
+/// 1 ) Construct the builder with [`from_expr`], used when the expression
+/// starts of the larger expresison 2 ) Adding the expressions vie [`expr`]
 ///
-/// Both of the methods above take a `parentheses` arguments which specifies whether the axpression being added should be wrapped in parethesises. If the given expression is composed of only a single operand, parentheses will not be added regardless of the value of `parentheses`.
+/// Both of the methods above take a `parentheses` arguments which specifies
+/// whether the axpression being added should be wrapped in parethesises. If the
+/// given expression is composed of only a single operand, parentheses will not
+/// be added regardless of the value of `parentheses`.
 ///
 /// ```
 /// use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, Token, BinOp};
@@ -144,7 +147,8 @@ impl ExpressionBuilder {
         }
     }
 
-    /// Construct a new [`ExpressionBuilder`] using `expr` as the first value(s) in the expression, with optional parentheses.
+    /// Construct a new [`ExpressionBuilder`] using `expr` as the first value(s)
+    /// in the expression, with optional parentheses.
     pub fn from_expr(expr: Expression, parentheses: bool) -> ExpressionBuilder {
         let builder = ExpressionBuilder { tokens: vec![] };
 
@@ -211,14 +215,14 @@ impl ExpressionBuilder {
         self
     }
 
-    /// Add the tokens from one expression to the current one, with optional parentheses.
+    /// Add the tokens from one expression to the current one, with optional
+    /// parentheses.
     pub fn expr(mut self, expr: Expression, parentheses: bool) -> ExpressionBuilder {
         if parentheses && expr.tokens.len() > 1 {
             self.tokens.push(Token::OpenParentheses);
         }
 
-        expr.tokens.iter()
-            .for_each(|token| self.tokens.push(token.clone()));
+        expr.tokens.iter().for_each(|token| self.tokens.push(token.clone()));
 
         if parentheses && expr.tokens.len() > 1 {
             self.tokens.push(Token::CloseParentheses);

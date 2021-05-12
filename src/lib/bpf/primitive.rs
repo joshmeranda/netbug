@@ -2,6 +2,7 @@ use std::net::IpAddr;
 use std::ops::Range;
 
 use crate::bpf::expression::Expression;
+use crate::bpf::Token;
 
 // todo: use something like https://docs.rs/strum/0.20.0/strum/index.html to generate enum names as str
 
@@ -49,7 +50,7 @@ impl AsRef<str> for LlcType {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq)]
-enum ReasonCode {
+pub enum ReasonCode {
     Match,
     BadOffset,
     Fragment,
@@ -74,7 +75,7 @@ impl AsRef<str> for ReasonCode {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq)]
-enum Action {
+pub enum Action {
     Pass,
     Block,
     Nat,
@@ -222,7 +223,77 @@ impl AsRef<str> for RelOp {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Qualifier {
-    Gateway,
+    Gateway, Mask,
+
+    Less, Greater,
+
+    RawProto,
+
+    ProtoChain,
+
+    Multicast, Broadcast,
+
+    EtherAbbr(EtherAbbrev),
+
+    Llc,
+
+    Inbound, Outbound,
+
+    Ifname, On,
+
+    Rnr, RuleNum,
+
+    Reason,
+
+    Rset, RuleSet,
+
+    Action,
+
+    Srnr, SubRuleNum,
+
+    Wlan,
+
+    // follows wlan
+    Ra, Ta, Addr1, Addr2, Addr3, Addr4,
+
+    WlanType, WlanSubType,
+
+    RawDir,
+
+    Vlan,
+
+    Mpls,
+
+    PppOverEtherDiscovery, // pppoed
+    PppOverEtherSession, // pppoes
+
+    Geneve,
+
+    Iso,
+
+    IsoAbbr(IsoProtocol), // Abbreviations clnp, esis, isis
+
+    L1, L2, Iih,
+    Lsp, Snp, Csnp, Psnp,
+
+    VirtualPathIdentifier, VirtualChannelIdentifier,
+
+    Lane,
+
+    Oamf4s, Oamf4e, Oamf4, Oam,
+
+    MetaSignallingCircuit, // metac
+
+    BroadcastSignalingCircuit, // bcc,
+
+    SignallingCircuit, // sc,
+
+    IlmiCircuit, // IlmiCircuit
+
+    ConenctMsg,
+
+    MetaConenct,
+
     Type(QualifierType),
     Dir(QualifierDirection),
     Proto(QualifierProtocol),
@@ -242,6 +313,7 @@ pub enum QualifierProtocol {
     Fddi,
     Tr,
     Wlan,
+    Icmp,
     Ip,
     Ip6,
     Arp,
@@ -260,6 +332,65 @@ enum QualifierDirection {
 impl AsRef<str> for Qualifier {
     fn as_ref(&self) -> &str {
         match self {
+            Qualifier::Gateway => "gateway",
+            Qualifier::Mask => "mask",
+            Qualifier::Less => "less",
+            Qualifier::Greater => "greater",
+            Qualifier::RawProto => "proto",
+            Qualifier::ProtoChain => "protochain",
+            Qualifier::Multicast => "multicast",
+            Qualifier::Broadcast => "broadcast",
+            Qualifier::EtherAbbr(abbr) => abbr.as_ref(),
+            Qualifier::Llc => "llc",
+            Qualifier::Inbound => "inbound",
+            Qualifier::Outbound => "outbound",
+            Qualifier::Ifname => "ifname",
+            Qualifier::On => "on",
+            Qualifier::Rnr => "rnr",
+            Qualifier::RuleNum => "rulenum",
+            Qualifier::Reason => "reason",
+            Qualifier::Rset => "rset",
+            Qualifier::RuleSet => "ruleset",
+            Qualifier::Action => "action",
+            Qualifier::Srnr => "srnr",
+            Qualifier::SubRuleNum => "subrulenum",
+            Qualifier::Wlan => "wlan",
+            Qualifier::Ra => "Ra",
+            Qualifier::Ta => "ta",
+            Qualifier::Addr1 => "addr1",
+            Qualifier::Addr2 => "addr2",
+            Qualifier::Addr3 => "addr3",
+            Qualifier::Addr4 => "addr4",
+            Qualifier::WlanType => "type",
+            Qualifier::WlanSubType => "subtype",
+            Qualifier::RawDir => "dir",
+            Qualifier::Vlan => "vlan",
+            Qualifier::Mpls => "mpls",
+            Qualifier::PppOverEtherDiscovery => "pppoed",
+            Qualifier::PppOverEtherSession => "pppoes",
+            Qualifier::Geneve => "geneve",
+            Qualifier::Iso => "iso",
+            Qualifier::IsoAbbr(abbr) => abbr.as_ref(),
+            Qualifier::L1 => "l1",
+            Qualifier::L2 => "l2",
+            Qualifier::Iih => "iih",
+            Qualifier::Lsp => "lsp",
+            Qualifier::Snp => "snp",
+            Qualifier::Csnp => "cnsp",
+            Qualifier::Psnp => "psnp",
+            Qualifier::VirtualPathIdentifier => "vpi",
+            Qualifier::VirtualChannelIdentifier => "vci",
+            Qualifier::Lane => "lane",
+            Qualifier::Oamf4s => "oamf4s",
+            Qualifier::Oamf4e => "oamf4e",
+            Qualifier::Oamf4 => "oamf4",
+            Qualifier::Oam => "oam",
+            Qualifier::MetaSignallingCircuit => "metac",
+            Qualifier::BroadcastSignalingCircuit => "bcc",
+            Qualifier::SignallingCircuit => "sc",
+            Qualifier::IlmiCircuit => "ilmic",
+            Qualifier::ConenctMsg => "connectmsg",
+            Qualifier::MetaConenct => "metaconnect",
             Qualifier::Type(t) => t.as_ref(),
             Qualifier::Dir(dir) => dir.as_ref(),
             Qualifier::Proto(proto) => proto.as_ref(),
@@ -301,6 +432,48 @@ impl AsRef<str> for QualifierProtocol {
             QualifierProtocol::Decnet => "decent",
             QualifierProtocol::Tcp => "tcp",
             QualifierProtocol::Udp => "udp",
+            QualifierProtocol::Icmp => "icmp",
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum EtherAbbrev {
+    Ip,
+    Ip6,
+    Arp,
+    Rarp,
+    Atalk,
+    Aarp,
+    Decnet,
+    Iso,
+    Stpm,
+    Ipx,
+    Netbui,
+    Lat,
+    Moprc,
+    Mopdl,
+}
+
+impl AsRef<str> for EtherAbbrev {
+    fn as_ref(&self) -> &str {
+        match self {
+            EtherAbbrev::Ip => "ip",
+            EtherAbbrev::Ip6 => "ip6",
+            EtherAbbrev::Arp => "arp",
+            EtherAbbrev::Rarp => "rarp",
+            EtherAbbrev::Atalk => "atalk",
+            EtherAbbrev::Aarp => "aarp",
+            EtherAbbrev::Decnet => "decnet",
+            EtherAbbrev::Iso => "iso",
+            EtherAbbrev::Stpm => "stpm",
+            EtherAbbrev::Ipx => "ipx",
+            EtherAbbrev::Netbui => "netbeui",
+            EtherAbbrev::Lat => "lat",
+            EtherAbbrev::Moprc => "moprc",
+            EtherAbbrev::Mopdl => "mopdl",
         }
     }
 }
@@ -468,7 +641,7 @@ pub enum Primitive {
     Gateway(IpAddr),
 
     // todo: handle special `net net/len` case
-    Net(IpAddr, Option<QualifierDirection>),
+    Net(IpAddr, Option<Direction>),
     Netmask(IpAddr, NetMask),
     NetLen(IpAddr, usize),
 
@@ -606,18 +779,6 @@ pub enum Primitive {
 impl ToString for Primitive {
     fn to_string(&self) -> String {
         match self {
-            Primitive::Generic(qualifiers, id) => {
-                let mut s = qualifiers.iter().fold(String::new(), |mut acc, q| {
-                    acc.push_str(q.as_ref());
-                    acc.push(' ');
-
-                    acc
-                });
-
-                s.push_str(id.as_ref());
-
-                s
-            },
             Primitive::Gateway(addr) => format!("gateway {}", addr.to_string()),
             Primitive::Net(addr, dir) => match dir {
                 Some(dir) => String::from(format!("{} net {}", dir.as_ref(), addr.to_string())),

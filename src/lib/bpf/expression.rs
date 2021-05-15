@@ -3,6 +3,8 @@ use std::vec::IntoIter;
 
 use crate::bpf::primitive::QualifierProtocol;
 use crate::bpf::{BpfError, Result, Token};
+use crate::bpf::filter::TokenStream;
+use std::slice::Iter;
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
 #[derive(Clone, Debug, PartialEq)]
@@ -15,6 +17,10 @@ impl Expression {
     /// For any real syntax checking, please use [ExpressionBuilder] to
     /// construct the [Expression].
     pub fn new(tokens: Vec<Token>) -> Expression { Expression { tokens } }
+}
+
+impl TokenStream for Expression {
+    fn stream(&self) -> Iter<Token> { self.tokens.iter() }
 }
 
 /// An operand, either an unsigned integer or packet data, in an expression.

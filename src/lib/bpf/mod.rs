@@ -10,7 +10,7 @@ use std::net::IpAddr;
 use std::ops::Range;
 
 use crate::bpf::expression::{BinOp, Operand};
-use crate::bpf::primitive::{Primitive, Qualifier, Host, ReasonCode, Action};
+use crate::bpf::primitive::{Action, Host, Identifier, Primitive, Qualifier, ReasonCode, RelOp};
 
 pub type Result<T> = std::result::Result<T, BpfError>;
 
@@ -42,9 +42,10 @@ pub enum Token {
     And,
     Or,
     Not,
-    Host(IpAddr),
-    Port(u16),
+    Escape,
+    Id(Identifier),
     Operand(Operand),
     Operator(BinOp),
+    RelationalOperator(RelOp),
     Qualifier(Qualifier),
 }

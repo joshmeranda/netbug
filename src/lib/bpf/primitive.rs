@@ -3,10 +3,9 @@ use std::ops::Range;
 use std::iter;
 
 use crate::bpf::expression::{Expression, BinOp};
-use crate::bpf::Token;
 use std::slice::Iter;
-use crate::bpf::filter::{FormatOptions, TokenStream};
-use crate::bpf::primitive::Primitive::IsoProto;
+use crate::bpf::token::{TokenStream, Token};
+use std::iter::FromIterator;
 
 // todo: use something like https://docs.rs/strum/0.20.0/strum/index.html to generate enum names as str
 
@@ -46,7 +45,7 @@ pub enum Identifier {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq)]
-enum LlcType {
+pub enum LlcType {
     I,
     S,
     U,
@@ -79,13 +78,6 @@ impl AsRef<str> for LlcType {
             LlcType::Xid => "xid",
             LlcType::Frmr => "frmr",
         }
-    }
-}
-
-impl TokenStream for LlcType {
-    fn stream(&self) -> core::slice::Iter<Token> {
-        vec![Token::Id(Identifier::Llc(self.clone()))]
-            .iter()
     }
 }
 
@@ -142,14 +134,14 @@ impl AsRef<str> for Action {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq)]
-enum WlanType {
+pub enum WlanType {
     Mgt,
     Ctl,
     Data,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum WlanSubType {
+pub enum WlanSubType {
     // mgt
     AssocReq,
     AssocResp,
@@ -379,7 +371,7 @@ pub enum Qualifier {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum QualifierType {
+pub enum QualifierType {
     Host,
     Net,
     Port,
@@ -403,7 +395,7 @@ pub enum QualifierProtocol {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum QualifierDirection {
+pub enum QualifierDirection {
     General(Direction),
     Wlan(WlanDirection),
 }
@@ -630,21 +622,21 @@ impl AsRef<str> for WlanDirection {
 /// Parent enum for al sub enums allowing for expressing all protocol types as a
 /// [`Token`].
 #[derive(Clone, Debug, PartialEq)]
-enum Protocol {
+pub enum Protocol {
     Iso(IsoProtocol),
     Ether(EtherProtocol),
     Primitive(NetProtocol),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum IsoProtocol {
+pub enum IsoProtocol {
     Clnp,
     Esis,
     Isis,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum EtherProtocol {
+pub enum EtherProtocol {
     Aarp,
     Arp,
     Atalk,
@@ -664,7 +656,7 @@ enum EtherProtocol {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum NetProtocol {
+pub enum NetProtocol {
     Icmp,
     Icmp6,
     Igmp,
@@ -1036,10 +1028,10 @@ impl ToString for Primitive {
     }
 }
 
-impl TokenStream for Primitive {
-    fn stream(self) -> Iter<Token> {
-        match self {
-            Primitive::Gateway(addr) => vec![Token::Qualifier(Qualifier::Gateway), Token::Id(Identifier::Addr(addr))].into_iter,
+impl Into<TokenStream> for Primitive {
+    fn into(self) -> TokenStream {
+        let tokens = match self {
+            Primitive::Gateway(addr) => vec![Token::Qualifier(Qualifier::Gateway), Token::Id(Identifier::Addr(addr))],
             Primitive::Net(addr, dir) => {
                 let mut tokens = match dir {
                     Some(dir) => vec![Token::Qualifier(Qualifier::Dir(QualifierDirection::General(dir)))],
@@ -1075,7 +1067,7 @@ impl TokenStream for Primitive {
                 tokens.push(Token::Operator(BinOp::Minus));
                 tokens.push(Token::Id(Identifier::RangeEnd(range.end)));
 
-                tokens.iter()
+                tokens
             }
             Primitive::Less(len) => vec![Token::Qualifier(Qualifier::Less), Token::Id(Identifier::Len(len))],
             Primitive::Greater(len) => vec![Token::Qualifier(Qualifier::Greater), Token::Id(Identifier::Len(len))],
@@ -1096,7 +1088,7 @@ impl TokenStream for Primitive {
             Primitive::EtherMulticast => vec![Token::Qualifier(Qualifier::Ether), Token::Qualifier(Qualifier::Multicast)],
             Primitive::IpMulticast => vec![Token::Qualifier(Qualifier::Proto(QualifierProtocol::Ip)), Token::Qualifier(Qualifier::Multicast)],
             Primitive::Ip6Multicast => vec![Token::Qualifier(Qualifier::Proto(QualifierProtocol::Ip6)), Token::Qualifier(Qualifier::Multicast)],
-            Primitive::EtherProto(proto) => vec![Qualifier::Ether, Qualifier::ProtoRaw, Identifier::Protocol(Protocol::Ether(proto))],
+            Primitive::EtherProto(proto) => vec![Token::Qualifier(Qualifier::Ether), Token::Qualifier(Qualifier::ProtoRaw), Token::Id(Identifier::Protocol(Protocol::Ether(proto)))],
             Primitive::Ip => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Ip))],
             Primitive::Ip6 => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Ip6))],
             Primitive::Arp => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Arp))],
@@ -1199,30 +1191,43 @@ impl TokenStream for Primitive {
             Primitive::Esis => vec![Token::Qualifier(Qualifier::IsoAbbr(IsoProtocol::Esis))],
             Primitive::Isis => vec![Token::Qualifier(Qualifier::IsoAbbr(IsoProtocol::Isis))],
             Primitive::L1 => vec![Token::Qualifier(Qualifier::L1)],
-            Primitive::L2 => vec![Token::Qualifier(Qualifier::L2)].iter(),
-            Primitive::Iih => vec![Token::Qualifier(Qualifier::Iih)].iter(),
-            Primitive::Lsp => vec![Token::Qualifier(Qualifier::Lsp)].iter(),
-            Primitive::Snp => vec![Token::Qualifier(Qualifier::Snp)].iter(),
-            Primitive::Csnp => vec![Token::Qualifier(Qualifier::Csnp)].iter(),
-            Primitive::Psnp => vec![Token::Qualifier(Qualifier::Psnp)].iter(),
-            Primitive::Vpi(vpi) => vec![Token::Qualifier(Qualifier::VirtualPathIdentifier), Token::Id(Identifier::VirtualPathIdentifier(vpi))].iter(),
-            Primitive::Vci(vci) => vec![Token::Qualifier(Qualifier::VirtualChannelIdentifier), Token::Id(Identifier::VirtualChannelIdentifier(vci))].iter(),
-            Primitive::Lane => vec![Token::Qualifier(Qualifier::Lane)].iter(),
-            Primitive::Oamf4s => vec![Token::Qualifier(Qualifier::Oamf4s)].iter(),
-            Primitive::Oamf4e => vec![Token::Qualifier(Qualifier::Oamf4e)].iter(),
-            Primitive::Oamf4 => vec![Token::Qualifier(Qualifier::Oamf4)].iter(),
-            Primitive::Oam => vec![Token::Qualifier(Qualifier::Oam)].iter(),
-            Primitive::Metac => vec![Token::Qualifier(Qualifier::MetaSignallingCircuit)].iter(),
-            Primitive::Bcc => vec![Token::Qualifier(Qualifier::BroadcastSignalingCircuit)].iter(),
-            Primitive::Sc => vec![Token::Qualifier(Qualifier::SignallingCircuit)].iter(),
-            Primitive::Ilmic => vec![Token::Qualifier(Qualifier::IlmiCircuit)].iter(),
-            Primitive::ConnectMsg => vec![Token::Qualifier(Qualifier::ConnectMsg)].iter(),
-            Primitive::MetaConnect => vec![Token::Qualifier(Qualifier::MetaConnect)].iter(),
+            Primitive::L2 => vec![Token::Qualifier(Qualifier::L2)],
+            Primitive::Iih => vec![Token::Qualifier(Qualifier::Iih)],
+            Primitive::Lsp => vec![Token::Qualifier(Qualifier::Lsp)],
+            Primitive::Snp => vec![Token::Qualifier(Qualifier::Snp)],
+            Primitive::Csnp => vec![Token::Qualifier(Qualifier::Csnp)],
+            Primitive::Psnp => vec![Token::Qualifier(Qualifier::Psnp)],
+            Primitive::Vpi(vpi) => vec![Token::Qualifier(Qualifier::VirtualPathIdentifier), Token::Id(Identifier::VirtualPathIdentifier(vpi))],
+            Primitive::Vci(vci) => vec![Token::Qualifier(Qualifier::VirtualChannelIdentifier), Token::Id(Identifier::VirtualChannelIdentifier(vci))],
+            Primitive::Lane => vec![Token::Qualifier(Qualifier::Lane)],
+            Primitive::Oamf4s => vec![Token::Qualifier(Qualifier::Oamf4s)],
+            Primitive::Oamf4e => vec![Token::Qualifier(Qualifier::Oamf4e)],
+            Primitive::Oamf4 => vec![Token::Qualifier(Qualifier::Oamf4)],
+            Primitive::Oam => vec![Token::Qualifier(Qualifier::Oam)],
+            Primitive::Metac => vec![Token::Qualifier(Qualifier::MetaSignallingCircuit)],
+            Primitive::Bcc => vec![Token::Qualifier(Qualifier::BroadcastSignalingCircuit)],
+            Primitive::Sc => vec![Token::Qualifier(Qualifier::SignallingCircuit)],
+            Primitive::Ilmic => vec![Token::Qualifier(Qualifier::IlmiCircuit)],
+            Primitive::ConnectMsg => vec![Token::Qualifier(Qualifier::ConnectMsg)],
+            Primitive::MetaConnect => vec![Token::Qualifier(Qualifier::MetaConnect)],
             Primitive::Comparison(left, op, right) => {
-                left.stream()
-                    .chain(iter::once(Token::RelationalOperator(op)))
-                    .chain(right.stream())
+                // todo: this could probably be optimized (maybe chaining)
+                let mut tokens = vec![];
+
+                for token in left.stream() {
+                    tokens.push(token);
+                }
+
+                tokens.push(Token::RelationalOperator(op));
+
+                for token in right.stream() {
+                    tokens.push(token);
+                }
+
+                tokens
             },
-        }
+        };
+
+        TokenStream::from_iter(tokens)
     }
 }

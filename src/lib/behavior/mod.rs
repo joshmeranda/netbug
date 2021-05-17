@@ -32,14 +32,14 @@ use crate::protocols::udp::UdpPacket;
 /// ```
 /// #  #[macro_use] extern crate netbug;
 /// enum Sample {
-///     Variant(usize, usize)
+///     Variant(usize, usize, usize)
 /// }
 ///
 /// # fn main() {
-/// let sample = Sample::Variant(0, 1);
-/// assert_eq!(variant_extract!(sample, Sample::Variant(_, m), m), 1);
+/// let sample = Sample::Variant(0, 1, 2);
+/// assert_eq!(variant_extract!(sample, Sample::Variant(_, m, _), m), 1);
 /// # }
-/// ```
+/// ```2
 ///
 /// ```should_panic
 /// #  #[macro_use] extern crate netbug;

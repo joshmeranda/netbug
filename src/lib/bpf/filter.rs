@@ -1,10 +1,5 @@
 use crate::bpf::primitive::{Primitive, Qualifier};
-use crate::bpf::Token;
-
-/// Simple trait allowing types to be converted into an iterator of tokens with the given [`FormatOptions.`]
-pub trait TokenStream {
-    fn stream(&self) -> core::slice::Iter<Token>;
-}
+use crate::bpf::token::Token;
 
 pub enum QualifierVariant {
     Exact,
@@ -47,9 +42,9 @@ struct FilterBuilder {
 }
 
 impl FilterBuilder {
-    pub fn with(primitive: Primitive) -> FilterBuilder {}
+    pub fn with(primitive: Primitive) -> FilterBuilder { todo!() }
 
-    pub fn with_not(primitive: Primitive) -> FilterBuilder {}
+    pub fn with_not(primitive: Primitive) -> FilterBuilder { todo!() }
 
     fn add_primitive(&mut self, primitive: Primitive) {}
 

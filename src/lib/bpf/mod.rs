@@ -1,6 +1,7 @@
 pub mod expression;
 mod filter;
 pub mod primitive;
+mod token;
 
 use std::collections::VecDeque;
 use std::error::Error;
@@ -33,19 +34,4 @@ impl Error for BpfError {
             BpfError::ExpressionSyntax(_) => None,
         }
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Token {
-    OpenParentheses,
-    CloseParentheses,
-    And,
-    Or,
-    Not,
-    Escape,
-    Id(Identifier),
-    Operand(Operand),
-    Operator(BinOp),
-    RelationalOperator(RelOp),
-    Qualifier(Qualifier),
 }

@@ -19,6 +19,7 @@ impl Expression {
     /// construct the [Expression].
     pub fn new(tokens: Vec<Token>) -> Expression { Expression { tokens } }
 
+    /// Build the token stream for this [`Express`].
     pub fn stream(self) -> TokenStream { self.tokens.into_iter().collect() }
 }
 

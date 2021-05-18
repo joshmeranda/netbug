@@ -11,7 +11,7 @@ pub enum QualifierVariant {
 /// string. todo: consider protocol number?
 pub struct FormatOptions {
     /// Use whitespace to separate operands from operators when serializing
-    /// arithmetic expression.
+    /// arithmetic expression. Defaults to `true`.
     ///
     /// # Example
     /// ```
@@ -28,7 +28,7 @@ pub struct FormatOptions {
     symbol_operators: bool,
 
     /// Specifies whether to use a [`Qualifier`]'s more verbose or abbreviated
-    /// variant if available, or follow the users exact specification.
+    /// variant if available, or follow the users exact specification. Defaults to [`QualifierVariant::Exact`].
     ///
     /// # Example
     /// ```
@@ -37,17 +37,37 @@ pub struct FormatOptions {
     variant: QualifierVariant,
 }
 
+impl Default for FormatOptions {
+    fn default() -> Self {
+        Self {
+            whitespace: true,
+            symbol_operators: false,
+            variant: QualifierVariant::Exact
+        }
+    }
+}
+
 struct FilterBuilder {
     options: FormatOptions,
     tokens:  TokenStream,
 }
 
 impl FilterBuilder {
-    pub fn with(primitive: Primitive) -> FilterBuilder { todo!() }
+    pub fn with(primitive: Primitive) -> FilterBuilder {
+        FilterBuilder {
+            options: FormatOptions::default(),
+            tokens: TokenStream::with(primitive),
+        }
+    }
 
-    pub fn with_not(primitive: Primitive) -> FilterBuilder { todo!() }
+    pub fn with_not(primitive: Primitive) -> FilterBuilder {
+        FilterBuilder {
+            options: FormatOptions::default(),
+            tokens: TokenStream::with_not(primitive),
+        }
+    }
 
-    fn add_primitive(&mut self, primitive: Primitive) {}
+    fn add_primitive(&mut self, primitive: Primitive) { todo!() }
 
     pub fn and(mut self, primitive: Primitive) -> FilterBuilder { self }
 

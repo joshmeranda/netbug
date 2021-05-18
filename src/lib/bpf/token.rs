@@ -7,6 +7,7 @@ use crate::bpf::primitive::{Identifier, Primitive, Qualifier, RelOp};
 /// The second bool is just a dummy type to not break with the na,ed lifetime
 pub struct TokenStream(Vec<Token>);
 
+// todo: probably ok to allow for direct manipulation sicne this will not be a user facing struct (provide a push method)
 impl TokenStream {
     pub fn with(primitive: Primitive) -> TokenStream { primitive.into() }
 

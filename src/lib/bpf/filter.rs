@@ -1,5 +1,5 @@
 use crate::bpf::primitive::{Primitive, Qualifier};
-use crate::bpf::token::Token;
+use crate::bpf::token::{Token, TokenStream};
 
 pub enum QualifierVariant {
     Exact,
@@ -38,7 +38,7 @@ pub struct FormatOptions {
 
 struct FilterBuilder {
     options: FormatOptions,
-    tokens:  Vec<Token>,
+    tokens: TokenStream,
 }
 
 impl FilterBuilder {

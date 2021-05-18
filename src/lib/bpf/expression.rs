@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
+use std::iter::FromIterator;
+use std::slice::Iter;
 use std::vec::IntoIter;
 
 use crate::bpf::primitive::QualifierProtocol;
+use crate::bpf::token::{Token, TokenStream};
 use crate::bpf::{BpfError, Result};
-use crate::bpf::token::{TokenStream, Token};
-use std::slice::Iter;
-use std::iter::FromIterator;
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
 #[derive(Clone, Debug, PartialEq)]
@@ -19,9 +19,7 @@ impl Expression {
     /// construct the [Expression].
     pub fn new(tokens: Vec<Token>) -> Expression { Expression { tokens } }
 
-    pub fn stream(self) -> TokenStream {
-        self.tokens.into_iter().collect()
-    }
+    pub fn stream(self) -> TokenStream { self.tokens.into_iter().collect() }
 }
 
 /// An operand, either an unsigned integer or packet data, in an expression.

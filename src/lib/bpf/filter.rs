@@ -4,11 +4,11 @@ use crate::bpf::token::{Token, TokenStream};
 pub enum QualifierVariant {
     Exact,
     Long,
-    Short
+    Short,
 }
 
-/// Allows for specifying how the resulting BPF program is to be formatted as a string.
-/// todo: consider protocol number?
+/// Allows for specifying how the resulting BPF program is to be formatted as a
+/// string. todo: consider protocol number?
 pub struct FormatOptions {
     /// Use whitespace to separate operands from operators when serializing
     /// arithmetic expression.
@@ -27,18 +27,19 @@ pub struct FormatOptions {
     /// ```
     symbol_operators: bool,
 
-    /// Specifies whether to use a [`Qualifier`]'s more verbose or abbreviated variant if available, or follow the users exact specification.
+    /// Specifies whether to use a [`Qualifier`]'s more verbose or abbreviated
+    /// variant if available, or follow the users exact specification.
     ///
     /// # Example
     /// ```
     /// todo!("Provide example of longer vs shorter variants")
     /// ```
-    variant: QualifierVariant
+    variant: QualifierVariant,
 }
 
 struct FilterBuilder {
     options: FormatOptions,
-    tokens: TokenStream,
+    tokens:  TokenStream,
 }
 
 impl FilterBuilder {

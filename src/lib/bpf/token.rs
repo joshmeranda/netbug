@@ -1,15 +1,14 @@
-use std::vec::IntoIter;
-use crate::bpf::primitive::{Qualifier, RelOp, Identifier, Primitive};
-use crate::bpf::expression::{BinOp, Operand};
 use std::iter::FromIterator;
+use std::vec::IntoIter;
+
+use crate::bpf::expression::{BinOp, Operand};
+use crate::bpf::primitive::{Identifier, Primitive, Qualifier, RelOp};
 
 /// The second bool is just a dummy type to not break with the na,ed lifetime
 pub struct TokenStream(Vec<Token>);
 
 impl TokenStream {
-    pub fn with(primitive: Primitive) -> TokenStream {
-        primitive.into()
-    }
+    pub fn with(primitive: Primitive) -> TokenStream { primitive.into() }
 
     pub fn with_not(primitive: Primitive) -> TokenStream {
         let mut stream = Self::with(primitive);
@@ -22,27 +21,21 @@ impl TokenStream {
 }
 
 impl FromIterator<Token> for TokenStream {
-    fn from_iter<T: IntoIterator<Item=Token>>(iter: T) -> Self {
-        TokenStream(iter.into_iter().collect())
-    }
+    fn from_iter<T: IntoIterator<Item = Token>>(iter: T) -> Self { TokenStream(iter.into_iter().collect()) }
 }
 
 impl IntoIterator for TokenStream {
     type Item = Token;
     type IntoIter = TokenStreamIntoIter;
 
-    fn into_iter(self) -> Self::IntoIter {
-        TokenStreamIntoIter::new(self.0)
-    }
+    fn into_iter(self) -> Self::IntoIter { TokenStreamIntoIter::new(self.0) }
 }
 
-impl <'a> IntoIterator for &'a TokenStream {
+impl<'a> IntoIterator for &'a TokenStream {
     type Item = &'a Token;
-    type IntoIter = TokenStreamIterator<'a> ;
+    type IntoIter = TokenStreamIterator<'a>;
 
-    fn into_iter(self) -> Self::IntoIter {
-        TokenStreamIterator::new(&self.0)
-    }
+    fn into_iter(self) -> Self::IntoIter { TokenStreamIterator::new(&self.0) }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -52,38 +45,27 @@ pub struct TokenStreamIntoIter {
 }
 
 impl TokenStreamIntoIter {
-    fn new(tokens: Vec<Token>) -> TokenStreamIntoIter {
-        Self {
-            tokens,
-        }
-    }
+    fn new(tokens: Vec<Token>) -> TokenStreamIntoIter { Self { tokens } }
 }
 
 impl Iterator for TokenStreamIntoIter {
     type Item = Token;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.tokens.pop()
-    }
+    fn next(&mut self) -> Option<Self::Item> { self.tokens.pop() }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct TokenStreamIterator<'a> {
     tokens: &'a Vec<Token>,
-    index: usize,
+    index:  usize,
 }
 
-impl <'a> TokenStreamIterator<'a> {
-    fn new(tokens: &'a Vec<Token>) -> TokenStreamIterator {
-        Self {
-            tokens,
-            index: 0
-        }
-    }
+impl<'a> TokenStreamIterator<'a> {
+    fn new(tokens: &'a Vec<Token>) -> TokenStreamIterator { Self { tokens, index: 0 } }
 }
 
-impl <'a> Iterator for TokenStreamIterator<'a> {
+impl<'a> Iterator for TokenStreamIterator<'a> {
     type Item = &'a Token;
 
     fn next(&mut self) -> Option<Self::Item> {

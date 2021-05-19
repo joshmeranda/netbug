@@ -42,6 +42,36 @@ pub enum Identifier {
     VirtualChannelIdentifier(usize),
 }
 
+impl ToString for Identifier {
+    fn to_string(&self) -> String {
+        match self {
+            Identifier::Addr(addr) => addr.to_string(),
+            Identifier::Host(host) => String::from(host),
+            Identifier::NetMask(mask) => mask.to_string(),
+            Identifier::Port(port) => port.to_string(),
+            Identifier::RangeStart(start) => start.to_string(),
+            Identifier::RangeEnd(end) => end.to_string(),
+            Identifier::Llc(llc) => llc.as_ref().to_owned(),
+            Identifier::Len(len) => len.to_string(),
+            Identifier::Protocol(proto) => proto.as_ref().to_owned(),
+            Identifier::Interface(interface) => String::from(interface),
+            Identifier::RuleNum(num) => num.to_string(),
+            Identifier::RuleSet(name) => String::from(name),
+            Identifier::Code(code) => code.as_ref().to_owned(),
+            Identifier::Action(act) => act.as_ref().to_owned(),
+            Identifier::WlanType(wlan) => wlan.as_ref().to_owned(),
+            Identifier::WlanSubType(sub) => sub.as_ref().to_owned(),
+            Identifier::Dir(dir) => dir.as_ref().to_owned(),
+            Identifier::VlanId(id) => id.to_string(),
+            Identifier::LabelNum(num) => num.to_string(),
+            Identifier::SessionId(id) => id.to_string(),
+            Identifier::VirtualNetworkIdentifier(id) => id.to_string(),
+            Identifier::VirtualPathIdentifier(id) => id.to_string(),
+            Identifier::VirtualChannelIdentifier(id) => id.to_string(),
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq)]
@@ -782,7 +812,7 @@ pub enum Primitive {
     // where  protocol  is  one of the above protocols
     Lat,
     Moprc,
-    Modpdl,
+    Mopdl,
 
     DecnetHost(Host, Option<QualifierDirection>),
 
@@ -869,6 +899,71 @@ pub enum Primitive {
 
     // todo: requires users to manually build the expression string rather than building programmatic
     Comparison(Expression, RelOp, Expression),
+}
+
+impl Primitive {
+    pub fn abbreviated(&self) -> Option<Primitive> {
+        match self {
+            Primitive::Proto(proto) => match proto {
+                NetProtocol::Tcp => Some(Primitive::Tcp),
+                NetProtocol::Udp => Some(Primitive::Udp),
+                NetProtocol::Icmp => Some(Primitive::Icmp),
+                _ => None,
+            }
+            Primitive::EtherProto(proto) => match proto {
+                EtherProtocol::Ip => Some(Primitive::Ip),
+                EtherProtocol::Ip6 => Some(Primitive::Ip6),
+                EtherProtocol::Arp => Some(Primitive::Arp),
+                EtherProtocol::Rarp => Some(Primitive::Rarp),
+                EtherProtocol::Atalk => Some(Primitive::Atalk),
+                EtherProtocol::Aarp => Some(Primitive::Aarp),
+                EtherProtocol::Decnet => Some(Primitive::Decnet),
+                EtherProtocol::Iso => Some(Primitive::Iso),
+                EtherProtocol::Stp => Some(Primitive::Stp),
+                EtherProtocol::Ipx => Some(Primitive::Ipx),
+                EtherProtocol::Netbeui => Some(Primitive::Netbeui),
+                EtherProtocol::Lat => Some(Primitive::Lat),
+                EtherProtocol::Moprc => Some(Primitive::Moprc),
+                EtherProtocol::Mopdl => Some(Primitive::Mopdl),
+                _ => None
+            }
+            Primitive::IsoProto(proto) => match proto {
+                IsoProtocol::Clnp => Some(Primitive::Clnp),
+                IsoProtocol::Esis => Some(Primitive::Esis),
+                IsoProtocol::Isis => Some(Primitive::Isis),
+            }
+            _ => None,
+        }
+    }
+
+    pub fn verbose(&self) -> Option<Primitive> {
+        match self {
+            Primitive::Tcp => Some(Primitive::Proto(NetProtocol::Tcp)),
+            Primitive::Udp => Some(Primitive::Proto(NetProtocol::Udp)),
+            Primitive::Icmp => Some(Primitive::Proto(NetProtocol::Icmp)),
+
+            Primitive::Ip => Some(Primitive::EtherProto(EtherProtocol::Ip)),
+            Primitive::Ip6 => Some(Primitive::EtherProto(EtherProtocol::Ip6)),
+            Primitive::Arp => Some(Primitive::EtherProto(EtherProtocol::Arp)),
+            Primitive::Rarp => Some(Primitive::EtherProto(EtherProtocol::Rarp)),
+            Primitive::Atalk => Some(Primitive::EtherProto(EtherProtocol::Atalk)),
+            Primitive::Aarp => Some(Primitive::EtherProto(EtherProtocol::Aarp)),
+            Primitive::Decnet => Some(Primitive::EtherProto(EtherProtocol::Decnet)),
+            Primitive::Iso => Some(Primitive::EtherProto(EtherProtocol::Iso)),
+            Primitive::Stp => Some(Primitive::EtherProto(EtherProtocol::Stp)),
+            Primitive::Ipx => Some(Primitive::EtherProto(EtherProtocol::Ipx)),
+            Primitive::Netbeui => Some(Primitive::EtherProto(EtherProtocol::Netbeui)),
+            Primitive::Lat => Some(Primitive::EtherProto(EtherProtocol::Lat)),
+            Primitive::Moprc => Some(Primitive::EtherProto(EtherProtocol::Moprc)),
+            Primitive::Mopdl => Some(Primitive::EtherProto(EtherProtocol::Mopdl)),
+
+            Primitive::Clnp => Some(Primitive::IsoProto(IsoProtocol::Clnp)),
+            Primitive::Esis => Some(Primitive::IsoProto(IsoProtocol::Esis)),
+            Primitive::Isis => Some(Primitive::IsoProto(IsoProtocol::Isis)),
+
+            _ => None,
+        }
+    }
 }
 
 impl Into<TokenStream> for Primitive {
@@ -998,7 +1093,7 @@ impl Into<TokenStream> for Primitive {
             Primitive::Netbeui => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Netbui))],
             Primitive::Lat => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Lat))],
             Primitive::Moprc => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Moprc))],
-            Primitive::Modpdl => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Mopdl))],
+            Primitive::Mopdl => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Mopdl))],
             Primitive::DecnetHost(host, dir) => {
                 let mut tokens = vec![Token::Qualifier(Qualifier::Decnet)];
 

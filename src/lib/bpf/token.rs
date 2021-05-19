@@ -3,21 +3,22 @@ use std::vec::IntoIter;
 
 use crate::bpf::expression::{BinOp, Operand};
 use crate::bpf::primitive::{Identifier, Primitive, Qualifier, RelOp};
+use crate::bpf::filter::FormatOptions;
 
 /// The second bool is just a dummy type to not break with the na,ed lifetime
 pub struct TokenStream(Vec<Token>);
 
-// todo: probably ok to allow for direct manipulation sicne this will not be a user facing struct (provide a push method)
+// todo: probably ok to allow for direct manipulation sicne this will not be a
+// user facing struct (provide a push method)
 impl TokenStream {
-    pub fn with(primitive: Primitive) -> TokenStream { primitive.into() }
+    pub fn new() -> TokenStream { Self(vec![]) }
 
-    pub fn with_not(primitive: Primitive) -> TokenStream {
-        let mut stream = Self::with(primitive);
+    pub fn push(&mut self, token: Token) { self.0.push(token); }
 
-        // prepend the token stream with a Not operator
-        stream.0.insert(0, Token::Not);
-
-        stream
+    pub fn push_primitive(&mut self, primitive: Primitive) {
+        Into::<TokenStream>::into(primitive)
+            .into_iter()
+            .for_each(|token| self.push(token));
     }
 }
 
@@ -96,4 +97,31 @@ pub enum Token {
     Operator(BinOp),
     RelationalOperator(RelOp),
     Qualifier(Qualifier),
+}
+
+impl Token {
+    pub fn repr(&self, options: &FormatOptions) -> String {
+        match self {
+            Token::OpenParentheses => "(".to_owned(),
+            Token::CloseParentheses => ")".to_owned(),
+            Token::And => match options.symbol_operators {
+                true => "&&".to_owned(),
+                false => "and".to_owned(),
+            }
+            Token::Or => match options.symbol_operators {
+                true => "||".to_owned(),
+                false => "or".to_owned(),
+            }
+            Token::Not => match options.symbol_operators {
+                true => "!".to_owned(),
+                false => "not".to_owned(),
+            }
+            Token::Escape => "\\".to_owned(),
+            Token::Id(id) => id.to_string(),
+            Token::Operand(op) => op.to_string(),
+            Token::Operator(op) => op.as_ref().to_owned(),
+            Token::RelationalOperator(op) => op.as_ref().to_owned(),
+            Token::Qualifier(qualifier) => qualifier.as_ref().to_owned(),
+        }
+    }
 }

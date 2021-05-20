@@ -7,8 +7,11 @@ pub enum QualifierVariant {
     Short,
 }
 
-/// Allows for specifying how the resulting BPF program is to be formatted as a
-/// string. todo: consider protocol number?
+/// Allows for specifying how the resulting BPF program is to be formatted.
+///
+/// It is important that these option be applied to the builder before any
+/// primitives are added since not all formatting options can be applied
+/// retroactively. This may be changed in a later release.
 pub struct FormatOptions {
     /// Use symbols for primitive expressions rather than their word
     /// counterparts, defaults to `false`.
@@ -17,7 +20,7 @@ pub struct FormatOptions {
     /// use netbug::bpf::filter::{FormatOptions, FilterBuilder, FilterExpression};
     /// use netbug::bpf::primitive::Primitive;
     ///
-    /// let mut builder = FilterBuilder::with(Primitive::Udp)
+    /// let mut builder = FilterBuilder::with(Primitive::Udp, None)
     ///     .or(Primitive::Tcp);
     ///
     /// assert_eq!(builder.build(), FilterExpression("udp or tcp".to_owned()));
@@ -25,10 +28,10 @@ pub struct FormatOptions {
     /// let mut options = FormatOptions::default();
     /// options.symbol_operators = true;
     ///
-    /// builder = builder.options(options);
+    /// let builder = FilterBuilder::with(Primitive::Udp, Some(options))
+    ///     .or(Primitive::Tcp);
     ///
     /// assert_eq!(builder.build(), FilterExpression("udp || tcp".to_owned()));
-    ///
     /// ```
     pub symbol_operators: bool,
 
@@ -50,17 +53,16 @@ pub struct FormatOptions {
     ///     RelOp::Eq,
     ///     ExpressionBuilder::new(Operand::Integer(5)).build());
     ///
-    /// let builder = FilterBuilder::with(primitive);
+    /// let builder = FilterBuilder::with(primitive.clone(), None);
     ///
     /// assert_eq!(builder.build(), FilterExpression("(5 + 10) ^ 2 = 5".to_owned()));
     ///
     /// let mut options = FormatOptions::default();
     /// options.whitespace = false;
     ///
-    /// let builder = builder.options(options);
+    /// let builder = FilterBuilder::with(primitive, Some(options));
     ///
     /// assert_eq!(builder.build(), FilterExpression(String::from("(5+10)^2=5")));
-    ///
     /// ```
     pub whitespace: bool,
 
@@ -70,7 +72,18 @@ pub struct FormatOptions {
     ///
     /// # Example
     /// ```
-    /// // todo!("Provide example of longer vs shorter variants")
+    /// # use netbug::bpf::filter::{FilterBuilder, FilterExpression, FormatOptions, QualifierVariant};
+    /// # use netbug::bpf::primitive::{Primitive, NetProtocol};
+    /// let builder = FilterBuilder::with(Primitive::Proto(NetProtocol::Udp), None);
+    ///
+    /// assert_eq!(builder.build(), FilterExpression("proto \\udp".to_owned()));
+    ///
+    /// let mut options = FormatOptions::default();
+    /// options.variant = QualifierVariant::Short;
+    ///
+    /// let builder = FilterBuilder::with(Primitive::Proto(NetProtocol::Udp), Some(options));
+    ///
+    /// assert_eq!(builder.build(), FilterExpression("udp".to_owned()));
     /// ```
     pub variant: QualifierVariant,
 }
@@ -85,40 +98,40 @@ impl Default for FormatOptions {
     }
 }
 
+// todo: consider storing Primitives rather than tokens to allow for
+// FormatOptions to be applied at any time.
 pub struct FilterBuilder {
     options: FormatOptions,
     tokens:  TokenStream,
 }
 
 impl FilterBuilder {
-    fn new() -> FilterBuilder {
+    /// Create a basic [`FilterBuilder`] with the optional given [`FormatOptions`], if `options` is `None` the default values are used.
+    fn new(options: Option<FormatOptions>) -> FilterBuilder {
         FilterBuilder {
-            options: FormatOptions::default(),
+            options: match options {
+                Some(opt) => opt,
+                None => FormatOptions::default()
+            },
             tokens:  TokenStream::new(),
         }
     }
 
-    pub fn with(primitive: Primitive) -> FilterBuilder {
-        let mut builder = Self::new();
+    pub fn with(primitive: Primitive, options: Option<FormatOptions>) -> FilterBuilder {
+        let mut builder = Self::new(options);
 
         builder.tokens.push_primitive(builder.format_primitive(primitive));
 
         builder
     }
 
-    pub fn with_not(primitive: Primitive) -> FilterBuilder {
-        let mut builder = Self::new();
+    pub fn with_not(primitive: Primitive, options: Option<FormatOptions>) -> FilterBuilder {
+        let mut builder = Self::new(options);
 
         builder.tokens.push(Token::Not);
         builder.tokens.push_primitive(builder.format_primitive(primitive));
 
         builder
-    }
-
-    pub fn options(mut self, options: FormatOptions) -> FilterBuilder {
-        self.options = options;
-
-        self
     }
 
     pub fn and(mut self, primitive: Primitive) -> FilterBuilder {
@@ -186,16 +199,16 @@ impl FilterBuilder {
                     println!("=== Number: {}", self.options.whitespace);
                     self.options.whitespace
                 },
-            }
+            },
             Token::RelationalOperator(_) => self.options.whitespace,
             Token::Qualifier(qualifier) => match qualifier {
                 Qualifier::Proto(_) => match next.unwrap() {
                     // the special case of a packet data access expression
                     Token::OpenBracket => false,
-                    _ => false
+                    _ => false,
                 },
-                _ => true
-            }
+                _ => true,
+            },
         }
     }
 
@@ -221,19 +234,3 @@ impl FilterBuilder {
 
 #[derive(Debug, PartialEq)]
 pub struct FilterExpression(pub String);
-
-#[cfg(test)]
-mod test {
-    use crate::bpf::filter::{FilterBuilder, FilterExpression};
-    use crate::bpf::primitive::Primitive;
-
-    #[test]
-    fn test_basic_ok() {
-        let builder = FilterBuilder::with(Primitive::Tcp).or(Primitive::Udp);
-
-        let actual = builder.build();
-        let expected = FilterExpression(String::from("tcp or udp"));
-
-        assert_eq!(expected, actual);
-    }
-}

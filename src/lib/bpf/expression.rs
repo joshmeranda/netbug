@@ -3,10 +3,10 @@ use std::iter::FromIterator;
 use std::slice::Iter;
 use std::vec::IntoIter;
 
-use crate::bpf::primitive::{QualifierProtocol, Qualifier};
+use crate::bpf::filter::FilterBuilder;
+use crate::bpf::primitive::{Qualifier, QualifierProtocol};
 use crate::bpf::token::{Token, TokenStream};
 use crate::bpf::{BpfError, Result};
-use crate::bpf::filter::FilterBuilder;
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
 #[derive(Clone, Debug, PartialEq)]
@@ -117,12 +117,13 @@ impl AsRef<str> for BinOp {
 /// ```
 /// For goruping values in parentheses (sub expressions) there are 2 options:
 ///
-/// 1 ) Construct the builder with [`ExpressionBuilder::from_expr`], used when the expression
-/// starts of the larger expresison
+/// 1 ) Construct the builder with [`ExpressionBuilder::from_expr`], used when
+/// the expression starts of the larger expresison
 ///
 /// 2 ) Adding the expressions via [`ExpressionBuilder::expr`]
 ///
-/// If the given expression has only 1 operand then no parenthesis as re aded as they would be redundant, but will be added in all other circumstances.
+/// If the given expression has only 1 operand then no parenthesis as re aded as
+/// they would be redundant, but will be added in all other circumstances.
 ///
 /// ```
 /// # use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, BinOp};
@@ -153,14 +154,11 @@ pub struct ExpressionBuilder {
 impl ExpressionBuilder {
     /// Construct a new expression builder with `operand` as the initial value.
     pub fn new(operand: Operand) -> ExpressionBuilder {
-        let mut builder = ExpressionBuilder {
-            tokens: vec![],
-        };
+        let mut builder = ExpressionBuilder { tokens: vec![] };
 
         builder.add_operand(operand);
 
         builder
-
     }
 
     /// Construct a new [`ExpressionBuilder`] using `expr` as the first value(s)
@@ -183,7 +181,7 @@ impl ExpressionBuilder {
                 self.tokens.push(Token::Colon);
                 self.tokens.push(Token::Integer(len));
                 self.tokens.push(Token::CloseBracket);
-            }
+            },
         }
     }
 
@@ -194,7 +192,9 @@ impl ExpressionBuilder {
             self.tokens.push(Token::OpenParentheses);
         }
 
-        expr.stream().into_iter().for_each(|token| self.tokens.push(token.clone()));
+        expr.stream()
+            .into_iter()
+            .for_each(|token| self.tokens.push(token.clone()));
 
         if parenthesis {
             self.tokens.push(Token::CloseParentheses);

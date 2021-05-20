@@ -134,7 +134,6 @@ impl Token {
             Token::Operator(op) => op.as_ref().to_owned(),
             Token::RelationalOperator(op) => op.as_ref().to_owned(),
             Token::Qualifier(qualifier) => qualifier.as_ref().to_owned(),
-
         }
     }
 }

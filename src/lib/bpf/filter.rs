@@ -10,6 +10,28 @@ pub enum QualifierVariant {
 /// Allows for specifying how the resulting BPF program is to be formatted as a
 /// string. todo: consider protocol number?
 pub struct FormatOptions {
+    /// Use symbols for primitive expressions rather than their word
+    /// counterparts, defaults to `false`.
+    /// # Example
+    /// ```
+    /// use netbug::bpf::filter::{FormatOptions, FilterBuilder, FilterExpression};
+    /// use netbug::bpf::primitive::Primitive;
+    ///
+    /// let mut builder = FilterBuilder::with(Primitive::Udp)
+    ///     .or(Primitive::Tcp);
+    ///
+    /// assert_eq!(builder.build(), FilterExpression("udp or tcp".to_owned()));
+    ///
+    /// let mut options = FormatOptions::default();
+    /// options.symbol_operators = true;
+    ///
+    /// builder = builder.options(options);
+    ///
+    /// assert_eq!(builder.build(), FilterExpression("udp || tcp".to_owned()));
+    ///
+    /// ```
+    pub symbol_operators: bool,
+
     /// Use whitespace to separate operands from operators when serializing
     /// arithmetic expression. Defaults to `true`.
     ///
@@ -19,48 +41,28 @@ pub struct FormatOptions {
     /// # use netbug::bpf::primitive::{Primitive, RelOp};
     /// # use netbug::bpf::expression::{ExpressionBuilder, Operand};
     ///
-    /// let mut options = FormatOptions::default();
-    /// options.whitespace = true;
-    ///
     /// let inner_expression = ExpressionBuilder::new(Operand::Integer(5))
     ///     .plus(Operand::Integer(10))
     ///     .build();
     ///
-    /// let builder = FilterBuilder::with(Primitive::Comparison(
-    ///                                     ExpressionBuilder::from_expr(inner_expression).raise(Operand::Integer(2)).build(),
-    ///                                     RelOp::Eq,
-    ///                                     ExpressionBuilder::new(Operand::Integer(5)).build()));
+    /// let primitive = Primitive::Comparison(
+    ///     ExpressionBuilder::from_expr(inner_expression).raise(Operand::Integer(2)).build(),
+    ///     RelOp::Eq,
+    ///     ExpressionBuilder::new(Operand::Integer(5)).build());
     ///
-    /// let actual = builder.build();
-    /// let expected = FilterExpression(String::from("(5 + 10) ^ 2 = 5"));
+    /// let builder = FilterBuilder::with(primitive);
     ///
-    /// assert_eq!(actual, expected);
-    /// ```
-    pub whitespace: bool,
-
-    /// Use symbols for primitive expressions rather than their word
-    /// counterparts, defaults to `false`.
-    /// # Example
-    /// ```
-    /// use netbug::bpf::filter::{FormatOptions, FilterBuilder, FilterExpression};
-    /// use netbug::bpf::primitive::Primitive;
-    ///
-    /// let builder = FilterBuilder::with(Primitive::Udp)
-    ///     .or(Primitive::Tcp);
-    ///
-    /// assert_eq!(builder.build(), FilterExpression("udp or tcp".to_owned()));
+    /// assert_eq!(builder.build(), FilterExpression("(5 + 10) ^ 2 = 5".to_owned()));
     ///
     /// let mut options = FormatOptions::default();
-    /// options.symbol_operators = true;
+    /// options.whitespace = false;
     ///
-    /// let builder = FilterBuilder::with(Primitive::Udp)
-    ///     .or(Primitive::Tcp)
-    ///     .options(options);
+    /// let builder = builder.options(options);
     ///
-    /// assert_eq!(builder.build(), FilterExpression("udp || tcp".to_owned()));
+    /// assert_eq!(builder.build(), FilterExpression(String::from("(5+10)^2=5")));
     ///
     /// ```
-    pub symbol_operators: bool,
+    pub whitespace: bool,
 
     /// Specifies whether to use a [`Qualifier`]'s more verbose or abbreviated
     /// variant if available, or follow the users exact specification. Defaults
@@ -180,7 +182,10 @@ impl FilterBuilder {
             Token::And | Token::Or | Token::Not | Token::Id(_) => true,
             Token::Integer(_) => match next.unwrap() {
                 Token::CloseParentheses | Token::CloseBracket => false,
-                _ => true,
+                _ => {
+                    println!("=== Number: {}", self.options.whitespace);
+                    self.options.whitespace
+                },
             }
             Token::RelationalOperator(_) => self.options.whitespace,
             Token::Qualifier(qualifier) => match qualifier {
@@ -194,7 +199,7 @@ impl FilterBuilder {
         }
     }
 
-    pub fn build(self) -> FilterExpression {
+    pub fn build(&self) -> FilterExpression {
         let mut filter = String::new();
         let mut iter: TokenStreamIterator = (&self.tokens).into_iter();
 

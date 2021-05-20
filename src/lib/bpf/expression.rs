@@ -271,5 +271,9 @@ impl ExpressionBuilder {
 
     /// Build the expression and return a [String] representation of the
     /// constructed expression.
-    pub fn build(self) -> Expression { Expression::new(self.tokens) }
+    pub fn build(&self) -> Expression {
+        let tokens = self.tokens.iter().map(|token| token.clone()).collect();
+
+        Expression::new(tokens)
+    }
 }

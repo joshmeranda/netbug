@@ -1,5 +1,5 @@
 use crate::bpf::primitive::{Primitive, Qualifier};
-use crate::bpf::token::{Token, TokenStream};
+use crate::bpf::token::{Token, TokenStream, TokenStreamIntoIter, TokenStreamIterator};
 
 pub enum QualifierVariant {
     Exact,
@@ -15,7 +15,26 @@ pub struct FormatOptions {
     ///
     /// # Example
     /// ```
-    /// todo!("Provide example of whitespace vs no whitespace in an express (5 * 10) ^ 2")
+    /// # use netbug::bpf::filter::{FormatOptions, FilterBuilder, FilterExpression};
+    /// # use netbug::bpf::primitive::{Primitive, RelOp};
+    /// # use netbug::bpf::expression::{ExpressionBuilder, Operand};
+    ///
+    /// let mut options = FormatOptions::default();
+    /// options.whitespace = true;
+    ///
+    /// let inner_expression = ExpressionBuilder::new(Operand::Integer(5))
+    ///     .plus(Operand::Integer(10))
+    ///     .build();
+    ///
+    /// let builder = FilterBuilder::with(Primitive::Comparison(
+    ///                                     ExpressionBuilder::from_expr(inner_expression).raise(Operand::Integer(2)).build(),
+    ///                                     RelOp::Eq,
+    ///                                     ExpressionBuilder::new(Operand::Integer(5)).build()));
+    ///
+    /// let actual = builder.build();
+    /// let expected = FilterExpression(String::from("(5 + 10) ^ 2 = 5"));
+    ///
+    /// assert_eq!(actual, expected);
     /// ```
     pub whitespace: bool,
 
@@ -23,7 +42,23 @@ pub struct FormatOptions {
     /// counterparts, defaults to `false`.
     /// # Example
     /// ```
-    /// todo!("Provide example of words vs symbol operatos")
+    /// use netbug::bpf::filter::{FormatOptions, FilterBuilder, FilterExpression};
+    /// use netbug::bpf::primitive::Primitive;
+    ///
+    /// let builder = FilterBuilder::with(Primitive::Udp)
+    ///     .or(Primitive::Tcp);
+    ///
+    /// assert_eq!(builder.build(), FilterExpression("udp or tcp".to_owned()));
+    ///
+    /// let mut options = FormatOptions::default();
+    /// options.symbol_operators = true;
+    ///
+    /// let builder = FilterBuilder::with(Primitive::Udp)
+    ///     .or(Primitive::Tcp)
+    ///     .options(options);
+    ///
+    /// assert_eq!(builder.build(), FilterExpression("udp || tcp".to_owned()));
+    ///
     /// ```
     pub symbol_operators: bool,
 
@@ -33,7 +68,7 @@ pub struct FormatOptions {
     ///
     /// # Example
     /// ```
-    /// todo!("Provide example of longer vs shorter variants")
+    /// // todo!("Provide example of longer vs shorter variants")
     /// ```
     pub variant: QualifierVariant,
 }
@@ -48,7 +83,7 @@ impl Default for FormatOptions {
     }
 }
 
-struct FilterBuilder {
+pub struct FilterBuilder {
     options: FormatOptions,
     tokens:  TokenStream,
 }
@@ -120,23 +155,80 @@ impl FilterBuilder {
             QualifierVariant::Long => match primitive.verbose() {
                 Some(p) => p,
                 None => primitive,
-            }
+            },
             QualifierVariant::Short => match primitive.abbreviated() {
                 Some(p) => p,
                 None => primitive,
+            },
+        }
+    }
+
+    /// Determine if a space is needed after a given [`Token`] given the value
+    /// of the next [`Token`].
+    fn needs_trailing_space(&self, token: &Token, next: Option<&Token>) -> bool {
+        if next.is_none() {
+            return false;
+        }
+
+        match token {
+            Token::CloseParentheses | Token::CloseBracket | Token::Operator(_) => match next.unwrap() {
+                Token::Operator(_) | Token::Integer(_) => self.options.whitespace,
+                Token::CloseParentheses => false,
+                _ => true,
+            },
+            Token::OpenParentheses | Token::OpenBracket | Token::Colon | Token::Escape => false,
+            Token::And | Token::Or | Token::Not | Token::Id(_) => true,
+            Token::Integer(_) => match next.unwrap() {
+                Token::CloseParentheses | Token::CloseBracket => false,
+                _ => true,
+            }
+            Token::RelationalOperator(_) => self.options.whitespace,
+            Token::Qualifier(qualifier) => match qualifier {
+                Qualifier::Proto(_) => match next.unwrap() {
+                    // the special case of a packet data access expression
+                    Token::OpenBracket => false,
+                    _ => false
+                },
+                _ => true
             }
         }
     }
 
     pub fn build(self) -> FilterExpression {
         let mut filter = String::new();
+        let mut iter: TokenStreamIterator = (&self.tokens).into_iter();
 
-        for token in self.tokens {
+        let mut next = iter.next();
+
+        while let Some(token) = next {
             filter.push_str(token.repr(&self.options).as_str());
+
+            next = iter.next();
+
+            if self.needs_trailing_space(token, next) {
+                filter.push(' ');
+            }
         }
 
         FilterExpression(filter)
     }
 }
 
-pub struct FilterExpression(String);
+#[derive(Debug, PartialEq)]
+pub struct FilterExpression(pub String);
+
+#[cfg(test)]
+mod test {
+    use crate::bpf::filter::{FilterBuilder, FilterExpression};
+    use crate::bpf::primitive::Primitive;
+
+    #[test]
+    fn test_basic_ok() {
+        let builder = FilterBuilder::with(Primitive::Tcp).or(Primitive::Udp);
+
+        let actual = builder.build();
+        let expected = FilterExpression(String::from("tcp or udp"));
+
+        assert_eq!(expected, actual);
+    }
+}

@@ -1,7 +1,7 @@
 pub mod expression;
-mod filter;
+pub mod filter;
 pub mod primitive;
-mod token;
+pub mod token;
 
 use std::collections::VecDeque;
 use std::error::Error;
@@ -10,6 +10,7 @@ use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
 use std::ops::Range;
 
+// todo: Everything below this is likely useless
 use crate::bpf::expression::{BinOp, Operand};
 use crate::bpf::primitive::{Action, Host, Identifier, Primitive, Qualifier, ReasonCode, RelOp};
 

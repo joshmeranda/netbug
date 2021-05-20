@@ -909,7 +909,7 @@ impl Primitive {
                 NetProtocol::Udp => Some(Primitive::Udp),
                 NetProtocol::Icmp => Some(Primitive::Icmp),
                 _ => None,
-            }
+            },
             Primitive::EtherProto(proto) => match proto {
                 EtherProtocol::Ip => Some(Primitive::Ip),
                 EtherProtocol::Ip6 => Some(Primitive::Ip6),
@@ -925,13 +925,13 @@ impl Primitive {
                 EtherProtocol::Lat => Some(Primitive::Lat),
                 EtherProtocol::Moprc => Some(Primitive::Moprc),
                 EtherProtocol::Mopdl => Some(Primitive::Mopdl),
-                _ => None
-            }
+                _ => None,
+            },
             Primitive::IsoProto(proto) => match proto {
                 IsoProtocol::Clnp => Some(Primitive::Clnp),
                 IsoProtocol::Esis => Some(Primitive::Esis),
                 IsoProtocol::Isis => Some(Primitive::Isis),
-            }
+            },
             _ => None,
         }
     }

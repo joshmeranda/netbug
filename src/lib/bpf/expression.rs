@@ -6,7 +6,6 @@ use std::vec::IntoIter;
 use crate::bpf::filter::FilterBuilder;
 use crate::bpf::primitive::{Qualifier, QualifierProtocol};
 use crate::bpf::token::{Token, TokenStream};
-use crate::bpf::{BpfError, Result};
 
 /// A simple wrapper around a [String] allowing for cleaner typing.
 #[derive(Clone, Debug, PartialEq)]

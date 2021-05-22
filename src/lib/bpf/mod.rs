@@ -1,3 +1,6 @@
+//! This module aims to provide the ability to programmatically build Berkley Packet Filter (BPF) expressions, with as little opportunity for failure as possible.
+//!
+//! NOTE: This module is likely to be move into its own crate in th future
 pub mod expression;
 pub mod filter;
 pub mod primitive;
@@ -9,30 +12,3 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
 use std::ops::Range;
-
-// todo: Everything below this is likely useless
-use crate::bpf::expression::{BinOp, Operand};
-use crate::bpf::primitive::{Action, Host, Identifier, Primitive, Qualifier, ReasonCode, RelOp};
-
-pub type Result<T> = std::result::Result<T, BpfError>;
-
-#[derive(Debug)]
-pub enum BpfError {
-    ExpressionSyntax(String),
-}
-
-impl Display for BpfError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            BpfError::ExpressionSyntax(reason) => write!(f, "Invalid syntax: {}", reason),
-        }
-    }
-}
-
-impl Error for BpfError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            BpfError::ExpressionSyntax(_) => None,
-        }
-    }
-}

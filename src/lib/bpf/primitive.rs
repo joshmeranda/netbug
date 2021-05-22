@@ -267,7 +267,7 @@ pub enum RelOp {
     Gte,
     Lte,
     Eq,
-    Neq,
+    Ne,
 }
 
 impl AsRef<str> for RelOp {
@@ -278,7 +278,7 @@ impl AsRef<str> for RelOp {
             RelOp::Gte => ">=",
             RelOp::Lte => "<=",
             RelOp::Eq => "=",
-            RelOp::Neq => "!=",
+            RelOp::Ne => "!=",
         }
     }
 }
@@ -593,7 +593,7 @@ impl AsRef<str> for EtherAbbr {
             EtherAbbr::Aarp => "aarp",
             EtherAbbr::Decnet => "decnet",
             EtherAbbr::Iso => "iso",
-            EtherAbbr::Stp => "stpm",
+            EtherAbbr::Stp => "stp",
             EtherAbbr::Ipx => "ipx",
             EtherAbbr::Netbui => "netbeui",
             EtherAbbr::Lat => "lat",
@@ -1075,11 +1075,20 @@ impl Into<TokenStream> for Primitive {
                 Token::Qualifier(Qualifier::Proto(QualifierProtocol::Ip6)),
                 Token::Qualifier(Qualifier::Multicast),
             ],
-            Primitive::EtherProto(proto) => vec![
-                Token::Qualifier(Qualifier::Ether),
-                Token::Qualifier(Qualifier::ProtoRaw),
-                Token::Id(Identifier::Protocol(Protocol::Ether(proto))),
-            ],
+            Primitive::EtherProto(proto) => {
+                let mut tokens = vec![
+                    Token::Qualifier(Qualifier::Ether),
+                    Token::Qualifier(Qualifier::ProtoRaw),
+                ];
+
+                if proto != EtherProtocol::Loopback {
+                    tokens.push(Token::Escape);
+                }
+
+                tokens.push(Token::Id(Identifier::Protocol(Protocol::Ether(proto))));
+
+                tokens
+            },
             Primitive::Ip => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Ip))],
             Primitive::Ip6 => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Ip6))],
             Primitive::Arp => vec![Token::Qualifier(Qualifier::EtherAbbr(EtherAbbr::Arp))],
@@ -1233,7 +1242,8 @@ impl Into<TokenStream> for Primitive {
             },
             Primitive::IsoProto(proto) => vec![
                 Token::Qualifier(Qualifier::Iso),
-                Token::Operator(BinOp::Divide),
+                Token::Qualifier(Qualifier::ProtoRaw),
+                Token::Escape,
                 Token::Id(Identifier::Protocol(Protocol::Iso(proto))),
             ],
             Primitive::Clnp => vec![Token::Qualifier(Qualifier::IsoAbbr(IsoProtocol::Clnp))],

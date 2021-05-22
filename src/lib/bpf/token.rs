@@ -2,7 +2,7 @@ use std::iter::FromIterator;
 use std::vec::IntoIter;
 
 use crate::bpf::expression::{BinOp, Operand};
-use crate::bpf::filter::FormatOptions;
+use crate::bpf::filter::FilterOptions;
 use crate::bpf::primitive::{Identifier, Primitive, Qualifier, RelOp};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -109,7 +109,7 @@ pub enum Token {
 }
 
 impl Token {
-    pub fn repr(&self, options: &FormatOptions) -> String {
+    pub fn repr(&self, options: &FilterOptions) -> String {
         match self {
             Token::OpenParentheses => "(".to_owned(),
             Token::CloseParentheses => ")".to_owned(),

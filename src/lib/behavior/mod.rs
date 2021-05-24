@@ -21,6 +21,8 @@ pub mod evaluate;
 
 use evaluate::PacketStatus;
 
+use crate::bpf::filter::FilterExpression;
+use crate::bpf::primitive::Primitive;
 use crate::protocols::udp::UdpPacket;
 
 /// Simple macro to extract values from an enum struct variant. If only one
@@ -491,5 +493,9 @@ impl<'a> Behavior {
         }
 
         eval
+    }
+
+    fn as_filter(&self) -> FilterExpression {
+        todo!()
     }
 }

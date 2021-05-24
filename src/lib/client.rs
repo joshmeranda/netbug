@@ -11,6 +11,8 @@ use std::thread::{Builder, JoinHandle};
 use pcap::{Capture, Device};
 
 use crate::behavior::Behavior;
+use crate::bpf::filter::{FilterBuilder, FilterExpression};
+use crate::bpf::primitive::Primitive;
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::error::{NbugError, Result};
@@ -164,7 +166,7 @@ impl Client {
     /// simply signals the capturing thread loops to discontinue iteration
     /// rather than immediately stopping them. Therefore, it is possible for
     /// extra packets to be captured and written to the resulting pcap
-    /// if the current thread iterations are still in progress.
+    /// between the time this funciotn is called and the signal is received.
     pub fn stop_capture(&mut self) -> Result<()> {
         if !self.is_capturing() {
             return Err(NbugError::Client(String::from("no capture is running")));
@@ -178,7 +180,7 @@ impl Client {
     /// Determine if the client is capturing network traffic.
     pub fn is_capturing(&self) -> bool { self.capturing.load(Ordering::SeqCst) }
 
-    /// Transfer all
+    /// Transfer all pcaps to the server.
     pub fn transfer_all(&self) -> Result<()> {
         for device in &self.devices {
             self.transfer_pcap(device.name.as_str())?;
@@ -187,7 +189,8 @@ impl Client {
         Ok(())
     }
 
-    /// Transfer a single pcap to the server.
+    /// Transfer a single pcap to the server according to the captured interface
+    /// name.
     pub fn transfer_pcap(&self, interface_name: &str) -> Result<()> {
         let mut tcp = TcpStream::connect(self.srv_addr)?;
         let mut buffer = [u8::default(); BUFFER_SIZE];
@@ -237,5 +240,7 @@ impl Client {
 
     /// Generate the bpf filter to use to minimize the data captured by the
     /// client.
-    pub fn generate_bpf_filter(&self) -> String { todo!() }
+    pub fn generate_bpf_filter(&self) -> FilterExpression {
+        todo!()
+    }
 }

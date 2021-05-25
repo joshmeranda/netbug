@@ -5,6 +5,8 @@ use crate::bpf::expression::{BinOp, Operand};
 use crate::bpf::filter::FilterOptions;
 use crate::bpf::primitive::{Identifier, Primitive, Qualifier, RelOp};
 
+/// A simple collection of BPF filter tokens. Should never be handled directly
+/// by the user, and be hidden behind the abstraction of a [`FilterBuilder`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct TokenStream(Vec<Token>);
 

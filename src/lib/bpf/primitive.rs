@@ -15,6 +15,7 @@ pub type Host = String;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/// Any token which is not a qualifier or other keyword.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Identifier {
     Addr(IpAddr),
@@ -765,7 +766,6 @@ impl AsRef<str> for NetProtocol {
 pub enum Primitive {
     Gateway(IpAddr),
 
-    // todo: handle special `net net/len` case
     Net(IpAddr, Option<Direction>),
     Netmask(IpAddr, NetMask),
     NetLen(IpAddr, usize),
@@ -1275,11 +1275,10 @@ impl Into<TokenStream> for Primitive {
             Primitive::Ilmic => vec![Token::Qualifier(Qualifier::IlmiCircuit)],
             Primitive::ConnectMsg => vec![Token::Qualifier(Qualifier::ConnectMsg)],
             Primitive::MetaConnect => vec![Token::Qualifier(Qualifier::MetaConnect)],
-            Primitive::Comparison(left, op, right) => left
-                .stream()
+            Primitive::Comparison(left, op, right) => Into::<TokenStream>::into(left)
                 .into_iter()
                 .chain(std::iter::once(Token::RelationalOperator(op)))
-                .chain(right.stream().into_iter())
+                .chain(Into::<TokenStream>::into(right).into_iter())
                 .collect(),
         };
 

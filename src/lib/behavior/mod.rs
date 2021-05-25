@@ -495,7 +495,5 @@ impl<'a> Behavior {
         eval
     }
 
-    fn as_filter(&self) -> FilterExpression {
-        todo!()
-    }
+    fn as_filter(&self) -> FilterExpression { todo!() }
 }

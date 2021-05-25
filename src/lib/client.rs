@@ -240,7 +240,5 @@ impl Client {
 
     /// Generate the bpf filter to use to minimize the data captured by the
     /// client.
-    pub fn generate_bpf_filter(&self) -> FilterExpression {
-        todo!()
-    }
+    pub fn generate_bpf_filter(&self) -> FilterExpression { todo!() }
 }

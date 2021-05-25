@@ -1,16 +1,27 @@
 use crate::bpf::primitive::{Primitive, Qualifier};
 use crate::bpf::token::{Token, TokenStream, TokenStreamIntoIter, TokenStreamIterator};
 
+/// Used to control the verbosity of some primitives when an expression is
+/// built.
 pub enum PrimitiveVerbosity {
+    /// Use the exact [`Primitive`] variant.
     Exact,
-    Long,
-    Short,
+
+    /// Use the most verbose [`Primitive`] variant possible (eq `proto \tcp`
+    /// instead of `tcp`).
+    Verbose,
+
+    /// Use the most concise [`Primitive`] variant possible (eq `tcp` instead of
+    /// `proto \tcp`).
+    Brief,
 }
 
-/// Allows for specifying how a [`FilterBuilder`] should behave.
+/// Allows for specifying how a [`FilterBuilder`] will serialize the
+/// [`FilterExpression`].
 pub struct FilterOptions {
     /// Use symbols for primitive expressions rather than their word
     /// counterparts, defaults to `false`.
+    ///
     /// # Example
     /// ```
     /// use netbug::bpf::filter::{FilterOptions, FilterBuilder, FilterExpression};
@@ -78,7 +89,7 @@ pub struct FilterOptions {
     /// assert_eq!(builder.build(), FilterExpression::new("proto \\udp".to_owned()));
     ///
     /// let mut options = FilterOptions::new();
-    /// options.use_verbosity(PrimitiveVerbosity::Short);
+    /// options.use_verbosity(PrimitiveVerbosity::Brief);
     ///
     /// let builder = FilterBuilder::with(Primitive::Proto(NetProtocol::Udp), &options);
     ///
@@ -104,22 +115,51 @@ impl FilterOptions {
     pub fn use_verbosity(&mut self, verbosity: PrimitiveVerbosity) { self.verbosity = verbosity; }
 }
 
+/// Programatically build a [`FilterExpression`]. Some of the behavior of this
+/// builder acn be configured using a [`FilterOptions`] object.
+///
+/// Take care when using any of [`FilterBuilder::and_filter`],
+/// [`FilterBuilder::and_not_filter`], [`FilterBuilder::or_filter`], or
+/// [`FilterBuilder::or_not_filter`] as different filters may have diffrent
+/// [`FilterOptions`], and the resulting [`FilterExpression`] may be an odd
+/// mixture of styles, so it is suggested that you create only one instance of
+/// [`FilterOptions`] which you pass to all [`FilterBuilder`]s.
+///
+/// # Examples
+/// ```
+/// # use netbug::bpf::filter::{FilterOptions, PrimitiveVerbosity, FilterBuilder};
+/// # use netbug::bpf::primitive::{Primitive, NetProtocol, Direction};
+/// # let mut options = FilterOptions::new();
+/// options.use_symbols(true);
+/// options.use_verbosity(PrimitiveVerbosity::Brief);
+/// let options = options;
+///
+/// let sub_filter = FilterBuilder::with(Primitive::Proto(NetProtocol::Udp), &options)
+///     .or(Primitive::Inbound);
+/// let filter = FilterBuilder::with_not(Primitive::Icmp, &options)
+///     .or_filter(sub_filter)
+///     .build();
+///
+/// assert_eq!(filter.to_string(), "! icmp || (udp || inbound)")
+/// ```
 pub struct FilterBuilder<'a> {
     options: &'a FilterOptions,
 
-    tokens:  TokenStream,
+    tokens: TokenStream,
 }
 
-impl <'a> FilterBuilder<'a> {
+impl<'a> FilterBuilder<'a> {
     /// Create a basic [`FilterBuilder`] with the optional given
     /// [`FormatOptions`], if `options` is `None` the default values are used.
     fn new(options: &FilterOptions) -> FilterBuilder {
         FilterBuilder {
             options,
-            tokens:  TokenStream::new(),
+            tokens: TokenStream::new(),
         }
     }
 
+    /// Construct a new [`FilterBuilder`] with the given [`Primitive`] as a
+    /// starting point.
     pub fn with(primitive: Primitive, options: &FilterOptions) -> FilterBuilder {
         let mut builder = Self::new(options);
 
@@ -128,6 +168,7 @@ impl <'a> FilterBuilder<'a> {
         builder
     }
 
+    /// Same as [`FilterBuilder::with`] only negating the given [`Primitive`].
     pub fn with_not(primitive: Primitive, options: &FilterOptions) -> FilterBuilder {
         let mut builder = Self::new(options);
 
@@ -137,16 +178,22 @@ impl <'a> FilterBuilder<'a> {
         builder
     }
 
-    pub fn with_filter(filter: FilterBuilder, options: &'a FilterOptions) -> FilterBuilder<'a> {
-        let mut builder = FilterBuilder::new(options);
+    /// Construct a new [`FilterBuilder`] with all the same primitives and
+    /// [`FilterOptions`] as the given [`FilterBuilder`]. If the given filter
+    /// has more than one primitive, the entire expression with be parenthesised
+    /// before more primitives are added.
+    pub fn with_filter(filter: FilterBuilder<'a>) -> FilterBuilder<'a> {
+        let mut builder = FilterBuilder::new(filter.options);
 
         builder.push_stream(filter.into());
 
         builder
     }
 
-    pub fn with_not_filter(filter: FilterBuilder, options: &'a FilterOptions) -> FilterBuilder<'a> {
-        let mut builder = FilterBuilder::new(options);
+    /// Same as [`FilterBuilder::with_filter`] only negating the filter
+    /// expression.
+    pub fn with_not_filter(filter: FilterBuilder<'a>) -> FilterBuilder<'a> {
+        let mut builder = FilterBuilder::new(filter.options);
 
         builder.tokens.push(Token::Not);
         builder.push_stream(filter.into());
@@ -237,11 +284,11 @@ impl <'a> FilterBuilder<'a> {
     fn format_primitive(&self, primitive: Primitive) -> Primitive {
         match self.options.verbosity {
             PrimitiveVerbosity::Exact => primitive,
-            PrimitiveVerbosity::Long => match primitive.verbose() {
+            PrimitiveVerbosity::Verbose => match primitive.verbose() {
                 Some(p) => p,
                 None => primitive,
             },
-            PrimitiveVerbosity::Short => match primitive.abbreviated() {
+            PrimitiveVerbosity::Brief => match primitive.abbreviated() {
                 Some(p) => p,
                 None => primitive,
             },
@@ -306,9 +353,7 @@ impl <'a> FilterBuilder<'a> {
 }
 
 impl Into<TokenStream> for FilterBuilder<'_> {
-    fn into(self) -> TokenStream {
-        self.tokens
-    }
+    fn into(self) -> TokenStream { self.tokens }
 }
 
 #[derive(Debug, PartialEq)]
@@ -319,14 +364,8 @@ impl FilterExpression {
 }
 
 impl ToString for FilterExpression {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
+    fn to_string(&self) -> String { self.0.clone() }
 }
-
-// todo: testing
-//   check each of the FormatOptions
-//   check the packet access
 
 #[cfg(test)]
 mod test {
@@ -340,7 +379,7 @@ mod test {
     #[test]
     fn test_abbreviated() {
         let mut options = FilterOptions::new();
-        options.use_verbosity(PrimitiveVerbosity::Short);
+        options.use_verbosity(PrimitiveVerbosity::Brief);
 
         let actual = FilterBuilder::with(Primitive::Proto(NetProtocol::Tcp), &options)
             .and(Primitive::Proto(NetProtocol::Udp))
@@ -382,7 +421,7 @@ mod test {
     #[test]
     fn test_verbose() {
         let mut options = FilterOptions::new();
-        options.use_verbosity(PrimitiveVerbosity::Long);
+        options.use_verbosity(PrimitiveVerbosity::Verbose);
 
         let actual = FilterBuilder::with(Primitive::Proto(NetProtocol::Tcp), &options)
             .and(Primitive::Udp)
@@ -474,12 +513,9 @@ mod test {
     #[test]
     fn test_sub_filter() {
         let options = FilterOptions::new();
-        let sub = FilterBuilder::with(Primitive::Udp, &options)
-            .or(Primitive::Tcp);
+        let sub = FilterBuilder::with(Primitive::Udp, &options).or(Primitive::Tcp);
 
-        let actual = FilterBuilder::with(Primitive::Ip6, &options)
-            .and_filter(sub)
-            .build();
+        let actual = FilterBuilder::with(Primitive::Ip6, &options).and_filter(sub).build();
         let expected = FilterExpression("ip6 and (udp or tcp)".to_owned());
 
         assert_eq!(actual, expected);
@@ -490,9 +526,7 @@ mod test {
         let options = FilterOptions::new();
         let sub = FilterBuilder::with(Primitive::Udp, &options);
 
-        let actual = FilterBuilder::with(Primitive::Ip6, &options)
-            .and_filter(sub)
-            .build();
+        let actual = FilterBuilder::with(Primitive::Ip6, &options).and_filter(sub).build();
         let expected = FilterExpression("ip6 and udp".to_owned());
 
         assert_eq!(actual, expected);

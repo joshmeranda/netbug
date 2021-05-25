@@ -7,26 +7,6 @@ use crate::bpf::filter::FilterBuilder;
 use crate::bpf::primitive::{Qualifier, QualifierProtocol};
 use crate::bpf::token::{Token, TokenStream};
 
-/// A simple wrapper around a [String] allowing for cleaner typing.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Expression {
-    tokens: TokenStream,
-}
-
-impl Expression {
-    /// No syntax checking is performed, any valid string can be passed here.
-    /// For any real syntax checking, please use [ExpressionBuilder] to
-    /// construct the [Expression].
-    pub fn new(tokens: Vec<Token>) -> Expression {
-        Expression {
-            tokens: TokenStream::from_iter(tokens.into_iter()),
-        }
-    }
-
-    /// Build the token stream for this [`Express`].
-    pub fn stream(self) -> TokenStream { self.tokens }
-}
-
 /// An operand, either an unsigned integer or packet data, in an expression.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Operand {
@@ -35,7 +15,7 @@ pub enum Operand {
     PacketData(QualifierProtocol, Expression, usize),
 }
 
-/// Any of the typical binary operators.
+/// Any of the typical binary arithmetic operands operators.
 #[derive(Clone, Debug, PartialEq)]
 pub enum BinOp {
     Plus,
@@ -67,26 +47,24 @@ impl AsRef<str> for BinOp {
     }
 }
 
-/// Allows for building an arithmetic expression as a string.
+/// Allows for building an arithmetic expression.
 ///
-/// # Examples
+/// # ExamplesEx
 ///
 /// The builder can be used to construct simple numerical expressions
 /// ```
 /// # use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand};
-/// # use netbug::bpf::token::Token;
+/// # use netbug::bpf::token::{Token, TokenStreamIntoIter, TokenStream};
 ///
 /// let expr = ExpressionBuilder::new(Operand::Integer(5))
 ///     .plus(Operand::Integer(1))
 ///     .build();
 ///
-/// let expected = Expression::new(vec![
-///         Token::Integer(5),
-///         Token::Operator(BinOp::Plus),
-///         Token::Integer(1),
-///     ]);
+/// let mut iter: TokenStreamIntoIter = Into::<TokenStream>::into(expr).into_iter();
 ///
-/// assert_eq!(expr, expected)
+/// assert_eq!(iter.next().unwrap(), Token::Integer(5));
+/// assert_eq!(iter.next().unwrap(), Token::Operator(BinOp::Plus));
+/// assert_eq!(iter.next().unwrap(), Token::Integer(1));
 /// ```
 ///
 /// or expressions containing a special data packet accessor (ie
@@ -95,38 +73,39 @@ impl AsRef<str> for BinOp {
 /// ```
 /// # use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand};
 /// # use netbug::bpf::primitive::{QualifierProtocol, Qualifier};
-/// # use netbug::bpf::token::Token;
+/// # use netbug::bpf::token::{Token, TokenStream, TokenStreamIntoIter};
 ///
-/// let expr = ExpressionBuilder::new(Operand::PacketData(QualifierProtocol::Ether, Expression::new(vec![Token::Integer(0)]), 1))
+/// let sub_expression = ExpressionBuilder::new(Operand::Integer(0)).build();
+///
+/// let expr = ExpressionBuilder::new(Operand::PacketData(QualifierProtocol::Ether, sub_expression, 1))
 ///     .and(Operand::Integer(1))
 ///     .build();
 ///
-/// let expected = Expression::new(vec![
-///         Token::Qualifier(Qualifier::Proto(QualifierProtocol::Ether)),
-///         Token::OpenBracket,
-///         Token::Integer(0),
-///         Token::Colon,
-///         Token::Integer(1),
-///         Token::CloseBracket,
-///         Token::Operator(BinOp::And),
-///         Token::Integer(1)
-///     ]);
+/// let mut iter: TokenStreamIntoIter = Into::<TokenStream>::into(expr).into_iter();
 ///
-/// assert_eq!(expr, expected)
+/// assert_eq!(iter.next().unwrap(), Token::Qualifier(Qualifier::Proto(QualifierProtocol::Ether)));
+/// assert_eq!(iter.next().unwrap(), Token::OpenBracket);
+/// assert_eq!(iter.next().unwrap(), Token::Integer(0));
+/// assert_eq!(iter.next().unwrap(), Token::Colon);
+/// assert_eq!(iter.next().unwrap(), Token::Integer(1));
+/// assert_eq!(iter.next().unwrap(), Token::CloseBracket);
+/// assert_eq!(iter.next().unwrap(), Token::Operator(BinOp::And));
+/// assert_eq!(iter.next().unwrap(), Token::Integer(1));
 /// ```
-/// For goruping values in parentheses (sub expressions) there are 2 options:
+/// For grouping values in parentheses (sub expressions) there are 2 options:
 ///
 /// 1 ) Construct the builder with [`ExpressionBuilder::from_expr`], used when
 /// the expression starts of the larger expresison
 ///
 /// 2 ) Adding the expressions via [`ExpressionBuilder::expr`]
 ///
-/// If the given expression has only 1 operand then no parenthesis as re aded as
-/// they would be redundant, but will be added in all other circumstances.
+/// If the given expression has only 1 or fewer operand(s) then no parenthesis
+/// are added as they would be redundant, but will be added in all other
+/// circumstances.
 ///
 /// ```
 /// # use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, BinOp};
-/// # use netbug::bpf::token::Token;
+/// # use netbug::bpf::token::{Token, TokenStream, TokenStreamIntoIter};
 ///
 /// let expr = ExpressionBuilder::from_expr(ExpressionBuilder::new(Operand::Integer(5))
 ///         .times(Operand::Integer(10))
@@ -134,17 +113,15 @@ impl AsRef<str> for BinOp {
 ///     .raise(Operand::Integer(2))
 ///     .build();
 ///
-/// let expected = Expression::new(vec![
-///         Token::OpenParentheses,
-///         Token::Integer(5),
-///         Token::Operator(BinOp::Multiply),
-///         Token::Integer(10),
-///         Token::CloseParentheses,
-///         Token::Operator(BinOp::Exponent),
-///         Token::Integer(2)
-///     ]);
+/// let mut iter: TokenStreamIntoIter = Into::<TokenStream>::into(expr).into_iter();
 ///
-/// assert_eq!(expr, expected)
+/// assert_eq!(iter.next().unwrap(), Token::OpenParentheses);
+/// assert_eq!(iter.next().unwrap(), Token::Integer(5));
+/// assert_eq!(iter.next().unwrap(), Token::Operator(BinOp::Multiply));
+/// assert_eq!(iter.next().unwrap(), Token::Integer(10));
+/// assert_eq!(iter.next().unwrap(), Token::CloseParentheses);
+/// assert_eq!(iter.next().unwrap(), Token::Operator(BinOp::Exponent));
+/// assert_eq!(iter.next().unwrap(), Token::Integer(2));
 /// ```
 pub struct ExpressionBuilder {
     tokens: Vec<Token>,
@@ -185,13 +162,13 @@ impl ExpressionBuilder {
     }
 
     fn add_expr(&mut self, expr: Expression) {
-        let parenthesis = expr.tokens.len() > 1;
+        let parenthesis = expr.0.len() > 1;
 
         if parenthesis {
             self.tokens.push(Token::OpenParentheses);
         }
 
-        expr.stream()
+        Into::<TokenStream>::into(expr)
             .into_iter()
             .for_each(|token| self.tokens.push(token.clone()));
 
@@ -273,6 +250,17 @@ impl ExpressionBuilder {
     pub fn build(&self) -> Expression {
         let tokens = self.tokens.iter().map(|token| token.clone()).collect();
 
-        Expression::new(tokens)
+        Expression(tokens)
+    }
+}
+
+/// A representation of an arithmetic expression, to be used with a
+/// [`FilterBuilder`] when constructing BPF programs.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Expression(TokenStream);
+
+impl Into<TokenStream> for Expression {
+    fn into(self) -> TokenStream {
+        self.0
     }
 }

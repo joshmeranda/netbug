@@ -260,7 +260,5 @@ impl ExpressionBuilder {
 pub struct Expression(TokenStream);
 
 impl Into<TokenStream> for Expression {
-    fn into(self) -> TokenStream {
-        self.0
-    }
+    fn into(self) -> TokenStream { self.0 }
 }

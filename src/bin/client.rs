@@ -17,8 +17,11 @@ fn main() {
 
         // explicit scope to drop any active captures from the
         let mut client: Client = Client::from_config(client_cfg);
+        let filter = client.as_bpf_filter();
 
-        if let Err(err) = client.start_capture() {
+        println!("=== {}", filter.to_string());
+
+        if let Err(err) = client.start_capture(Some(&filter)) {
             eprintln!("{}", err.to_string());
         } else {
             let result = if client.allow_concurrent {

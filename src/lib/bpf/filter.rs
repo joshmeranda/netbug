@@ -28,18 +28,20 @@ pub struct FilterOptions {
     /// use netbug::bpf::primitive::Primitive;
     ///
     /// let options = FilterOptions::new();
-    /// let mut builder = FilterBuilder::with(Primitive::Udp, &options)
-    ///     .or(Primitive::Tcp);
+    /// let mut expr = FilterBuilder::with(Primitive::Udp, &options)
+    ///     .or(Primitive::Tcp)
+    ///     .build();
     ///
-    /// assert_eq!(builder.build(), FilterExpression::new("udp or tcp".to_owned()));
+    /// assert_eq!(expr.to_string(), "udp or tcp");
     ///
     /// let mut options = FilterOptions::new();
     /// options.use_symbols(true);
     ///
-    /// let builder = FilterBuilder::with(Primitive::Udp, &options)
-    ///     .or(Primitive::Tcp);
+    /// let expr = FilterBuilder::with(Primitive::Udp, &options)
+    ///     .or(Primitive::Tcp)
+    ///     .build();
     ///
-    /// assert_eq!(builder.build(), FilterExpression::new("udp || tcp".to_owned()));
+    /// assert_eq!(expr.to_string(), "udp || tcp");
     /// ```
     pub symbol_operators: bool,
 
@@ -62,16 +64,18 @@ pub struct FilterOptions {
     ///     ExpressionBuilder::new(Operand::Integer(5)).build());
     ///
     /// let options = FilterOptions::new();
-    /// let builder = FilterBuilder::with(primitive.clone(), &options);
+    /// let expr = FilterBuilder::with(primitive.clone(), &options)
+    ///     .build();
     ///
-    /// assert_eq!(builder.build(), FilterExpression::new("(5 + 10) ^ 2 = 5".to_owned()));
+    /// assert_eq!(expr.to_string(), "(5 + 10) ^ 2 = 5");
     ///
     /// let mut options = FilterOptions::new();
     /// options.use_whitespace(false);
     ///
-    /// let builder = FilterBuilder::with(primitive, &options);
+    /// let expr = FilterBuilder::with(primitive, &options)
+    ///     .build();
     ///
-    /// assert_eq!(builder.build(), FilterExpression::new(String::from("(5+10)^2=5")));
+    /// assert_eq!(expr.to_string(), "(5+10)^2=5");
     /// ```
     pub whitespace: bool,
 
@@ -84,16 +88,18 @@ pub struct FilterOptions {
     /// # use netbug::bpf::filter::{FilterBuilder, FilterExpression, FilterOptions, PrimitiveVerbosity};
     /// # use netbug::bpf::primitive::{Primitive, NetProtocol};
     /// let options = FilterOptions::new();
-    /// let builder = FilterBuilder::with(Primitive::Proto(NetProtocol::Udp), &options);
+    /// let expr = FilterBuilder::with(Primitive::Proto(NetProtocol::Udp), &options)
+    ///     .build();
     ///
-    /// assert_eq!(builder.build(), FilterExpression::new("proto \\udp".to_owned()));
+    /// assert_eq!(expr.to_string(), "proto \\udp");
     ///
     /// let mut options = FilterOptions::new();
     /// options.use_verbosity(PrimitiveVerbosity::Brief);
     ///
-    /// let builder = FilterBuilder::with(Primitive::Proto(NetProtocol::Udp), &options);
+    /// let expr = FilterBuilder::with(Primitive::Proto(NetProtocol::Udp), &options)
+    ///     .build();
     ///
-    /// assert_eq!(builder.build(), FilterExpression::new("udp".to_owned()));
+    /// assert_eq!(expr.to_string(), "udp");
     /// ```
     pub verbosity: PrimitiveVerbosity,
 }
@@ -236,6 +242,7 @@ impl<'a> FilterBuilder<'a> {
     ///////////////////////////////////////////////////////////////////////////
 
     fn push_stream(&mut self, stream: TokenStream) {
+        // todo: should be one primitive not one token
         let parentheses = stream.len() > 1;
 
         if parentheses {
@@ -309,13 +316,10 @@ impl<'a> FilterBuilder<'a> {
                 _ => true,
             },
             Token::OpenParentheses | Token::OpenBracket | Token::Colon | Token::Escape => false,
-            Token::And | Token::Or | Token::Not | Token::Id(_) => true,
-            Token::Integer(_) => match next.unwrap() {
+            Token::And | Token::Or | Token::Not => true,
+            Token::Id(_) | Token::Integer(_) => match next.unwrap() {
                 Token::CloseParentheses | Token::CloseBracket => false,
-                _ => {
-                    println!("=== Number: {}", self.options.whitespace);
-                    self.options.whitespace
-                },
+                _ => self.options.whitespace,
             },
             Token::RelationalOperator(_) => self.options.whitespace,
             Token::Qualifier(qualifier) => match qualifier {
@@ -360,7 +364,8 @@ impl Into<TokenStream> for FilterBuilder<'_> {
 pub struct FilterExpression(String);
 
 impl FilterExpression {
-    pub fn new(filter: String) -> FilterExpression { FilterExpression(filter) }
+    /// Create a simple empty [`FilterExpression`] which will match any packet.
+    pub fn empty() -> FilterExpression { FilterExpression(String::from("")) }
 }
 
 impl ToString for FilterExpression {
@@ -405,17 +410,12 @@ mod test {
             .and(Primitive::IsoProto(IsoProtocol::Isis))
             .build();
 
-        let expected = FilterExpression(
-            concat!(
-                "tcp and udp and icmp and proto igmp ",
-                "or ip and ip6 and arp and rarp and atalk and aarp and decnet and iso and stp and ipx and netbeui and \
-                 lat and moprc and mopdl and ether proto loopback ",
-                "or clnp and esis and isis"
-            )
-            .to_owned(),
-        );
+        let expected = concat!("tcp and udp and icmp and proto igmp ",
+            "or ip and ip6 and arp and rarp and atalk and aarp and decnet and iso and stp and ipx and netbeui and ",
+            "lat and moprc and mopdl and ether proto loopback ",
+            "or clnp and esis and isis");
 
-        assert_eq!(actual, expected);
+        assert_eq!(actual.to_string(), expected);
     }
 
     #[test]
@@ -445,20 +445,15 @@ mod test {
             .and(Primitive::Isis)
             .build();
 
-        let expected = FilterExpression(
-            concat!(
-                "proto \\tcp and proto \\udp and proto \\icmp ",
+        let expected = concat!("proto \\tcp and proto \\udp and proto \\icmp ",
                 "or ether proto \\ip and ether proto \\ip6 and ether proto \\arp and ether proto \\rarp ",
                 "and ether proto \\atalk and ether proto \\aarp and ether proto \\decnet ",
                 "and ether proto \\iso and ether proto \\stp and ether proto \\ipx ",
                 "and ether proto \\netbeui and ether proto \\lat and ether proto \\moprc ",
                 "and ether proto \\mopdl ",
-                "or iso proto \\clnp and iso proto \\esis and iso proto \\isis",
-            )
-            .to_owned(),
-        );
+                "or iso proto \\clnp and iso proto \\esis and iso proto \\isis");
 
-        assert_eq!(actual, expected);
+        assert_eq!(actual.to_string(), expected);
     }
 
     #[test]
@@ -469,9 +464,8 @@ mod test {
         let actual = FilterBuilder::with(Primitive::Tcp, &options)
             .and(Primitive::Proto(NetProtocol::Tcp))
             .build();
-        let expected = FilterExpression::new("tcp and proto \\tcp".to_owned());
 
-        assert_eq!(actual, expected);
+        assert_eq!(actual.to_string(), "tcp and proto \\tcp");
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -489,25 +483,22 @@ mod test {
         );
 
         let options = FilterOptions::new();
-        let builder = FilterBuilder::with(primitive, &options);
+        let expr = FilterBuilder::with(primitive, &options)
+            .build();
 
-        let expected = FilterExpression::new("icmp[(5 >> 10):0] != 10".to_owned());
-
-        assert_eq!(builder.build(), expected);
+        assert_eq!(expr.to_string(), "icmp[(5 >> 10):0] != 10");
     }
 
     #[test]
     fn test_not() {
         let options = FilterOptions::new();
-        let actual = FilterBuilder::with_not(Primitive::Tcp, &options)
+        let expr = FilterBuilder::with_not(Primitive::Tcp, &options)
             .or(Primitive::Udp)
             .or_not(Primitive::Icmp)
             .and_not(Primitive::Ip)
             .build();
 
-        let expected = FilterExpression("not tcp or udp or not icmp and not ip".to_owned());
-
-        assert_eq!(actual, expected)
+        assert_eq!(expr.to_string(), "not tcp or udp or not icmp and not ip")
     }
 
     #[test]
@@ -515,10 +506,9 @@ mod test {
         let options = FilterOptions::new();
         let sub = FilterBuilder::with(Primitive::Udp, &options).or(Primitive::Tcp);
 
-        let actual = FilterBuilder::with(Primitive::Ip6, &options).and_filter(sub).build();
-        let expected = FilterExpression("ip6 and (udp or tcp)".to_owned());
+        let expr = FilterBuilder::with(Primitive::Ip6, &options).and_filter(sub).build();
 
-        assert_eq!(actual, expected);
+        assert_eq!(expr.to_string(), "ip6 and (udp or tcp)");
     }
 
     #[test]
@@ -526,9 +516,22 @@ mod test {
         let options = FilterOptions::new();
         let sub = FilterBuilder::with(Primitive::Udp, &options);
 
-        let actual = FilterBuilder::with(Primitive::Ip6, &options).and_filter(sub).build();
-        let expected = FilterExpression("ip6 and udp".to_owned());
+        let expr = FilterBuilder::with(Primitive::Ip6, &options)
+            .and_filter(sub)
+            .build();
 
-        assert_eq!(actual, expected);
+        assert_eq!(expr.to_string(), "ip6 and udp");
+    }
+
+    #[test]
+    fn test_after_port() {
+        let options = FilterOptions::new();
+        let sub = FilterBuilder::with(Primitive::Tcp, &options)
+            .and(Primitive::Port(10, None));
+
+        let expr = FilterBuilder::with_filter(sub)
+            .build();
+
+        assert_eq!(expr.to_string(), "(tcp and port 10)");
     }
 }

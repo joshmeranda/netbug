@@ -10,8 +10,11 @@ use crate::bpf::token::{Token, TokenStream};
 // todo: use something like https://docs.rs/strum/0.20.0/strum/index.html to generate enum names as str
 
 // todo: needs better NetMask type
-pub type NetMask = IpAddr;
-pub type Host = String;
+#[derive(Clone, Debug, PartialEq)]
+pub struct NetMask(pub IpAddr);
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Host(pub String);
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +37,7 @@ pub enum Identifier {
     Action(Action),
     WlanType(WlanType),
     WlanSubType(WlanSubType),
-    Dir(Direction),
+    Dir(FrameDirection),
     VlanId(usize),
     LabelNum(usize),
     SessionId(usize),
@@ -47,8 +50,8 @@ impl ToString for Identifier {
     fn to_string(&self) -> String {
         match self {
             Identifier::Addr(addr) => addr.to_string(),
-            Identifier::Host(host) => String::from(host),
-            Identifier::NetMask(mask) => mask.to_string(),
+            Identifier::Host(host) => host.0.to_string(),
+            Identifier::NetMask(mask) => mask.0.to_string(),
             Identifier::Port(port) => port.to_string(),
             Identifier::RangeStart(start) => start.to_string(),
             Identifier::RangeEnd(end) => end.to_string(),
@@ -624,6 +627,14 @@ pub enum WlanDirection {
     Addr4,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum FrameDirection {
+    Nods,
+    Tods,
+    Fromds,
+    Dstods,
+}
+
 impl AsRef<str> for Direction {
     fn as_ref(&self) -> &str {
         match self {
@@ -644,6 +655,17 @@ impl AsRef<str> for WlanDirection {
             WlanDirection::Addr2 => "addr2",
             WlanDirection::Addr3 => "addr3",
             WlanDirection::Addr4 => "add41",
+        }
+    }
+}
+
+impl AsRef<str> for FrameDirection {
+    fn as_ref(&self) -> &str {
+        match self {
+            FrameDirection::Nods => "nods",
+            FrameDirection::Tods => "tods",
+            FrameDirection::Fromds => "fromds",
+            FrameDirection::Dstods => "dstods",
         }
     }
 }
@@ -764,14 +786,15 @@ impl AsRef<str> for NetProtocol {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Primitive {
+    Host(Host, Option<Direction>),
     Gateway(IpAddr),
 
     Net(IpAddr, Option<Direction>),
     Netmask(IpAddr, NetMask),
     NetLen(IpAddr, usize),
 
-    Port(u16, Option<QualifierDirection>),
-    PortRange(Range<u16>, Option<QualifierDirection>),
+    Port(u16, Option<Direction>),
+    PortRange(Range<u16>, Option<Direction>),
     Less(usize),
     Greater(usize),
 
@@ -849,7 +872,7 @@ pub enum Primitive {
 
     SubType(WlanSubType),
 
-    Direction(Direction),
+    Direction(FrameDirection),
 
     Vlan(Option<usize>),
 
@@ -969,6 +992,19 @@ impl Primitive {
 impl Into<TokenStream> for Primitive {
     fn into(self) -> TokenStream {
         let tokens = match self {
+            Primitive::Host(host, dir) => {
+                let mut tokens = match dir {
+                    Some(dir) => vec![
+                        Token::Qualifier(Qualifier::Dir(QualifierDirection::General(dir))),
+                        Token::Qualifier(Qualifier::Host),
+                    ],
+                    None => vec![Token::Qualifier(Qualifier::Host)],
+                };
+
+                tokens.push(Token::Id(Identifier::Host(host)));
+
+                tokens
+            },
             Primitive::Gateway(addr) => vec![Token::Qualifier(Qualifier::Gateway), Token::Id(Identifier::Addr(addr))],
             Primitive::Net(addr, dir) => {
                 let mut tokens = match dir {
@@ -995,7 +1031,7 @@ impl Into<TokenStream> for Primitive {
             ],
             Primitive::Port(port, dir) => {
                 let mut tokens = match dir {
-                    Some(dir) => vec![Token::Qualifier(Qualifier::Dir(dir))],
+                    Some(dir) => vec![Token::Qualifier(Qualifier::Dir(QualifierDirection::General(dir)))],
                     None => vec![],
                 };
 
@@ -1006,7 +1042,7 @@ impl Into<TokenStream> for Primitive {
             },
             Primitive::PortRange(range, dir) => {
                 let mut tokens = match dir {
-                    Some(dir) => vec![Token::Qualifier(Qualifier::Dir(dir))],
+                    Some(dir) => vec![Token::Qualifier(Qualifier::Dir(QualifierDirection::General(dir)))],
                     None => vec![],
                 };
 

@@ -499,8 +499,12 @@ impl<'a> Behavior {
         match addr {
             Addr::Internet(addr) =>
                 FilterBuilder::with(Primitive::Host(Host(addr.to_string()), None), options),
-            Addr::Socket(sock) => FilterBuilder::with(Primitive::Host(Host(sock.ip().to_string()), None), options)
-                .and(Primitive::Port(sock.port(), None)),
+            Addr::Socket(sock) => {
+                let mut builder = FilterBuilder::with(Primitive::Host(Host(sock.ip().to_string()), None), options);
+                builder.and(Primitive::Port(sock.port(), None));
+
+                builder
+            },
         }
     }
 
@@ -547,16 +551,16 @@ impl<'a> Behavior {
 
         let mut builder = FilterBuilder::with(protocol, options);
 
-        builder = match self.direction {
+        match self.direction {
             Direction::In => builder.and(Primitive::Inbound),
             Direction::Out => builder.and(Primitive::Outbound),
-            _ => builder // do nothing ...
+            _ => { /* do nothing ... */ }
         };
 
-        let addr_builder = FilterBuilder::with_filter(Behavior::addr_filter(self.src, options))
-            .or_filter(Behavior::addr_filter(self.dst, options));
+        let mut addr_builder = FilterBuilder::with_filter(Behavior::addr_filter(self.src, options));
+        addr_builder.or_filter(Behavior::addr_filter(self.dst, options));
 
-        builder = builder.and_filter(addr_builder);
+        builder.and_filter(addr_builder);
 
         Some(builder)
     }

@@ -256,12 +256,9 @@ impl Client {
 
         let mut builder = FilterBuilder::with_filter(iter.next().unwrap().unwrap());
         while let Some(filter) = iter.next() {
-            builder = match filter {
+            match filter {
                 Some(f) => builder.or_filter(f),
-                None => {
-                    eprintln!("Could not build a BPF filter ");
-                    builder
-                }
+                None => eprintln!("Could not build a BPF filter "),
             }
         }
 

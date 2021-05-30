@@ -56,9 +56,10 @@ impl AsRef<str> for BinOp {
 /// # use netbug::bpf::expression::{ExpressionBuilder, BinOp, Expression, Operand};
 /// # use netbug::bpf::token::{Token, TokenStreamIntoIter, TokenStream};
 ///
-/// let expr = ExpressionBuilder::new(Operand::Integer(5))
-///     .plus(Operand::Integer(1))
-///     .build();
+/// let mut builder = ExpressionBuilder::new(Operand::Integer(5));
+/// builder.plus(Operand::Integer(1));
+///
+/// let expr = builder.build();
 ///
 /// let mut iter: TokenStreamIntoIter = Into::<TokenStream>::into(expr).into_iter();
 ///
@@ -77,9 +78,10 @@ impl AsRef<str> for BinOp {
 ///
 /// let sub_expression = ExpressionBuilder::new(Operand::Integer(0)).build();
 ///
-/// let expr = ExpressionBuilder::new(Operand::PacketData(QualifierProtocol::Ether, sub_expression, 1))
-///     .and(Operand::Integer(1))
-///     .build();
+/// let mut builder = ExpressionBuilder::new(Operand::PacketData(QualifierProtocol::Ether, sub_expression, 1));
+/// builder.and(Operand::Integer(1));
+///
+/// let expr = builder.build();
 ///
 /// let mut iter: TokenStreamIntoIter = Into::<TokenStream>::into(expr).into_iter();
 ///
@@ -106,12 +108,15 @@ impl AsRef<str> for BinOp {
 /// ```
 /// # use netbug::bpf::expression::{ExpressionBuilder, Expression, Operand, BinOp};
 /// # use netbug::bpf::token::{Token, TokenStream, TokenStreamIntoIter};
+/// let mut inner_builder = ExpressionBuilder::new(Operand::Integer(5));
+/// inner_builder.times(Operand::Integer(10));
 ///
-/// let expr = ExpressionBuilder::from_expr(ExpressionBuilder::new(Operand::Integer(5))
-///         .times(Operand::Integer(10))
-///         .build())
-///     .raise(Operand::Integer(2))
-///     .build();
+/// let inner_expr = inner_builder.build();
+///
+/// let mut builder = ExpressionBuilder::from_expr(inner_expr);
+/// builder.raise(Operand::Integer(2));
+///
+/// let expr = builder.build();
 ///
 /// let mut iter: TokenStreamIntoIter = Into::<TokenStream>::into(expr).into_iter();
 ///
@@ -177,72 +182,60 @@ impl ExpressionBuilder {
         }
     }
 
-    pub fn plus(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn plus(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::Plus));
         self.add_operand(operand);
-        self
     }
 
-    pub fn minus(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn minus(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::Minus));
         self.add_operand(operand);
-        self
     }
 
-    pub fn times(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn times(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::Multiply));
         self.add_operand(operand);
-        self
     }
 
-    pub fn divide(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn divide(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::Divide));
         self.add_operand(operand);
-        self
     }
 
-    pub fn modulus(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn modulus(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::Modulus));
         self.add_operand(operand);
-        self
     }
 
-    pub fn and(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn and(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::And));
         self.add_operand(operand);
-        self
     }
 
-    pub fn or(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn or(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::Or));
         self.add_operand(operand);
-        self
     }
 
-    pub fn raise(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn raise(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::Exponent));
         self.add_operand(operand);
-        self
     }
 
-    pub fn left_shift(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn left_shift(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::LeftShift));
         self.add_operand(operand);
-        self
     }
 
-    pub fn right_shift(mut self, operand: Operand) -> ExpressionBuilder {
+    pub fn right_shift(&mut self, operand: Operand) {
         self.tokens.push(Token::Operator(BinOp::RightShift));
         self.add_operand(operand);
-        self
     }
 
     /// Add the tokens from one expression to the current one, with optional
     /// parentheses.
-    pub fn expr(mut self, expr: Expression) -> ExpressionBuilder {
+    pub fn expr(mut self, expr: Expression) {
         self.add_expr(expr);
-
-        self
     }
 
     /// Build the expression and return a [String] representation of the

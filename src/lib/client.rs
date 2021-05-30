@@ -268,8 +268,8 @@ impl Client {
 
 #[cfg(test)]
 mod test {
-    use crate::client::Client;
     use crate::behavior::Behavior;
+    use crate::client::Client;
     use crate::protocols::ProtocolNumber;
 
     #[test]
@@ -281,7 +281,10 @@ mod test {
         client.behaviors.push(icmp);
         client.behaviors.push(tcp);
 
-        assert_eq!(client.as_bpf_filter().to_string(),
-                   "(icmp and ((host 127.0.0.1) or (host 8.8.8.8))) or (tcp and ((host 127.0.0.1 and port 80) or (host 8.8.8.8 and port 80)))");
+        assert_eq!(
+            client.as_bpf_filter().to_string(),
+            "(icmp and ((host 127.0.0.1) or (host 8.8.8.8))) or (tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port \
+             80)))"
+        );
     }
 }

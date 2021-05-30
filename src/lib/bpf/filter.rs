@@ -402,10 +402,12 @@ mod test {
 
         let expr = builder.build();
 
-        let expected = concat!("tcp and udp and icmp and proto igmp ",
+        let expected = concat!(
+            "tcp and udp and icmp and proto igmp ",
             "or ip and ip6 and arp and rarp and atalk and aarp and decnet and iso and stp and ipx and netbeui and ",
             "lat and moprc and mopdl and ether proto loopback ",
-            "or clnp and esis and isis");
+            "or clnp and esis and isis"
+        );
 
         assert_eq!(expr.to_string(), expected);
     }
@@ -438,13 +440,15 @@ mod test {
 
         let expr = builder.build();
 
-        let expected = concat!("proto \\tcp and proto \\udp and proto \\icmp ",
-                "or ether proto \\ip and ether proto \\ip6 and ether proto \\arp and ether proto \\rarp ",
-                "and ether proto \\atalk and ether proto \\aarp and ether proto \\decnet ",
-                "and ether proto \\iso and ether proto \\stp and ether proto \\ipx ",
-                "and ether proto \\netbeui and ether proto \\lat and ether proto \\moprc ",
-                "and ether proto \\mopdl ",
-                "or iso proto \\clnp and iso proto \\esis and iso proto \\isis");
+        let expected = concat!(
+            "proto \\tcp and proto \\udp and proto \\icmp ",
+            "or ether proto \\ip and ether proto \\ip6 and ether proto \\arp and ether proto \\rarp ",
+            "and ether proto \\atalk and ether proto \\aarp and ether proto \\decnet ",
+            "and ether proto \\iso and ether proto \\stp and ether proto \\ipx ",
+            "and ether proto \\netbeui and ether proto \\lat and ether proto \\moprc ",
+            "and ether proto \\mopdl ",
+            "or iso proto \\clnp and iso proto \\esis and iso proto \\isis"
+        );
 
         assert_eq!(expr.to_string(), expected);
     }
@@ -478,8 +482,7 @@ mod test {
         );
 
         let options = FilterOptions::new();
-        let expr = FilterBuilder::with(primitive, &options)
-            .build();
+        let expr = FilterBuilder::with(primitive, &options).build();
 
         assert_eq!(expr.to_string(), "icmp[(5 >> 10):0] != 10");
     }
@@ -516,7 +519,7 @@ mod test {
         let options = FilterOptions::new();
         let sub = FilterBuilder::with(Primitive::Udp, &options);
 
-        let mut builder= FilterBuilder::with(Primitive::Ip6, &options);
+        let mut builder = FilterBuilder::with(Primitive::Ip6, &options);
         builder.and_filter(sub);
 
         let expr = builder.build();
@@ -530,8 +533,7 @@ mod test {
         let mut sub = FilterBuilder::with(Primitive::Tcp, &options);
         sub.and(Primitive::Port(10, None));
 
-        let expr = FilterBuilder::with_filter(sub)
-            .build();
+        let expr = FilterBuilder::with_filter(sub).build();
 
         assert_eq!(expr.to_string(), "(tcp and port 10)");
     }

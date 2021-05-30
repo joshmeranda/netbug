@@ -234,9 +234,7 @@ impl ExpressionBuilder {
 
     /// Add the tokens from one expression to the current one, with optional
     /// parentheses.
-    pub fn expr(mut self, expr: Expression) {
-        self.add_expr(expr);
-    }
+    pub fn expr(mut self, expr: Expression) { self.add_expr(expr); }
 
     /// Build the expression and return a [String] representation of the
     /// constructed expression.

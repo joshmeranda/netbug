@@ -32,6 +32,8 @@ pub struct Client {
     srv_addr: SocketAddr,
 
     behaviors: Vec<Behavior>,
+
+    filter: FilterExpression,
 }
 
 impl Default for Client {
@@ -43,6 +45,7 @@ impl Default for Client {
             capturing:        Arc::new(AtomicBool::new(false)),
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behaviors:        vec![],
+            filter: FilterExpression::empty(),
         }
     }
 }
@@ -58,6 +61,10 @@ impl Client {
             .into_iter()
             .filter(|device| cfg.interfaces.contains(&device.name))
             .collect();
+        let filter = match cfg.filter {
+            Some(filter) => filter,
+            None => Client::bpf_filter(&cfg.behaviors)
+        };
 
         Client {
             pcap_dir: cfg.pcap_dir,
@@ -65,7 +72,8 @@ impl Client {
             srv_addr: cfg.srv_addr,
             behaviors: cfg.behaviors,
             devices,
-            ..Client::default()
+            filter,
+            capturing: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -117,7 +125,7 @@ impl Client {
     /// output, be mindful of your client's scoping to prevent capturing
     /// unnecessary packets. The resulting captures will always be in sequential
     /// order.
-    pub fn start_capture(&mut self, filter: Option<&FilterExpression>) -> Result<()> {
+    pub fn start_capture(&mut self) -> Result<()> {
         if self.is_capturing() {
             return Err(NbugError::Client(String::from("capture is already running")));
         } else if self.devices.is_empty() {
@@ -137,10 +145,8 @@ impl Client {
 
             let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
-            if let Some(expression) = filter {
-                if let Err(err) = capture.filter(expression.to_string().as_str()) {
-                    eprintln!("Error adding filter to capture: {}", err.to_string());
-                }
+            if let Err(err) = capture.filter(self.filter.to_string().as_str()) {
+                eprintln!("Error adding filter to capture: {}", err.to_string());
             }
 
             let mut pcap_path = PathBuf::from(&self.pcap_dir);
@@ -246,13 +252,13 @@ impl Client {
 
     /// Generate the bpf filter to use to minimize the data captured by the
     /// client.
-    pub fn as_bpf_filter(&self) -> FilterExpression {
-        if self.behaviors.is_empty() {
+    fn bpf_filter(behaviors: &[Behavior]) -> FilterExpression {
+        if behaviors.is_empty() {
             return FilterExpression::empty();
         }
 
         let options = FilterOptions::new();
-        let mut iter = self.behaviors.iter().map(|behavior| behavior.as_filter(&options));
+        let mut iter = behaviors.iter().map(|behavior| behavior.as_filter(&options));
 
         let mut builder = FilterBuilder::with_filter(iter.next().unwrap().unwrap());
         while let Some(filter) = iter.next() {
@@ -274,15 +280,15 @@ mod test {
 
     #[test]
     fn test_filter_builder() {
-        let mut client = Client::new();
         let icmp: Behavior = toml::from_str("src = \"127.0.0.1\"\ndst = \"8.8.8.8\"\nprotocol = \"icmp\"").unwrap();
         let tcp: Behavior = toml::from_str("src = \"127.0.0.1:80\"\ndst = \"8.8.8.8:80\"\nprotocol = \"tcp\"").unwrap();
 
-        client.behaviors.push(icmp);
-        client.behaviors.push(tcp);
+        let mut behaviors = Vec::new();
+        behaviors.push(icmp);
+        behaviors.push(tcp);
 
         assert_eq!(
-            client.as_bpf_filter().to_string(),
+            Client::bpf_filter(behaviors.as_slice()).to_string(),
             "(icmp and ((host 127.0.0.1) or (host 8.8.8.8))) or (tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port \
              80)))"
         );

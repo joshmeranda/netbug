@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use super::defaults;
 use super::error::{ConfigError, Result};
 use crate::behavior::Behavior;
+use crate::bpf::filter::FilterExpression;
 
 /// Represents basic client configuration.
 /// todo: specify pcap backup
@@ -41,6 +42,9 @@ pub struct ClientConfig {
     pub srv_addr: SocketAddr,
 
     pub behaviors: Vec<Behavior>,
+
+    /// If present, the given BPF filter is used when filtering packets. If not specified netbug will generate its own.
+    pub filter: Option<FilterExpression>,
 }
 
 impl ClientConfig {

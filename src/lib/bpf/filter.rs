@@ -1,5 +1,6 @@
 use crate::bpf::primitive::{Primitive, Qualifier};
 use crate::bpf::token::{Token, TokenStream, TokenStreamIntoIter, TokenStreamIterator};
+use std::str::FromStr;
 
 /// Used to control the verbosity of some primitives when an expression is
 /// built.
@@ -351,7 +352,7 @@ impl Into<TokenStream> for FilterBuilder<'_> {
     fn into(self) -> TokenStream { self.tokens }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq)]
 pub struct FilterExpression(String);
 
 impl FilterExpression {

@@ -597,7 +597,7 @@ mod test {
 
         assert_eq!(
             expr.to_string(),
-            "tcp and ((host 127.0.0.1 and port 80) or (host 8.8.8.8 and port 80))"
+            "tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port 80))"
         );
     }
 }

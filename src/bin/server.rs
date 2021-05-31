@@ -9,42 +9,6 @@ use netbug::config::server::ServerConfig;
 use netbug::error::Result;
 use netbug::process::PcapProcessor;
 use netbug::receiver::Receiver;
-use threadpool::ThreadPool;
-
-fn run_server(cfg: ServerConfig) -> Result<()> {
-    let listener = TcpListener::bind(cfg.srv_addr)?;
-    let pool = ThreadPool::new(cfg.n_workers);
-
-    for conn in listener.incoming() {
-        let stream = match conn {
-            Ok(stream) => stream,
-            Err(err) => {
-                eprintln!("Error accepting connections: {}", err.to_string());
-                break;
-            },
-        };
-
-        println!("Accepted connection from '{}'", stream.peer_addr().unwrap().to_string());
-
-        // ensure the pcap directory exists before receiving pcaps from the peer
-        // todo: might be faster to push and pop the peer addresses from the same
-        //   PathBuf rather than continuously cloning it
-        let mut pcap_dir = cfg.pcap_dir.clone();
-        pcap_dir.push(stream.peer_addr().unwrap().to_string());
-
-        if !pcap_dir.exists() {
-            if let Err(err) = fs::create_dir_all(&pcap_dir) {
-                eprintln!(
-                    "Error creating pcap directory '{}': {}",
-                    pcap_dir.to_str().unwrap(),
-                    err.to_string()
-                );
-            }
-        }
-    }
-
-    Ok(())
-}
 
 fn main() {
     let server_cfg = match ServerConfig::from_path("examples/config/server.toml") {

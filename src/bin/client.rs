@@ -7,13 +7,22 @@ use netbug::config::client::ClientConfig;
 use netbug::bpf::filter::FilterExpression;
 use std::time::Duration;
 use clap::{App, SubCommand, Arg};
+use clokwerk::{Interval, ScheduleHandle, Scheduler};
 
-fn run_scheduled(mut client: Client, delay: u8) {
-    // todo: replace this with a real implementation
-    loop {
-        run_once(&mut client, delay);
-        std::thread::sleep(Duration::from_secs(1));
-    }
+fn run_scheduled(mut client: Client, delay: u8, interval: Interval) {
+    run_once(&mut client, delay);
+
+    let mut scheduler = Scheduler::new();
+
+    scheduler.every(interval)
+        .run(move || run_once(&mut client, delay));
+
+    let handle = scheduler.watch_thread(Duration::from_secs(1));
+
+    // todo: handle interrupts
+    loop { /* keep blocking for scheduled stuff */ }
+
+    handle.stop();
 }
 
 fn run_once(client: &mut Client, delay: u8) {
@@ -51,6 +60,7 @@ fn main() {
         .author(crate_authors!())
         .about("Run one of the NetBug client tools")
         .arg(Arg::with_name("scheduled")
+            .long("sched")
             .short("s")
             .help("run the client indefinitely taking captures at startup and then according to the configured schedule (not yet implemented)"))
         .get_matches();
@@ -64,10 +74,12 @@ fn main() {
     };
 
     let delay = client_cfg.delay;
+    let interval = client_cfg.interval;
+
     let mut client: Client = Client::from_config(client_cfg);
 
     if matches.is_present("scheduled") {
-        run_scheduled(client, delay);
+        run_scheduled(client, delay, interval.0);
     } else {
         run_once(&mut client, delay);
     }

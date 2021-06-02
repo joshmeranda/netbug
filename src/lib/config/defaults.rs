@@ -1,5 +1,7 @@
 /// Provides default values used to generate default configurations
 use std::path::PathBuf;
+use crate::config::client::CaptureInterval;
+use clokwerk::Interval;
 
 const NETBUG_BASE_DIR: &str = "/etc/nbug.d";
 
@@ -47,12 +49,16 @@ pub mod client {
     use std::net::{IpAddr, Ipv4Addr};
 
     use crate::Addr;
+    use clokwerk::Interval;
+    use crate::config::client::CaptureInterval;
 
     pub fn default_concurrent_run() -> bool { false }
 
     pub fn default_delay() -> u8 { 1 }
 
     pub fn default_addr() -> Addr { Addr::Internet(IpAddr::V4(Ipv4Addr::UNSPECIFIED)) }
+
+    pub fn default_interval() -> CaptureInterval { CaptureInterval(Interval::Minutes(10)) }
 }
 
 // Server Specific Values

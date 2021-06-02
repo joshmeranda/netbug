@@ -6,11 +6,15 @@ interfaces = [ "lo", "wlp1s0" ]
 
 srv_addr = "127.0.0.1:8081"
 
+# Uncomment to allow any and all packets through the filter and into the
+# resulting pcap
+# filter = ""
+
 # Defines how the network should behave for different types of traffic
 # originating from this machine. Most protocols will have default behavior
-# (tcp, udp, icmp) youmay also define a specigic command to run to mock sample
-# network traffic. To do this specify the command each argument as discrete
-# elemnts of an array.
+# (tcp, udp, icmp); however, you may also define a specific command to run to
+# mock sample network traffic. To do this specify the command with each
+# argument as discrete elemnts of an array.
 [[behaviors]]
 dst = "127.0.0.1"
 protocol = "icmp"

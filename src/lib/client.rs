@@ -146,7 +146,7 @@ impl Client {
             let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
             if let Err(err) = capture.filter(self.filter.to_string().as_str()) {
-                eprintln!("Error adding filter to capture: {}", err.to_string());
+                return Err(NbugError::Client(format!("Error adding filter to capture: {}", err.to_string()).to_owned()));
             }
 
             let mut pcap_path = PathBuf::from(&self.pcap_dir);

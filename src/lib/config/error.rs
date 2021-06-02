@@ -11,6 +11,7 @@ pub enum ConfigError {
     Io(io::Error),
     Toml(de::Error),
     Addr(AddrParseError),
+    Other(String),
 }
 
 impl Display for ConfigError {
@@ -21,6 +22,7 @@ impl Display for ConfigError {
             },
             ConfigError::Toml(err) => write!(f, "Error parsing configuration: {}", err.to_string()),
             ConfigError::Addr(err) => write!(f, "Bad address: {}", err.to_string()),
+            ConfigError::Other(s) => write!(f, "{}", s),
         }
     }
 }
@@ -31,6 +33,7 @@ impl error::Error for ConfigError {
             ConfigError::Io(err) => Some(err),
             ConfigError::Toml(err) => Some(err),
             ConfigError::Addr(err) => Some(err),
+            ConfigError::Other(_) => None,
         }
     }
 }

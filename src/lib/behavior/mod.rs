@@ -241,7 +241,7 @@ impl<'a> Behavior {
     }
 
     fn build_icmp_evaluation(&self, has_reply: bool, has_request: bool) -> BehaviorEvaluation {
-        let mut eval = BehaviorEvaluation::new();
+        let mut eval = BehaviorEvaluation::new(self.src, self.dst);
 
         match self.direction {
             Direction::Out => {
@@ -326,7 +326,7 @@ impl<'a> Behavior {
             }
         }
 
-        let mut eval = BehaviorEvaluation::new();
+        let mut eval = BehaviorEvaluation::new(self.src, self.dst);
 
         match self.direction {
             Direction::Out | Direction::In => {
@@ -433,7 +433,7 @@ impl<'a> Behavior {
             }
         }
 
-        let mut eval = BehaviorEvaluation::new();
+        let mut eval = BehaviorEvaluation::new(self.src, self.dst);
 
         match self.direction {
             Direction::Out => {

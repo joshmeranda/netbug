@@ -19,6 +19,8 @@ extern crate num_derive;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 
+use serde::{Serialize, Serializer};
+
 use crate::config::error::ConfigError;
 use crate::error::NbugError;
 
@@ -38,7 +40,7 @@ const MESSAGE_VERSION: u8 = 0;
 
 /// Simple wrapper around address types allowing for multiple address
 /// specifications.
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Addr {
     /// An internet address with only an ip.
     Internet(IpAddr),
@@ -91,5 +93,13 @@ impl<'de> serde::Deserialize<'de> for Addr {
         }
 
         deserializer.deserialize_any(AddrVisitor)
+    }
+}
+
+impl Serialize for Addr {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer, {
+        serializer.serialize_str(self.to_string().as_str())
     }
 }

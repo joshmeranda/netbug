@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::Addr;
+
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum PacketStatus {
     Ok, // the packet was received or not received as expected
@@ -11,20 +13,30 @@ pub enum PacketStatus {
 /// specific steps required by the behavior.
 #[derive(Serialize)]
 pub struct BehaviorEvaluation<'a> {
+    src: Addr,
+
+    dst: Addr,
+
     /// The statuses of individual packets / packet types of the behavior's
     /// protocol.
     packet_status: HashMap<&'a str, PacketStatus>,
 }
 
 impl<'a> BehaviorEvaluation<'a> {
-    pub fn new() -> BehaviorEvaluation<'a> {
+    pub fn new(src: Addr, dst: Addr) -> BehaviorEvaluation<'a> {
         BehaviorEvaluation {
+            src,
+            dst,
             packet_status: HashMap::new(),
         }
     }
 
-    pub fn with_statuses(packet_status: HashMap<&'a str, PacketStatus>) -> BehaviorEvaluation {
-        BehaviorEvaluation { packet_status }
+    pub fn with_statuses(src: Addr, dst: Addr, packet_status: HashMap<&'a str, PacketStatus>) -> BehaviorEvaluation {
+        BehaviorEvaluation {
+            src,
+            dst,
+            packet_status,
+        }
     }
 
     pub fn insert_status(&mut self, key: &'a str, status: PacketStatus) { self.packet_status.insert(key, status); }

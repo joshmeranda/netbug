@@ -23,6 +23,9 @@ pub struct ServerConfig {
 
     #[serde(default = "defaults::default_report_dir")]
     pub report_dir: PathBuf,
+
+    #[serde(default = "defaults::server::default_overwrite_report")]
+    pub overwrite_report: bool,
 }
 
 impl ServerConfig {

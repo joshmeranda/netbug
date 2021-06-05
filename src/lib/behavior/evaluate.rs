@@ -60,4 +60,31 @@ impl<'a> BehaviorReport<'a> {
 
         self.evaluations.push(evaluation);
     }
+
+    pub fn iter(&'a mut self) -> ReportIterator<'a> { ReportIterator::new(&self.evaluations) }
+}
+
+pub struct ReportIterator<'a> {
+    evaluations: &'a Vec<BehaviorEvaluation<'a>>,
+    index:       usize,
+}
+
+impl<'a> ReportIterator<'a> {
+    pub fn new(evaluations: &'a Vec<BehaviorEvaluation>) -> ReportIterator<'a> {
+        ReportIterator { evaluations, index: 0 }
+    }
+}
+
+impl<'a> Iterator for ReportIterator<'a> {
+    type Item = &'a BehaviorEvaluation<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let eval = self.evaluations.get(self.index);
+
+        if eval.is_some() {
+            self.index += 1;
+        }
+
+        eval
+    }
 }

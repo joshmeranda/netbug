@@ -27,21 +27,29 @@ impl Receiver {
     /// Receive a pcap from a client and return the file the data was dumped to.
     /// The receiver blocks until either a pcap is receiver from the client, or
     /// an error occurs.
-    pub fn receive(&mut self) -> Result<PathBuf> {
-        let (stream, peer) = self.listener.accept()?;
+    pub fn receive(&mut self) -> Result<Vec<PathBuf>> {
+        let (mut stream, peer) = self.listener.accept()?;
 
         // ensure that a pcap directory for the peer exists
         let mut dir = self.pcap_dir.clone();
-        dir.push(peer.to_string());
+        dir.push(peer.ip().to_string());
 
         if !dir.exists() {
             fs::create_dir_all(dir);
         }
 
-        self.receive_pcap(stream)
+        let mut received = vec![];
+
+        while stream.peek(&mut [0; 1]).unwrap() != 0 {
+            let path = self.receive_pcap(&mut stream)?;
+
+            received.push(path);
+        }
+
+        Ok(received)
     }
 
-    fn receive_pcap(&self, mut stream: TcpStream) -> Result<PathBuf> {
+    fn receive_pcap(&self, stream: &mut TcpStream) -> Result<PathBuf> {
         // todo: receive and create pcap file to local server
         let mut buffer = [0; BUFFER_SIZE];
         let mut byte_count: usize = stream.peek(&mut buffer)?;
@@ -72,7 +80,7 @@ impl Receiver {
         };
 
         let mut pcap_path = self.pcap_dir.clone();
-        pcap_path.push(stream.peer_addr().unwrap().to_string());
+        pcap_path.push(stream.peer_addr().unwrap().ip().to_string());
         pcap_path.push(format!("{}.pcap", name));
         let mut pcap_file = File::create(&pcap_path)?;
 

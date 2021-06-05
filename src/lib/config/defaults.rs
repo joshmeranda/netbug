@@ -1,7 +1,9 @@
 /// Provides default values used to generate default configurations
 use std::path::PathBuf;
-use crate::config::client::CaptureInterval;
+
 use clokwerk::Interval;
+
+use crate::config::client::CaptureInterval;
 
 const NETBUG_BASE_DIR: &str = "/etc/nbug.d";
 
@@ -48,9 +50,10 @@ pub fn default_server_port() -> u16 { 8081 }
 pub mod client {
     use std::net::{IpAddr, Ipv4Addr};
 
-    use crate::Addr;
     use clokwerk::Interval;
+
     use crate::config::client::CaptureInterval;
+    use crate::Addr;
 
     pub fn default_concurrent_run() -> bool { false }
 
@@ -65,4 +68,6 @@ pub mod client {
 // todo: calculate the number of sockets / cores / threads on the host machine
 pub mod server {
     pub fn default_n_workers() -> usize { 4 }
+
+    pub fn default_overwrite_report() -> bool { false }
 }

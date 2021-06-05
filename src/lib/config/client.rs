@@ -1,18 +1,19 @@
+use std::fmt::Display;
 use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
+
+use clokwerk::Interval;
+use regex::Regex;
+use serde::de::Error;
+use serde::{de, Deserialize, Deserializer};
 
 use super::defaults;
 use super::error::{ConfigError, Result};
 use crate::behavior::Behavior;
 use crate::bpf::filter::FilterExpression;
-use clokwerk::Interval;
-use std::str::FromStr;
 use crate::error::NbugError;
-use regex::Regex;
-use std::fmt::Display;
-use serde::{Deserializer, de, Deserialize};
-use serde::de::Error;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CaptureInterval(pub Interval);
@@ -39,14 +40,17 @@ impl FromStr for CaptureInterval {
                     _ => Err(ConfigError::Other(format!("Bad interval unit: {}", unit))),
                 }
             },
-            None => Err(ConfigError::Other(format!("could not parse an Interval from the string {}", s).to_owned())),
+            None => Err(ConfigError::Other(
+                format!("could not parse an Interval from the string {}", s).to_owned(),
+            )),
         }
     }
 }
 
-impl <'de> Deserialize <'de> for CaptureInterval {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, <D as Deserializer<'de>>::Error> where
-        D: Deserializer<'de> {
+impl<'de> Deserialize<'de> for CaptureInterval {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>, {
         let s = Deserialize::deserialize(deserializer)?;
 
         match CaptureInterval::from_str(s) {
@@ -92,7 +96,8 @@ pub struct ClientConfig {
 
     pub behaviors: Vec<Behavior>,
 
-    /// If present, the given BPF filter is used when filtering packets. If not specified netbug will generate its own.
+    /// If present, the given BPF filter is used when filtering packets. If not
+    /// specified netbug will generate its own.
     pub filter: Option<FilterExpression>,
 
     #[serde(default = "defaults::client::default_interval")]
@@ -121,9 +126,10 @@ impl ClientConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::config::client::CaptureInterval;
     use clokwerk::Interval;
     use serde::de::Error;
+
+    use crate::config::client::CaptureInterval;
 
     #[derive(Deserialize)]
     struct IntervalWrapper {

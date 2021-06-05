@@ -2,20 +2,20 @@
 extern crate clap;
 extern crate netbug;
 
+use std::time::Duration;
+
+use clap::{App, Arg, SubCommand};
+use clokwerk::{Interval, ScheduleHandle, Scheduler};
+use netbug::bpf::filter::FilterExpression;
 use netbug::client::Client;
 use netbug::config::client::ClientConfig;
-use netbug::bpf::filter::FilterExpression;
-use std::time::Duration;
-use clap::{App, SubCommand, Arg};
-use clokwerk::{Interval, ScheduleHandle, Scheduler};
 
 fn run_scheduled(mut client: Client, delay: u8, interval: Interval) {
     run_once(&mut client, delay);
 
     let mut scheduler = Scheduler::new();
 
-    scheduler.every(interval)
-        .run(move || run_once(&mut client, delay));
+    scheduler.every(interval).run(move || run_once(&mut client, delay));
 
     let handle = scheduler.watch_thread(Duration::from_secs(1));
 
@@ -39,7 +39,7 @@ fn run_once(client: &mut Client, delay: u8) {
 
     if let Err(err) = result {
         eprintln!("{}", err.to_string());
-        return
+        return;
     }
 
     // small delay to ensure all relevant packets are dumped
@@ -59,10 +59,10 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Run one of the NetBug client tools")
-        .arg(Arg::with_name("scheduled")
-            .long("sched")
-            .short("s")
-            .help("run the client indefinitely taking captures at startup and then according to the configured schedule (not yet implemented)"))
+        .arg(Arg::with_name("scheduled").long("sched").short("s").help(
+            "run the client indefinitely taking captures at startup and then according to the configured schedule \
+             (not yet implemented)",
+        ))
         .get_matches();
 
     let client_cfg = match ClientConfig::from_path("examples/config/client.toml") {

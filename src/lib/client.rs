@@ -45,7 +45,7 @@ impl Default for Client {
             capturing:        Arc::new(AtomicBool::new(false)),
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behaviors:        vec![],
-            filter: FilterExpression::empty(),
+            filter:           FilterExpression::empty(),
         }
     }
 }
@@ -63,7 +63,7 @@ impl Client {
             .collect();
         let filter = match cfg.filter {
             Some(filter) => filter,
-            None => Client::bpf_filter(&cfg.behaviors)
+            None => Client::bpf_filter(&cfg.behaviors),
         };
 
         Client {
@@ -146,7 +146,9 @@ impl Client {
             let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
             if let Err(err) = capture.filter(self.filter.to_string().as_str()) {
-                return Err(NbugError::Client(format!("Error adding filter to capture: {}", err.to_string()).to_owned()));
+                return Err(NbugError::Client(
+                    format!("Error adding filter to capture: {}", err.to_string()).to_owned(),
+                ));
             }
 
             let mut pcap_path = PathBuf::from(&self.pcap_dir);
@@ -194,17 +196,21 @@ impl Client {
 
     /// Transfer all pcaps to the server.
     pub fn transfer_all(&self) -> Result<()> {
+        let mut stream = TcpStream::connect(self.srv_addr)?;
+
         for device in &self.devices {
-            self.transfer_pcap(device.name.as_str())?;
+            self.transfer_pcap(device.name.as_str(), &mut stream)?;
         }
+
+        stream.shutdown(Shutdown::Both)?;
 
         Ok(())
     }
 
     /// Transfer a single pcap to the server according to the captured interface
     /// name.
-    pub fn transfer_pcap(&self, interface_name: &str) -> Result<()> {
-        let mut tcp = TcpStream::connect(self.srv_addr)?;
+    fn transfer_pcap(&self, interface_name: &str, stream: &mut TcpStream) -> Result<()> {
+        // let mut tcp = TcpStream::connect(self.srv_addr)?;
         let mut buffer = [u8::default(); BUFFER_SIZE];
 
         // construct the path to the interface's pcap file
@@ -224,7 +230,7 @@ impl Client {
         let data_len_bytes: [u8; 8] = data_len.to_be_bytes();
         buffer[2..HEADER_LENGTH].copy_from_slice(&data_len_bytes);
 
-        // add the interface name to the bufer
+        // add the interface name to the buffer
         let name_bytes = interface_name.as_bytes();
 
         buffer[HEADER_LENGTH..HEADER_LENGTH + interface_name.len()].copy_from_slice(name_bytes);
@@ -234,7 +240,7 @@ impl Client {
         let mut bytes_read: usize = pcap_file.read(&mut buffer[HEADER_LENGTH + interface_name.len()..])?;
 
         // send the header, interface name, and first chunk of pcap data
-        tcp.write(&buffer[0..HEADER_LENGTH + interface_name.len() + bytes_read])?;
+        stream.write(&buffer[0..HEADER_LENGTH + interface_name.len() + bytes_read])?;
         remaining_bytes -= bytes_read as u64;
 
         // send file data in chunks of size BUFFER_SIZE
@@ -242,10 +248,8 @@ impl Client {
             bytes_read = pcap_file.read(&mut buffer[HEADER_LENGTH..])?;
             remaining_bytes -= bytes_read as u64;
 
-            tcp.write(&buffer[0..bytes_read])?;
+            stream.write(&buffer[0..bytes_read])?;
         }
-
-        tcp.shutdown(Shutdown::Both)?;
 
         Ok(())
     }

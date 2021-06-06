@@ -2,9 +2,11 @@ script_dir = "examples/scripts"
 
 pcap_dir = "nbug.d/pcap"
 
-interfaces = [ "lo" ]
+interfaces = [ "lo", "wlp1s0" ]
 
 srv_addr = "127.0.0.1:8081"
+
+interval = "1s"
 
 # Uncomment to allow any and all packets through the filter and into the
 # resulting pcap

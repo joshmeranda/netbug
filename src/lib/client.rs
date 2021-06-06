@@ -232,7 +232,6 @@ impl Client {
 
         // add the interface name to the buffer
         let name_bytes = interface_name.as_bytes();
-
         buffer[HEADER_LENGTH..HEADER_LENGTH + interface_name.len()].copy_from_slice(name_bytes);
 
         // read first data chunk into free buffer space after the header and interface

@@ -50,31 +50,19 @@ impl Receiver {
     }
 
     fn receive_pcap(&self, stream: &mut TcpStream) -> Result<PathBuf> {
-        // todo: receive and create pcap file to local server
-        let mut buffer = [0; BUFFER_SIZE];
-        let mut byte_count: usize = stream.peek(&mut buffer)?;
+        let mut header_buffer = [0; HEADER_LENGTH];
 
-        // wait until a full message header has been read
-        while byte_count < HEADER_LENGTH {
-            byte_count = stream.peek(&mut buffer)?;
-
-            if byte_count == 0 {
-                return Err(NbugError::Server(String::from(
-                    "Client unexpectedly closed the connection",
-                )));
-            }
-        }
-
-        byte_count = stream.read(&mut buffer)?;
+        stream.read(&mut header_buffer);
 
         // pull out header values
-        let _version: u8 = buffer[0]; // for now version can be safely ignored
-        let name_len: u8 = buffer[1];
+        let _version: u8 = header_buffer[0]; // for now version can be safely ignored since there is only one version
+        let name_len: u8 = header_buffer[1];
+        let data_len: u64 = u64::from_be_bytes(header_buffer[2..HEADER_LENGTH].try_into().unwrap());
 
-        // pull out the  message data length from the raw bytes
-        let data_len: u64 = u64::from_be_bytes(buffer[2..HEADER_LENGTH].try_into().unwrap());
+        let mut buffer = [0; BUFFER_SIZE];
+        stream.read(&mut buffer[0..name_len as usize])?;
 
-        let name = match std::str::from_utf8(&buffer[HEADER_LENGTH..HEADER_LENGTH + name_len as usize]) {
+        let name = match std::str::from_utf8(&buffer[0..name_len as usize]) {
             Ok(n) => n,
             Err(_) => return Err(NbugError::Packet(String::from("Packet name is not valid utf8"))),
         };
@@ -84,16 +72,23 @@ impl Receiver {
         pcap_path.push(format!("{}.pcap", name));
         let mut pcap_file = File::create(&pcap_path)?;
 
+        // read data data after header to file
+        let mut byte_count = stream.read(&mut buffer[0..data_len as usize])?;
+        pcap_file.write(&buffer[0..byte_count])?;
+
         // the amount of byte left to be added to the raw_message Vec after the initial
         // chunk
-        let mut remaining_bytes: usize = data_len as usize;
-
-        // read data data after header to file
-        remaining_bytes -= pcap_file.write(&buffer[HEADER_LENGTH + name_len as usize..byte_count])?;
+        let mut remaining_bytes: usize = data_len as usize - byte_count;
 
         // pull out the remaining data
         while remaining_bytes > 0 {
-            byte_count = stream.read(&mut buffer)?;
+            let buffer_slice = if remaining_bytes >= BUFFER_SIZE {
+                &mut buffer
+            } else {
+                &mut buffer[0..remaining_bytes]
+            };
+
+            byte_count = stream.read(buffer_slice)?;
 
             if byte_count == 0 {
                 return Err(NbugError::Server(String::from("Client unexpectedly closed connection")));

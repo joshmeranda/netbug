@@ -26,7 +26,7 @@ use crate::error::NbugError;
 
 /// The total length og the PcapMessage header as raw bytes. The header is
 /// composed of the packet version number (u8), pcap name length (u8), and the
-/// total data length (u64).s
+/// total data length (u64).
 pub const HEADER_LENGTH: usize = 10;
 
 /// This buffer size must be large enough to contain at least the header

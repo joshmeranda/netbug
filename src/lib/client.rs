@@ -1,6 +1,6 @@
 use std::default::Default;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write, BufWriter};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -197,11 +197,13 @@ impl Client {
     /// Transfer all pcaps to the server.
     pub fn transfer_all(&self) -> Result<()> {
         let mut stream = TcpStream::connect(self.srv_addr)?;
+        let mut writer = BufWriter::with_capacity(BUFFER_SIZE, stream);
 
         for device in &self.devices {
-            self.transfer_pcap(device.name.as_str(), &mut stream)?;
+            self.transfer_pcap(device.name.as_str(), &mut writer)?;
         }
 
+        let mut stream = writer.into_inner().unwrap();
         stream.shutdown(Shutdown::Both)?;
 
         Ok(())
@@ -209,10 +211,7 @@ impl Client {
 
     /// Transfer a single pcap to the server according to the captured interface
     /// name.
-    fn transfer_pcap(&self, interface_name: &str, stream: &mut TcpStream) -> Result<()> {
-        // let mut tcp = TcpStream::connect(self.srv_addr)?;
-        let mut buffer = [u8::default(); BUFFER_SIZE];
-
+    fn transfer_pcap(&self, interface_name: &str, stream: &mut BufWriter<TcpStream>) -> Result<()> {
         // construct the path to the interface's pcap file
         let mut pcap_path = self.pcap_dir.to_path_buf();
         pcap_path.push(format!("{}.pcap", interface_name));
@@ -221,34 +220,20 @@ impl Client {
 
         // get the amount of bytes in the pcap files
         let data_len = fs::metadata(&pcap_path)?.len();
-        let mut remaining_bytes = data_len;
 
         // fill the header bytes with the relevant behavior
-        buffer[0] = MESSAGE_VERSION;
-        buffer[1] = interface_name.len() as u8;
+        stream.write(&[MESSAGE_VERSION, interface_name.len() as u8]);
+
+        println!("\n=== Sending pcap for device: ({}) '{}'", stream.buffer()[1], interface_name);
 
         let data_len_bytes: [u8; 8] = data_len.to_be_bytes();
-        buffer[2..HEADER_LENGTH].copy_from_slice(&data_len_bytes);
+        stream.write(&data_len_bytes);
 
         // add the interface name to the buffer
         let name_bytes = interface_name.as_bytes();
-        buffer[HEADER_LENGTH..HEADER_LENGTH + interface_name.len()].copy_from_slice(name_bytes);
+        stream.write(&name_bytes);
 
-        // read first data chunk into free buffer space after the header and interface
-        // name
-        let mut bytes_read: usize = pcap_file.read(&mut buffer[HEADER_LENGTH + interface_name.len()..])?;
-
-        // send the header, interface name, and first chunk of pcap data
-        stream.write(&buffer[0..HEADER_LENGTH + interface_name.len() + bytes_read])?;
-        remaining_bytes -= bytes_read as u64;
-
-        // send file data in chunks of size BUFFER_SIZE
-        while remaining_bytes > 0 {
-            bytes_read = pcap_file.read(&mut buffer[HEADER_LENGTH..])?;
-            remaining_bytes -= bytes_read as u64;
-
-            stream.write(&buffer[0..bytes_read])?;
-        }
+        io::copy(&mut pcap_file, stream);
 
         Ok(())
     }

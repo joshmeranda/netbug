@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::fs;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Read, Write, BufWriter, BufReader};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
@@ -37,24 +37,23 @@ impl Receiver {
         dir.push(peer.ip().to_string());
 
         if !dir.exists() {
-            fs::create_dir_all(dir);
+            fs::create_dir_all(&dir);
         }
 
         let mut received = vec![];
+        let mut reader = BufReader::with_capacity(BUFFER_SIZE, stream);
 
-        while stream.peek(&mut [0; 1]).unwrap() != 0 {
-            let path = self.receive_pcap(&mut stream)?;
-
+        while let Ok(path) = self.receive_pcap(&mut reader, dir.clone()) {
             received.push(path);
         }
 
         Ok(received)
     }
 
-    fn receive_pcap(&self, stream: &mut TcpStream) -> Result<PathBuf> {
+    fn receive_pcap(&self, stream: &mut BufReader<TcpStream>, dir: PathBuf) -> Result<PathBuf> {
         let mut header_buffer = [0; HEADER_LENGTH];
 
-        stream.read_exact(&mut header_buffer);
+        stream.read_exact(&mut header_buffer)?;
 
         // pull out header values
         let _version: u8 = header_buffer[0]; // for now version can be safely ignored since there is only one version
@@ -69,10 +68,11 @@ impl Receiver {
             Err(_) => return Err(NbugError::Packet(String::from("Capture file name is not valid utf8"))),
         };
 
-        let mut pcap_path = self.pcap_dir.clone();
-        pcap_path.push(stream.peer_addr().unwrap().ip().to_string());
+        let mut pcap_path = dir.clone();
         pcap_path.push(format!("{}.pcap", name));
         let mut pcap_file = File::create(&pcap_path)?;
+
+        let mut writer = BufWriter::new(pcap_file);
 
         // the amount of byte left to be added to the raw_message Vec after the initial
         // chunk
@@ -84,7 +84,7 @@ impl Receiver {
             let slice = &mut buffer[0..upper];
 
             stream.read_exact(slice)?;
-            pcap_file.write_all(slice)?;
+            writer.write_all(slice)?;
 
             remaining_bytes -= upper;
         }

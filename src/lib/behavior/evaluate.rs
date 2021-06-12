@@ -1,3 +1,4 @@
+use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 
 use crate::Addr;
@@ -9,9 +10,20 @@ pub enum PacketStatus {
     NotReceived,
 }
 
+impl ToString for PacketStatus {
+    fn to_string(&self) -> String {
+        match self {
+            PacketStatus::Ok => "Ok",
+            PacketStatus::Received => "Received",
+            PacketStatus::NotReceived => "NotReceived",
+        }
+        .to_owned()
+    }
+}
+
 /// A simple evaluation of single behavior, including a breakdown of any
 /// specific steps required by the behavior.
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct BehaviorEvaluation<'a> {
     src: Addr,
 
@@ -19,6 +31,7 @@ pub struct BehaviorEvaluation<'a> {
 
     /// The statuses of individual packets / packet types of the behavior's
     /// protocol.
+    #[serde(borrow)]
     packet_status: HashMap<&'a str, PacketStatus>,
 }
 
@@ -42,14 +55,21 @@ impl<'a> BehaviorEvaluation<'a> {
     pub fn insert_status(&mut self, key: &'a str, status: PacketStatus) { self.packet_status.insert(key, status); }
 
     pub fn passed(&self) -> bool { self.packet_status.values().all(|status| *status == PacketStatus::Ok) }
+
+    pub fn source(&self) -> Addr { self.src }
+
+    pub fn destination(&self) -> Addr { self.dst }
+
+    pub fn data(&self) -> Iter<&'a str, PacketStatus> { self.packet_status.iter() }
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct BehaviorReport<'a> {
     passing: usize,
 
     failing: usize,
 
+    #[serde(borrow)]
     evaluations: Vec<BehaviorEvaluation<'a>>,
 }
 
@@ -73,7 +93,7 @@ impl<'a> BehaviorReport<'a> {
         self.evaluations.push(evaluation);
     }
 
-    pub fn iter(&'a mut self) -> ReportIterator<'a> { ReportIterator::new(&self.evaluations) }
+    pub fn iter(&'a self) -> ReportIterator<'a> { ReportIterator::new(&self.evaluations) }
 }
 
 pub struct ReportIterator<'a> {

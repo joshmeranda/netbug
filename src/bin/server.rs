@@ -3,16 +3,16 @@ extern crate clap;
 
 use std::error::Error;
 use std::fs;
-use std::fs::{File, OpenOptions};
+use std::fs::{DirEntry, File, OpenOptions};
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, Utc};
-use clap::{App, Arg, ArgGroup, SubCommand};
+use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
+use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport};
 use netbug::config::server::ServerConfig;
-use netbug::error::Result;
 use netbug::process::PcapProcessor;
 use netbug::receiver::Receiver;
 
@@ -81,17 +81,105 @@ fn run(cfg: ServerConfig) {
     println!("Stopping server...");
 }
 
-fn report(cfg: ServerConfig) {}
+enum ReportFilter {
+    All,
+    Passed,
+    Failed,
+}
+
+fn get_report_path(report_dir: PathBuf, offset: usize) -> Option<PathBuf> {
+    let read = match fs::read_dir(report_dir) {
+        Err(err) => return None,
+        Ok(read) => read,
+    };
+
+    let mut entries: Vec<DirEntry> = read.map(|entry| entry.unwrap()).collect();
+    entries.sort_by(|left, right| {
+        let left_time = left.metadata().unwrap().created().unwrap();
+        let right_time = right.metadata().unwrap().created().unwrap();
+
+        // left_time < right_time
+
+        left_time.cmp(&right_time)
+    });
+
+    match entries.get(offset) {
+        None => None,
+        Some(entry) => Some(entry.path()),
+    }
+}
+
+fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {
+    let report_path = match get_report_path(cfg.report_dir, offset) {
+        Some(path) => path,
+        None => {
+            eprintln!(
+                "Could not find a report with the given offset. Please make sure you have at least {} report(s)",
+                offset + 1
+            );
+            return;
+        },
+    };
+
+    let content = match fs::read_to_string(report_path.clone()) {
+        Ok(content) => content,
+        Err(err) => {
+            eprintln!(
+                "An error occurred reading '{}': {}",
+                report_path.to_str().unwrap(),
+                err.to_string()
+            );
+            return;
+        },
+    };
+
+    // let report: BehaviorReport = match serde_json::from_str(content.as_str()) {
+    let report: BehaviorReport = match serde_json::from_str(content.as_str()) {
+        Ok(report) => report,
+        Err(err) => {
+            eprintln!(
+                "An error occurred reading '{}': {}",
+                report_path.to_str().unwrap(),
+                err.to_string()
+            );
+            return;
+        },
+    };
+
+    let evals: Vec<&BehaviorEvaluation> = report
+        .iter()
+        .filter(|eval| match filter {
+            ReportFilter::All => true,
+            ReportFilter::Passed => eval.passed(),
+            ReportFilter::Failed => !eval.passed(),
+        })
+        .collect();
+
+    for eval in evals {
+        println!("{} -> {}", eval.source().to_string(), eval.destination().to_string());
+
+        for (name, status) in eval.data() {
+            println!("{}\t{}", name, status.to_string());
+        }
+
+        println!();
+    }
+}
 
 fn main() {
     let matches = App::new("nbug")
         .version(crate_version!())
         .author(crate_authors!())
         .about("Start the nbug server to view ")
+        .settings(&[
+            AppSettings::SubcommandRequiredElseHelp,
+            AppSettings::UnifiedHelpMessage,
+            AppSettings::VersionlessSubcommands,
+        ])
         .subcommand(SubCommand::with_name("run").about("run the nbug server"))
         .subcommand(
             SubCommand::with_name("report")
-                .about("send a human readable report of the recevied pcaps")
+                .about("show a human readable report of the recevied pcaps")
                 .arg(
                     Arg::with_name("failed")
                         .help("only show report of failing behaviors")
@@ -108,6 +196,16 @@ fn main() {
                     ArgGroup::with_name("filters")
                         .args(&["failed", "passed"])
                         .multiple(false),
+                )
+                .arg(
+                    Arg::with_name("offset")
+                        .help(
+                            "show the n + 1 th most recent report (0 shows the most recent, 1 shows the 2nd most \
+                             recent, ...)",
+                        )
+                        .long("offset")
+                        .short("o")
+                        .default_value("0"),
                 ),
         )
         .get_matches();
@@ -120,5 +218,25 @@ fn main() {
         },
     };
 
-    run(server_cfg);
+    if let Some(sub_matches) = matches.subcommand_matches("report") {
+        let filter = if sub_matches.is_present("failed") {
+            ReportFilter::Failed
+        } else if matches.is_present("passed") {
+            ReportFilter::Passed
+        } else {
+            ReportFilter::All
+        };
+
+        let offset = match sub_matches.value_of("offset").unwrap().parse::<usize>() {
+            Ok(offset) => offset,
+            Err(err) => {
+                eprintln!("Bad offset value");
+                return;
+            },
+        };
+
+        report(server_cfg, filter, offset);
+    } else {
+        run(server_cfg)
+    }
 }

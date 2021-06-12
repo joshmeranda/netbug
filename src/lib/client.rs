@@ -1,6 +1,6 @@
 use std::default::Default;
 use std::fs::{self, File};
-use std::io::{self, Read, Write, BufWriter};
+use std::io::{self, BufWriter, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -224,7 +224,11 @@ impl Client {
         // fill the header bytes with the relevant behavior
         stream.write(&[MESSAGE_VERSION, interface_name.len() as u8]);
 
-        println!("\n=== Sending pcap for device: ({}) '{}'", stream.buffer()[1], interface_name);
+        println!(
+            "\n=== Sending pcap for device: ({}) '{}'",
+            stream.buffer()[1],
+            interface_name
+        );
 
         let data_len_bytes: [u8; 8] = data_len.to_be_bytes();
         stream.write(&data_len_bytes);

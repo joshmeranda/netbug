@@ -1,14 +1,14 @@
 use std::convert::TryInto;
 use std::fs;
 use std::fs::File;
-use std::io::{Read, Write, BufWriter, BufReader};
+use std::hash::BuildHasherDefault;
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use crate::error::{NbugError, Result};
 use crate::{BUFFER_SIZE, HEADER_LENGTH};
-use std::hash::BuildHasherDefault;
-use std::ops::Range;
 
 pub struct Receiver {
     listener: TcpListener,
@@ -80,7 +80,11 @@ impl Receiver {
 
         // pull out the remaining data
         while remaining_bytes > 0 {
-            let upper = if remaining_bytes >= BUFFER_SIZE { BUFFER_SIZE } else { remaining_bytes };
+            let upper = if remaining_bytes >= BUFFER_SIZE {
+                BUFFER_SIZE
+            } else {
+                remaining_bytes
+            };
             let slice = &mut buffer[0..upper];
 
             stream.read_exact(slice)?;

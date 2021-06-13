@@ -159,7 +159,7 @@ fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {
         println!("{} -> {}", eval.source().to_string(), eval.destination().to_string());
 
         for (name, status) in eval.data() {
-            println!("{}\t{}", name, status.to_string());
+            println!("{} : {}", name, status.to_string());
         }
 
         println!();
@@ -205,7 +205,7 @@ fn main() {
                         )
                         .long("offset")
                         .short("o")
-                        .default_value("0"),
+                        .takes_value(true),
                 ),
         )
         .get_matches();
@@ -227,12 +227,15 @@ fn main() {
             ReportFilter::All
         };
 
-        let offset = match sub_matches.value_of("offset").unwrap().parse::<usize>() {
-            Ok(offset) => offset,
-            Err(err) => {
-                eprintln!("Bad offset value");
-                return;
+        let offset = match sub_matches.value_of("offset") {
+            Some(offset) => match offset.parse::<usize>() {
+                Ok(offset) => offset,
+                Err(err) => {
+                    eprintln!("Bad offset value");
+                    return;
+                },
             },
+            None => 0,
         };
 
         report(server_cfg, filter, offset);

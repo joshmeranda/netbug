@@ -496,15 +496,13 @@ impl<'a> Behavior {
     }
 
     fn addr_filter(addr: Addr, options: &FilterOptions) -> FilterBuilder {
-        match addr {
-            Addr::Internet(addr) => FilterBuilder::with(Primitive::Host(Host(addr.to_string()), None), options),
-            Addr::Socket(sock) => {
-                let mut builder = FilterBuilder::with(Primitive::Host(Host(sock.ip().to_string()), None), options);
-                builder.and(Primitive::Port(sock.port(), None));
+        let mut builder = FilterBuilder::with(Primitive::Host(Host(addr.ip().to_string()),None), options);
 
-                builder
-            },
+        if let Some(port) = addr.port() {
+            builder.and(Primitive::Port(port, None));
         }
+
+        builder
     }
 
     /// Create a [`FilterBuilder`] which will capture the packet traffic

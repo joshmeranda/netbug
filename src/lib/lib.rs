@@ -49,6 +49,22 @@ pub enum Addr {
     Socket(SocketAddr),
 }
 
+impl Addr {
+    pub fn ip(&self) -> IpAddr {
+        match self {
+            Addr::Internet(ip) => *ip,
+            Addr::Socket(socket) => socket.ip()
+        }
+    }
+
+    pub fn port(&self) -> Option<u16> {
+        match self {
+            Addr::Internet(_) => None,
+            Addr::Socket(socket) => Some(socket.port())
+        }
+    }
+}
+
 impl FromStr for Addr {
     type Err = NbugError;
 

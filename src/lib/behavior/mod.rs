@@ -496,7 +496,7 @@ impl<'a> Behavior {
     }
 
     fn addr_filter(addr: Addr, options: &FilterOptions) -> FilterBuilder {
-        let mut builder = FilterBuilder::with(Primitive::Host(Host(addr.ip().to_string()),None), options);
+        let mut builder = FilterBuilder::with(Primitive::Host(Host(addr.ip().to_string()), None), options);
 
         if let Some(port) = addr.port() {
             builder.and(Primitive::Port(port, None));

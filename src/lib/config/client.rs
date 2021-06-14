@@ -112,7 +112,6 @@ impl ClientConfig {
     }
 
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<ClientConfig> {
-        // todo: handle toml parsing error
         // todo: handle config errors
         //   script_dir | pcap_dir is not a dir, etc
         let content = fs::read_to_string(path)?;

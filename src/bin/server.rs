@@ -19,7 +19,15 @@ use netbug::receiver::Receiver;
 fn run(cfg: ServerConfig) {
     println!("Starting server...");
 
-    let mut receiver = match Receiver::new(cfg.srv_addr, cfg.pcap_dir.clone()) {
+    let listener = match TcpListener::bind(cfg.srv_addr) {
+        Ok(listener) => listener,
+        Err(err) => {
+            eprintln!("Error binding to socket '{}': {}", cfg.srv_addr, err.to_string());
+            return;
+        },
+    };
+
+    let mut receiver = match Receiver::new(listener, cfg.pcap_dir.clone()) {
         Ok(receiver) => receiver,
         Err(err) => {
             eprintln!("Error creating pcap receiver: {}", err.to_string());

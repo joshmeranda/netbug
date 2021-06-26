@@ -7,6 +7,7 @@ use num_traits::FromPrimitive;
 use crate::error::NbugError;
 use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
+#[derive(Debug, PartialEq)]
 pub enum IpPacket {
     V4(Ipv4Packet),
     V6(Ipv6Packet),
@@ -49,6 +50,8 @@ impl TryFrom<&[u8]> for IpPacket {
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         let version = data[0] >> 4;
 
+        println!("=== Version: {}", version);
+
         match version {
             4 => Ok(IpPacket::V4(Ipv4Packet::try_from(data)?)),
             6 => Ok(IpPacket::V6(Ipv6Packet::try_from(data)?)),
@@ -60,7 +63,7 @@ impl TryFrom<&[u8]> for IpPacket {
     }
 }
 
-#[derive(FromPrimitive)]
+#[derive(Debug, FromPrimitive, PartialEq)]
 enum ServiceType {
     Routine             = 0b000,
     Priority            = 0b001,
@@ -73,6 +76,7 @@ enum ServiceType {
 }
 
 /// The IPv4 Packet header as specified in [RFC 791](https://tools.ietf.org/html/rfc791#section-3.1).
+#[derive(Debug, PartialEq)]
 pub struct Ipv4Packet {
     header_length: u16,
 
@@ -129,7 +133,7 @@ impl TryFrom<&[u8]> for Ipv4Packet {
             ))));
         }
 
-        let header_length = (data[0] as u16 & 0xF) * 32 / 8;
+        let header_length = (data[0] as u16 & 0xF) * 4;
 
         if header_length as usize != Ipv4Packet::MIN_BYTES {
             return Err(NbugError::Packet(String::from(format!(
@@ -195,6 +199,7 @@ impl TryFrom<&[u8]> for Ipv4Packet {
 
 /// Ipv6 Packet Header as specified in [RFC 8200](https://tools.ietf.org/html/rfc8200#section-3).
 /// todo: support for extension headers
+#[derive(Debug, PartialEq)]
 pub struct Ipv6Packet {
     traffic_class: u8,
 
@@ -221,7 +226,7 @@ impl TryFrom<&[u8]> for Ipv6Packet {
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         let version = data[0] >> 4;
 
-        if version != 4 {
+        if version != 6 {
             return Err(NbugError::Packet(String::from(format!(
                 "Wrong version number, expected '6' received: {}",
                 version
@@ -229,16 +234,15 @@ impl TryFrom<&[u8]> for Ipv6Packet {
         }
 
         let mut traffic_class: u8 = 0;
-        traffic_class |= data[0] | data[1] >> 4; // last 4 of first byte, and first 4 of second byte
+        traffic_class |= data[0] & 0x0 | data[1] >> 4; // last 4 of first byte, and first 4 of second byte
 
-        let mut flow_label: u32 = 0;
-        flow_label |= data[1] as u32 & 0x0Fu32; // add last 4 bytes of previous byte
-        flow_label <<= 16;
-
-        flow_label &= data[2] as u32;
+        let mut flow_label: u32 = data[1] as u32 & 0x0f;
         flow_label <<= 8;
 
-        flow_label &= data[3] as u32;
+        flow_label |= data[2] as u32;
+        flow_label <<= 8;
+
+        flow_label |= data[3] as u32;
 
         let mut length_bytes = [0u8; 2];
         length_bytes.copy_from_slice(&data[4..6]);
@@ -250,11 +254,11 @@ impl TryFrom<&[u8]> for Ipv6Packet {
         let hop_limit = data[7];
 
         let mut source_bytes = [0u8; 16];
-        source_bytes.copy_from_slice(&data[8..12]);
+        source_bytes.copy_from_slice(&data[8..24]);
         let source = Ipv6Addr::from(source_bytes);
 
         let mut destination_bytes = [0u8; 16];
-        destination_bytes.copy_from_slice(&data[12..16]);
+        destination_bytes.copy_from_slice(&data[24..40]);
         let destination = Ipv6Addr::from(destination_bytes);
 
         Ok(Ipv6Packet {
@@ -266,5 +270,108 @@ impl TryFrom<&[u8]> for Ipv6Packet {
             source,
             destination,
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::convert::{From, TryFrom};
+    use std::net::{Ipv4Addr, Ipv6Addr};
+
+    use crate::protocols::ip::{IpPacket, Ipv4Packet, Ipv6Packet, ServiceType};
+    use crate::protocols::ProtocolNumber;
+
+    // does not contain any options, if you need options for testing you can build
+    // you own packet with this as a template
+    const SAMPLE_IPV4_DATA: &[u8] = &[
+        0x45, //version && header length
+        0x00, // type of service
+        0x00, 0x54, // total length
+        0xc8, 0x9b, // identification
+        0x40, 0x00, // flags and offset
+        0x40, // ttl
+        0x01, // next header protocol
+        0x74, 0x0b, // checksum
+        0x7f, 0x00, 0x00, 0x01, // source
+        0x7f, 0x00, 0x00, 0x01, // destination
+    ];
+
+    const SAMPLE_IPV6_DATA: &[u8] = &[
+        0x60, // version && traffic class
+        0x02, 0x00, 0xa3, // traffic class && flow label
+        0x00, 0x40, // payload length
+        0x3a, // next header (icmpv6)
+        0x40, // hop limit
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // source
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x01, // destination
+    ];
+
+    #[test]
+    fn test_ip_ok() {
+        let ipv4 = IpPacket::try_from(SAMPLE_IPV4_DATA).unwrap();
+
+        if let IpPacket::V6(_) = ipv4 {
+            panic!("Expected to find ip v4");
+        }
+
+        let ipv6 = IpPacket::try_from(SAMPLE_IPV6_DATA).unwrap();
+
+        if let IpPacket::V4(_) = ipv6 {
+            panic!("Expected to find ip v6");
+        }
+    }
+
+    #[test]
+    fn test_ipv4_basic_ok() {
+        let actual = Ipv4Packet::try_from(SAMPLE_IPV4_DATA).unwrap();
+        let expected = Ipv4Packet {
+            header_length:    20,
+            service_type:     ServiceType::Routine,
+            low_delay:        false,
+            high_throughput:  false,
+            high_reliability: false,
+            total_length:     0x00_54,
+            identification:   0xc8_9b,
+            flags:            0b0000_0010,
+            offset:           0x00,
+            ttl:              0x40,
+            protocol:         ProtocolNumber::Icmp,
+            checksum:         0x74_0b,
+            source:           Ipv4Addr::from(0x7f_00_00_01),
+            destination:      Ipv4Addr::from(0x7f_00_00_01),
+        };
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_ipv4_too_small() {
+        if let Ok(_) = Ipv4Packet::try_from(&SAMPLE_IPV4_DATA[1..]) {
+            panic!("too few bytes were provided, try_from should have failed");
+        }
+    }
+
+    #[test]
+    fn test_ipv6_basic_ok() {
+        let actual = Ipv6Packet::try_from(SAMPLE_IPV6_DATA).unwrap();
+        let expected = Ipv6Packet {
+            traffic_class:  0x00,
+            flow_label:     0x02_00_a3,
+            payload_length: 0x40,
+            next_header:    ProtocolNumber::Ipv6Icmp,
+            hop_limit:      0x40,
+            source:         Ipv6Addr::from(0x00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_01),
+            destination:    Ipv6Addr::from(0x00_00_00_00_00_00_00_00_00_00_00_00_00_00_00_01),
+        };
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_ipv6_too_small() {
+        if let Ok(_) = Ipv6Packet::try_from(&SAMPLE_IPV6_DATA[1..]) {
+            panic!("too few bytes were provided, try_from should have failed");
+        }
     }
 }

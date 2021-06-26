@@ -7,6 +7,8 @@ use crate::protocols::ProtocolNumber;
 
 pub static ICMP_KIND_KEY: &str = "IcmpKind";
 
+pub static MIN_ICMP_HEADER_LEN: usize = 8;
+
 /// Simple wrapper around icmp types. Since neither icmp version 4 or 6 provide
 /// a method for asserting the version beyond the type used in the internet
 /// header, they must be parsed separately before being wrapped into this enum.
@@ -24,6 +26,7 @@ pub static ICMP_KIND_KEY: &str = "IcmpKind";
 /// let icmp4 = IcmpPacket::V4(Icmpv4Packet::try_from(data4).unwrap());
 /// let icmp6 = IcmpPacket::V6(Icmpv6Packet::try_from(data6).unwrap());
 /// ```
+#[derive(Debug, PartialEq)]
 pub enum IcmpPacket {
     V4(Icmpv4Packet),
     V6(Icmpv6Packet),
@@ -31,7 +34,10 @@ pub enum IcmpPacket {
 
 /// Simple wrapper around an icmp echo and reply packet as defined in [RFC 4443 4.1](https://tools.ietf.org/html/rfc4443#section-4.1)
 /// and similarly in [RFC 794 pg 14](https://tools.ietf.org/html/rfc792#page-14)
+#[derive(Debug, PartialEq)]
 pub struct IcmpCommon {
+    kind:       u8,
+    code:       u8,
     checksum:   u16,
     identifier: u16,
     sequence:   u16,
@@ -48,19 +54,24 @@ impl TryFrom<&[u8]> for IcmpCommon {
             ))));
         }
 
+        let icmp_type = data[0];
+        let code = data[1];
+
         let mut checksum_bytes = [0u8; 2];
-        checksum_bytes.copy_from_slice(&data[0..2]);
+        checksum_bytes.copy_from_slice(&data[2..4]);
         let checksum = u16::from_be_bytes(checksum_bytes);
 
         let mut identifier_bytes = [0u8; 2];
-        identifier_bytes.copy_from_slice(&data[0..2]);
+        identifier_bytes.copy_from_slice(&data[4..6]);
         let identifier = u16::from_be_bytes(identifier_bytes);
 
         let mut sequence_bytes = [0u8; 2];
-        sequence_bytes.copy_from_slice(&data[0..2]);
+        sequence_bytes.copy_from_slice(&data[6..8]);
         let sequence = u16::from_be_bytes(sequence_bytes);
 
         Ok(IcmpCommon {
+            kind: icmp_type,
+            code,
             checksum,
             identifier,
             sequence,
@@ -69,6 +80,7 @@ impl TryFrom<&[u8]> for IcmpCommon {
 }
 
 pub mod icmpv4 {
+    use std::cmp::PartialEq;
     use std::collections::HashMap;
     use std::convert::TryFrom;
     use std::net::Ipv4Addr;
@@ -76,12 +88,12 @@ pub mod icmpv4 {
     use num_traits::FromPrimitive;
 
     use crate::error::NbugError;
-    use crate::protocols::icmp::{IcmpCommon, ICMP_KIND_KEY};
+    use crate::protocols::icmp::{IcmpCommon, ICMP_KIND_KEY, MIN_ICMP_HEADER_LEN};
     use crate::protocols::ip::Ipv4Packet;
     use crate::protocols::ProtocolNumber;
 
     /// Maps variants to icmp message types as defined in [RFC 792 Summary of Message Types](https://tools.ietf.org/html/rfc792#page-20)
-    #[derive(FromPrimitive)]
+    #[derive(Debug, FromPrimitive, PartialEq)]
     pub enum Icmpv4MessageKind {
         EchoReply          = 0,
         DestinationUnreachable = 3,
@@ -96,6 +108,7 @@ pub mod icmpv4 {
         InformationReply   = 16,
     }
 
+    #[derive(Debug, PartialEq)]
     pub struct IcmpTimestamp {
         common:             IcmpCommon,
         original_timestamp: u32,
@@ -137,6 +150,7 @@ pub mod icmpv4 {
         }
     }
 
+    #[derive(Debug, PartialEq)]
     pub struct IcmpErrorPacket {
         checksum:        u16,
         internet_header: Ipv4Packet,
@@ -160,6 +174,7 @@ pub mod icmpv4 {
     }
 
     /// Defines the variants of icmp v4 packets as defined in [RFC 792](https://tools.ietf.org/html/rfc792)
+    #[derive(Debug, PartialEq)]
     pub enum Icmpv4Packet {
         /// Described in [RFC 792 Pg 14](https://tools.ietf.org/html/rfc792#page-14)
         EchoReply(IcmpCommon),
@@ -220,6 +235,13 @@ pub mod icmpv4 {
         type Error = NbugError;
 
         fn try_from(data: &[u8]) -> Result<Icmpv4Packet, Self::Error> {
+            if data.len() < MIN_ICMP_HEADER_LEN {
+                return Err(NbugError::Packet(String::from(format!(
+                    "Too few bytes, expected at least: {}",
+                    MIN_ICMP_HEADER_LEN
+                ))));
+            }
+
             let kind =
                 FromPrimitive::from_u8(data[0]).expect(&*format!("Invalid icmp message type value '{}'", data[0]));
 
@@ -263,11 +285,11 @@ pub mod icmpv6 {
     use num_traits::FromPrimitive;
 
     use crate::error::NbugError;
-    use crate::protocols::icmp::{IcmpCommon, ICMP_KIND_KEY};
+    use crate::protocols::icmp::{IcmpCommon, ICMP_KIND_KEY, MIN_ICMP_HEADER_LEN};
     use crate::protocols::ProtocolNumber;
 
     /// Map variants to icmp v6 message types as defined in [RFC 4443 2.1](https://tools.ietf.org/html/rfc4443#section-2.1).
-    #[derive(FromPrimitive)]
+    #[derive(Debug, FromPrimitive, PartialEq)]
     pub enum Icmpv6MessageKind {
         DestinationUnreachable = 1,
         PacketTooBig     = 2,
@@ -285,7 +307,7 @@ pub mod icmpv6 {
     }
 
     /// As defined in [RFC 4443 Section 3.1](https://tools.ietf.org/html/rfc4443#section-3.1)
-    #[derive(FromPrimitive)]
+    #[derive(Debug, FromPrimitive, PartialEq)]
     pub enum DestinationUnreachableCode {
         NoRoute             = 0,
         Prohibited          = 1,
@@ -297,14 +319,14 @@ pub mod icmpv6 {
     }
 
     /// As defined in [RFC 443 Section 3.3](https://tools.ietf.org/html/rfc4443#section-3.3)
-    #[derive(FromPrimitive)]
+    #[derive(Debug, FromPrimitive, PartialEq)]
     pub enum TimeExceededCode {
         HopLimitExceeded = 0,
         FragmentReassemblyExceeded = 1,
     }
 
     /// As defined in [RFC 443 Section 3.4](https://tools.ietf.org/html/rfc4443#section-3.4)
-    #[derive(FromPrimitive)]
+    #[derive(Debug, FromPrimitive, PartialEq)]
     pub enum ParameterProblemCode {
         ErroneousHeader    = 0,
         UnrecognizedNextHeader = 1,
@@ -315,6 +337,7 @@ pub mod icmpv6 {
     ///
     /// todo: figure out the invoking packet
     /// todo: support more message types
+    #[derive(Debug, PartialEq)]
     pub enum Icmpv6Packet {
         EchoRequest(IcmpCommon),
 
@@ -334,6 +357,13 @@ pub mod icmpv6 {
         type Error = NbugError;
 
         fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+            if data.len() < MIN_ICMP_HEADER_LEN {
+                return Err(NbugError::Packet(String::from(format!(
+                    "Too few bytes, expected at least: {}",
+                    MIN_ICMP_HEADER_LEN
+                ))));
+            }
+
             let kind =
                 FromPrimitive::from_u8(data[0]).expect(&*format!("Invalid icmp message type value '{}'", data[0]));
 
@@ -345,6 +375,73 @@ pub mod icmpv6 {
                     data[0]
                 )))),
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::convert::TryFrom;
+
+    use crate::protocols::icmp::icmpv4::Icmpv4Packet;
+    use crate::protocols::icmp::icmpv6::Icmpv6Packet;
+    use crate::protocols::icmp::{IcmpCommon, IcmpPacket};
+
+    const SAMPLE_ICMP_V4_DATA: &[u8] = &[
+        0x00, // type (echo reply)
+        0x00, // code
+        0x0c, 0x7b, // checksum
+        0x00, 0x02, // identifier
+        0x00, 0x01, // sequence number
+    ];
+
+    const SAMPLE_ICMP_V6_DATA: &[u8] = &[
+        0x80, // type (echo request)
+        0x00, // code
+        0x7a, 0x78, // checksum
+        0x00, 0x2c, // identifier
+        0x00, 0x01, // sequence number
+    ];
+
+    #[test]
+    fn test_icmp_v4_ok() {
+        let actual = Icmpv4Packet::try_from(SAMPLE_ICMP_V4_DATA).unwrap();
+        let expected = Icmpv4Packet::EchoReply(IcmpCommon {
+            kind:       0x0,
+            code:       0x0,
+            checksum:   0x0c7b,
+            identifier: 0x02,
+            sequence:   0x01,
+        });
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_icmp_v4_too_small() {
+        if let Ok(_) = Icmpv4Packet::try_from(&SAMPLE_ICMP_V4_DATA[1..]) {
+            panic!("too few bytes were provided, try_from should have failed");
+        }
+    }
+
+    #[test]
+    fn test_icmp_v6_ok() {
+        let actual = Icmpv6Packet::try_from(SAMPLE_ICMP_V6_DATA).unwrap();
+        let expected = Icmpv6Packet::EchoRequest(IcmpCommon {
+            kind:       0x80,
+            code:       0x00,
+            checksum:   0x7a78,
+            identifier: 0x2c,
+            sequence:   0x01,
+        });
+
+        assert_eq!(expected, actual)
+    }
+
+    #[test]
+    fn test_icmp_v6_too_small() {
+        if let Ok(_) = Icmpv6Packet::try_from(&SAMPLE_ICMP_V6_DATA[1..]) {
+            panic!("too few bytes were provided, try_from should have failed");
         }
     }
 }

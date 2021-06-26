@@ -225,83 +225,59 @@ mod test {
     use crate::protocols::ethernet::{Ethernet2Packet, Ethernet3Packet, IeeEthernetPacket};
     use crate::protocols::ProtocolNumber;
 
+    const SAMPLE_IEE_802_2_DATA: &[u8] = &[
+        0, 1, 2, 3, 4, 5, // destination MAC
+        5, 4, 3, 2, 1, 0, // source MAC
+        0x08, 0x_00, // type (Iv4)
+    ];
+
+    // does not contain any data, if you need data for testing you can build
+    // you own packet with this as a template
+    const SAMPLE_IEE_802_3_DATA: &[u8] = &[
+        0, 1, 2, 3, 4, 5, // destination MAC
+        5, 4, 3, 2, 1, 0, // source MAC
+        0, 0, // length
+        0, 0, 0, 0, 0, 0, 0, 0, // payload data
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 1, // frame check sequence
+    ];
+
     #[test]
-    fn iee_ethernet2_from_raw_ok() {
-        let raw: &[u8] = &[
-            0, 1, 2, 3, 4, 5, // destination MAC
-            5, 4, 3, 2, 1, 0, // source MAC
-            0x08, 0x_00, // type (Iv4)
-        ];
+    fn iee_ethernet_from_raw_ok() {
+        let iee_802_2 = IeeEthernetPacket::try_from(SAMPLE_IEE_802_2_DATA).unwrap();
 
-        assert_eq!(
-            IeeEthernetPacket::Ieee8022(Ethernet2Packet::new(
-                [0, 1, 2, 3, 4, 5],
-                [5, 4, 3, 2, 1, 0],
-                ProtocolNumber::Ipv4
-            )),
-            IeeEthernetPacket::try_from(raw).unwrap()
-        );
-    }
+        if let IeeEthernetPacket::Ieee8023(_) = iee_802_2 {
+            panic!("Expected to find ethernet of type 802.2");
+        }
 
-    #[test]
-    fn iee_ethernet3_from_raw_ok() {
-        let raw: &[u8] = &[
-            0, 1, 2, 3, 4, 5, // destination MAC
-            5, 4, 3, 2, 1, 0, // source MAC
-            0, 24, // length
-            0, 1, 2, 3, 4, 5, 6, 7, // payload data
-            8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, // frame check sequence
-        ];
+        let iee_802_3 = IeeEthernetPacket::try_from(SAMPLE_IEE_802_3_DATA).unwrap();
 
-        assert_eq!(
-            IeeEthernetPacket::Ieee8023(Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 24, 1)),
-            IeeEthernetPacket::try_from(raw).unwrap()
-        );
+        if let IeeEthernetPacket::Ieee8022(_) = iee_802_3 {
+            panic!("Expected to find ethernet of type 802.3");
+        }
     }
 
     #[test]
     fn ethernet2_from_raw_ok() {
-        let raw: &[u8] = &[
-            0, 1, 2, 3, 4, 5, // destination MAC
-            5, 4, 3, 2, 1, 0, // source MAC
-            0x08, 0x_00, // type (Iv4)
-        ];
+        let actual = Ethernet2Packet::try_from(SAMPLE_IEE_802_2_DATA).unwrap();
+        let expected = Ethernet2Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], ProtocolNumber::Ipv4);
 
-        assert_eq!(
-            Ethernet2Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], ProtocolNumber::Ipv4),
-            Ethernet2Packet::try_from(raw).unwrap()
-        );
+        assert_eq!(expected, actual);
     }
 
     #[test]
     fn ethernet2_from_raw_too_small() {
-        let raw: &[u8] = &[
-            0, 1, 2, 3, 4, // destination MAC (too small)
-            5, 4, 3, 2, 1, 0, // source MAC
-            0x08, 0x_00, // type (Iv4)
-        ];
-
-        if let Ok(_) = Ethernet2Packet::try_from(raw) {
+        if let Ok(_) = Ethernet2Packet::try_from(&SAMPLE_IEE_802_2_DATA[1..]) {
             panic!("too few bytes were provided, try_from should have failed");
         }
     }
 
     #[test]
     fn ethernet3_from_raw_empty_payload_ok() {
-        let raw: &[u8] = &[
-            0, 1, 2, 3, 4, 5, // destination MAC
-            5, 4, 3, 2, 1, 0, // source MAC
-            0, 0, // length
-            0, 0, 0, 0, 0, 0, 0, 0, // payload data
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 1, // frame check sequence
-        ];
+        let actual = Ethernet3Packet::try_from(SAMPLE_IEE_802_3_DATA).unwrap();
+        let expected = Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 0, 1);
 
-        assert_eq!(
-            Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 0, 1),
-            Ethernet3Packet::try_from(raw).unwrap()
-        );
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -315,10 +291,10 @@ mod test {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, // frame check sequence
         ];
 
-        assert_eq!(
-            Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 24, 1),
-            Ethernet3Packet::try_from(raw).unwrap()
-        );
+        let actual = Ethernet3Packet::try_from(raw).unwrap();
+        let expected = Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 24, 1);
+
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -332,10 +308,10 @@ mod test {
             35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 0, 0, 0, 1, // frame check sequence
         ];
 
-        assert_eq!(
-            Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 46, 1),
-            Ethernet3Packet::try_from(raw).unwrap()
-        );
+        let actual = Ethernet3Packet::try_from(raw).unwrap();
+        let expected = Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 46, 1);
+
+        assert_eq!(expected, actual);
     }
 
     #[test]
@@ -349,24 +325,15 @@ mod test {
             35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 0, 0, 0, 1, // frame check sequence
         ];
 
-        assert_eq!(
-            Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 48, 1),
-            Ethernet3Packet::try_from(raw).unwrap()
-        );
+        let actual = Ethernet3Packet::try_from(raw).unwrap();
+        let expected = Ethernet3Packet::new([0, 1, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0], 48, 1);
+
+        assert_eq!(expected, actual);
     }
 
     #[test]
     fn ethernet_from_raw_too_small() {
-        let raw: &[u8] = &[
-            0, 1, 2, 3, 4, // destination MAC (too small)
-            5, 4, 3, 2, 1, 0, // source MAC
-            0, 0, // length
-            0, 0, 0, 0, 0, 0, 0, 0, // payload data
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 1, // frame check sequence
-        ];
-
-        if let Ok(n) = Ethernet3Packet::try_from(raw) {
+        if let Ok(n) = Ethernet3Packet::try_from(&SAMPLE_IEE_802_3_DATA[1..]) {
             panic!("too few bytes were provided, try_from should have failed");
         }
     }

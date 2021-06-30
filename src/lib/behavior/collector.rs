@@ -66,7 +66,7 @@ impl<'a> BehaviorCollector<'a> {
         let mut report = BehaviorReport::new();
 
         for (behavior, packets) in self.behavior_map {
-            let evaluation = behavior.evaluate(packets);
+            let evaluation = behavior.evaluate(packets.as_slice());
 
             report.add(evaluation);
         }

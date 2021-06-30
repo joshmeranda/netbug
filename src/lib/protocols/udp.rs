@@ -5,15 +5,15 @@ use crate::error::NbugError;
 use crate::protocols::{ProtocolNumber, ProtocolPacket, DST_PORT_KEY, SRC_PORT_KEY};
 
 /// The UDP Packet a s specified in [RFC 768](https://tools.ietf.org/html/rfc768).
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct UdpPacket {
     pub source_port: u16,
 
     pub destination_port: u16,
 
-    length: u16,
+    pub length: u16,
 
-    checksum: u16,
+    pub checksum: u16,
 }
 
 impl UdpPacket {
@@ -58,21 +58,20 @@ impl TryFrom<&[u8]> for UdpPacket {
 
 #[cfg(test)]
 mod test {
-    use crate::protocols::udp::UdpPacket;
     use std::convert::TryFrom;
 
-    const SAMPLE_UDP_DATA: &[u8] = &[
-        0xe9, 0x5d, 0x1f, 0x91, 0x00, 0xab, 0xfe, 0xbe,
-    ];
+    use crate::protocols::udp::UdpPacket;
+
+    const SAMPLE_UDP_DATA: &[u8] = &[0xe9, 0x5d, 0x1f, 0x91, 0x00, 0xab, 0xfe, 0xbe];
 
     #[test]
     fn test_udp_ok() {
         let actual = UdpPacket::try_from(SAMPLE_UDP_DATA).unwrap();
         let expected = UdpPacket {
-            source_port: 0xe9_5d,
+            source_port:      0xe9_5d,
             destination_port: 0x1f_91,
-            length: 0x00_ab,
-            checksum: 0xfe_be,
+            length:           0x00_ab,
+            checksum:         0xfe_be,
         };
 
         assert_eq!(expected, actual);

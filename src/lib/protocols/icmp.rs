@@ -26,7 +26,7 @@ pub static MIN_ICMP_HEADER_LEN: usize = 8;
 /// let icmp4 = IcmpPacket::V4(Icmpv4Packet::try_from(data4).unwrap());
 /// let icmp6 = IcmpPacket::V6(Icmpv6Packet::try_from(data6).unwrap());
 /// ```
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IcmpPacket {
     V4(Icmpv4Packet),
     V6(Icmpv6Packet),
@@ -34,13 +34,13 @@ pub enum IcmpPacket {
 
 /// Simple wrapper around an icmp echo and reply packet as defined in [RFC 4443 4.1](https://tools.ietf.org/html/rfc4443#section-4.1)
 /// and similarly in [RFC 794 pg 14](https://tools.ietf.org/html/rfc792#page-14)
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct IcmpCommon {
-    kind:       u8,
-    code:       u8,
-    checksum:   u16,
-    identifier: u16,
-    sequence:   u16,
+    pub kind:       u8,
+    pub code:       u8,
+    pub checksum:   u16,
+    pub identifier: u16,
+    pub sequence:   u16,
 }
 
 impl TryFrom<&[u8]> for IcmpCommon {
@@ -93,7 +93,7 @@ pub mod icmpv4 {
     use crate::protocols::ProtocolNumber;
 
     /// Maps variants to icmp message types as defined in [RFC 792 Summary of Message Types](https://tools.ietf.org/html/rfc792#page-20)
-    #[derive(Debug, FromPrimitive, PartialEq)]
+    #[derive(Clone, Debug, FromPrimitive, PartialEq)]
     pub enum Icmpv4MessageKind {
         EchoReply          = 0,
         DestinationUnreachable = 3,
@@ -108,12 +108,12 @@ pub mod icmpv4 {
         InformationReply   = 16,
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     pub struct IcmpTimestamp {
-        common:             IcmpCommon,
-        original_timestamp: u32,
-        receive_timestamp:  u32,
-        transmit_timestamp: u32,
+        pub common:             IcmpCommon,
+        pub original_timestamp: u32,
+        pub receive_timestamp:  u32,
+        pub transmit_timestamp: u32,
     }
 
     impl TryFrom<&[u8]> for IcmpTimestamp {
@@ -150,10 +150,10 @@ pub mod icmpv4 {
         }
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     pub struct IcmpErrorPacket {
-        checksum:        u16,
-        internet_header: Ipv4Packet,
+        pub checksum:        u16,
+        pub internet_header: Ipv4Packet,
     }
 
     impl TryFrom<&[u8]> for IcmpErrorPacket {
@@ -174,7 +174,7 @@ pub mod icmpv4 {
     }
 
     /// Defines the variants of icmp v4 packets as defined in [RFC 792](https://tools.ietf.org/html/rfc792)
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     pub enum Icmpv4Packet {
         /// Described in [RFC 792 Pg 14](https://tools.ietf.org/html/rfc792#page-14)
         EchoReply(IcmpCommon),
@@ -289,7 +289,7 @@ pub mod icmpv6 {
     use crate::protocols::ProtocolNumber;
 
     /// Map variants to icmp v6 message types as defined in [RFC 4443 2.1](https://tools.ietf.org/html/rfc4443#section-2.1).
-    #[derive(Debug, FromPrimitive, PartialEq)]
+    #[derive(Clone, Debug, FromPrimitive, PartialEq)]
     pub enum Icmpv6MessageKind {
         DestinationUnreachable = 1,
         PacketTooBig     = 2,
@@ -307,7 +307,7 @@ pub mod icmpv6 {
     }
 
     /// As defined in [RFC 4443 Section 3.1](https://tools.ietf.org/html/rfc4443#section-3.1)
-    #[derive(Debug, FromPrimitive, PartialEq)]
+    #[derive(Clone, Debug, FromPrimitive, PartialEq)]
     pub enum DestinationUnreachableCode {
         NoRoute             = 0,
         Prohibited          = 1,
@@ -319,14 +319,14 @@ pub mod icmpv6 {
     }
 
     /// As defined in [RFC 443 Section 3.3](https://tools.ietf.org/html/rfc4443#section-3.3)
-    #[derive(Debug, FromPrimitive, PartialEq)]
+    #[derive(Clone, Debug, FromPrimitive, PartialEq)]
     pub enum TimeExceededCode {
         HopLimitExceeded = 0,
         FragmentReassemblyExceeded = 1,
     }
 
     /// As defined in [RFC 443 Section 3.4](https://tools.ietf.org/html/rfc4443#section-3.4)
-    #[derive(Debug, FromPrimitive, PartialEq)]
+    #[derive(Clone, Debug, FromPrimitive, PartialEq)]
     pub enum ParameterProblemCode {
         ErroneousHeader    = 0,
         UnrecognizedNextHeader = 1,
@@ -337,7 +337,7 @@ pub mod icmpv6 {
     ///
     /// todo: figure out the invoking packet
     /// todo: support more message types
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     pub enum Icmpv6Packet {
         EchoRequest(IcmpCommon),
 

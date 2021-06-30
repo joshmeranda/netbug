@@ -4,7 +4,7 @@ use crate::error::{NbugError, Result};
 use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 /// An ethernet packet, conforming to either IEE 802.2 or 802.3.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum IeeEthernetPacket {
     Ieee8022(Ethernet2Packet),
     Ieee8023(Ethernet3Packet),
@@ -57,7 +57,7 @@ impl PartialEq<Ethernet3Packet> for IeeEthernetPacket {
 }
 
 /// The ethernet packet for IEE 802.2true.
-#[derive(Copy, Clone, Debug, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct Ethernet2Packet {
     pub destination: [u8; 6],
 
@@ -128,7 +128,7 @@ impl PartialEq<Ethernet2Packet> for Ethernet2Packet {
 }
 
 /// The ethernet packet for IEE 802.3
-#[derive(Copy, Clone, Debug, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct Ethernet3Packet {
     pub destination: [u8; 6],
 

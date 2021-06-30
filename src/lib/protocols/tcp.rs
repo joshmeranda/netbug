@@ -12,8 +12,8 @@ static SEQUENCE_NUMBER: &str = "SEQUENCE_NUMBER";
 
 static ACKNOWLEDGEMENT_NUMBER: &str = "ACKNOWLEDGEMENT_NUMBER";
 
-#[derive(Debug, FromPrimitive, PartialEq)]
-enum TcpOptionKind {
+#[derive(Clone, Debug, FromPrimitive, PartialEq)]
+pub enum TcpOptionKind {
     End            = 0,
     NoOp           = 1,
     MaxSegmentSize = 2,
@@ -22,8 +22,8 @@ enum TcpOptionKind {
     Timestamp      = 8,
 }
 
-#[derive(Debug, PartialEq)]
-struct TcpOption {
+#[derive(Clone, Debug, PartialEq)]
+pub struct TcpOption {
     kind:       TcpOptionKind,
     pub length: Option<u8>,
 }
@@ -57,7 +57,7 @@ impl TryFrom<&[u8]> for TcpOption {
     }
 }
 
-#[derive(Eq, Debug, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TcpControlBits {
     Urg = 0b00_100000,
     Ack = 0b00_010000,
@@ -122,27 +122,27 @@ impl TcpControlBits {
 }
 
 /// The TCP Packet as specified in [RFC 793 3.1](https://tools.ietf.org/html/rfc793#section-3.1).
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TcpPacket {
     pub source_port: u16,
 
     pub destination_port: u16,
 
-    sequence_number: u32,
+    pub sequence_number: u32,
 
-    acknowledgement_number: u32,
+    pub acknowledgement_number: u32,
 
-    offset: u8,
+    pub offset: u8,
 
     pub control_bits: u8,
 
-    window: u16,
+    pub window: u16,
 
-    checksum: u16,
+    pub checksum: u16,
 
-    urgent_pointer: u16,
+    pub urgent_pointer: u16,
 
-    options: Option<Vec<TcpOption>>,
+    pub options: Option<Vec<TcpOption>>,
 }
 
 impl TcpPacket {
@@ -205,7 +205,7 @@ impl TryFrom<&[u8]> for TcpPacket {
 
                 option_start += match option.length {
                     Some(n) => n as usize,
-                    None => 1
+                    None => 1,
                 };
 
                 options.push(option);
@@ -233,7 +233,7 @@ impl TryFrom<&[u8]> for TcpPacket {
 mod test {
     use std::convert::TryFrom;
 
-    use crate::protocols::tcp::{TcpPacket, TcpOption, TcpOptionKind};
+    use crate::protocols::tcp::{TcpOption, TcpOptionKind, TcpPacket};
 
     const SAMPLE_TCP_SYN_DATA: &[u8] = &[
         0xcc, 0xfe, // source port
@@ -250,16 +250,16 @@ mod test {
     fn test_tcp_basic_ok() {
         let actual = TcpPacket::try_from(SAMPLE_TCP_SYN_DATA).unwrap();
         let expected = TcpPacket {
-            source_port: 0xcc_fe,
-            destination_port: 0x1f_92,
-            sequence_number: 0x0a_04_08_62,
+            source_port:            0xcc_fe,
+            destination_port:       0x1f_92,
+            sequence_number:        0x0a_04_08_62,
             acknowledgement_number: 0x00_00_00_00,
-            offset: 20,
-            control_bits: 0x002,
-            window: 0xff_d7,
-            checksum: 0xfe_30,
-            urgent_pointer: 0x_00,
-            options: None,
+            offset:                 20,
+            control_bits:           0x002,
+            window:                 0xff_d7,
+            checksum:               0xfe_30,
+            urgent_pointer:         0x_00,
+            options:                None,
         };
 
         assert_eq!(expected, actual);
@@ -276,43 +276,42 @@ mod test {
             0xff, 0xd7, // window
             0xfe, 0x30, // checksum
             0x00, 0x00, // urgent pointer
-
             // options
-            0x02, 0x04, 0xff, 0xd7, 0x04, 0x02, 0x08, 0x0a, 0x27, 0xb8,
-            0xac, 0x99, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x03, 0x0
+            0x02, 0x04, 0xff, 0xd7, 0x04, 0x02, 0x08, 0x0a, 0x27, 0xb8, 0xac, 0x99, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03,
+            0x03, 0x0,
         ];
 
         let actual = TcpPacket::try_from(raw).unwrap();
         let expected = TcpPacket {
-            source_port: 0xcc_fe,
-            destination_port: 0x1f_92,
-            sequence_number: 0x0a_04_08_62,
+            source_port:            0xcc_fe,
+            destination_port:       0x1f_92,
+            sequence_number:        0x0a_04_08_62,
             acknowledgement_number: 0x00_00_00_00,
-            offset: 40,
-            control_bits: 0x002,
-            window: 0xff_d7,
-            checksum: 0xfe_30,
-            urgent_pointer: 0x_00,
-            options: Some(vec![
+            offset:                 40,
+            control_bits:           0x002,
+            window:                 0xff_d7,
+            checksum:               0xfe_30,
+            urgent_pointer:         0x_00,
+            options:                Some(vec![
                 TcpOption {
-                    kind: TcpOptionKind::MaxSegmentSize,
-                    length: Some(4)
+                    kind:   TcpOptionKind::MaxSegmentSize,
+                    length: Some(4),
                 },
                 TcpOption {
-                    kind: TcpOptionKind::SelectiveAck,
-                    length: Some(2)
+                    kind:   TcpOptionKind::SelectiveAck,
+                    length: Some(2),
                 },
                 TcpOption {
-                    kind: TcpOptionKind::Timestamp,
-                    length: Some(10)
+                    kind:   TcpOptionKind::Timestamp,
+                    length: Some(10),
                 },
                 TcpOption {
-                    kind: TcpOptionKind::NoOp,
-                    length: None
+                    kind:   TcpOptionKind::NoOp,
+                    length: None,
                 },
                 TcpOption {
-                    kind: TcpOptionKind::WindowScale,
-                    length: Some(3)
+                    kind:   TcpOptionKind::WindowScale,
+                    length: Some(3),
                 },
             ]),
         };

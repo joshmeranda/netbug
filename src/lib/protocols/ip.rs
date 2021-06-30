@@ -7,7 +7,7 @@ use num_traits::FromPrimitive;
 use crate::error::NbugError;
 use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IpPacket {
     V4(Ipv4Packet),
     V6(Ipv6Packet),
@@ -63,8 +63,8 @@ impl TryFrom<&[u8]> for IpPacket {
     }
 }
 
-#[derive(Debug, FromPrimitive, PartialEq)]
-enum ServiceType {
+#[derive(Clone, Debug, FromPrimitive, PartialEq)]
+pub enum ServiceType {
     Routine             = 0b000,
     Priority            = 0b001,
     Immediate           = 0b010,
@@ -76,31 +76,31 @@ enum ServiceType {
 }
 
 /// The IPv4 Packet header as specified in [RFC 791](https://tools.ietf.org/html/rfc791#section-3.1).
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Ipv4Packet {
-    header_length: u16,
+    pub header_length: u16,
 
-    service_type: ServiceType,
+    pub service_type: ServiceType,
 
-    low_delay: bool,
+    pub low_delay: bool,
 
-    high_throughput: bool,
+    pub high_throughput: bool,
 
-    high_reliability: bool,
+    pub high_reliability: bool,
 
-    total_length: u16,
+    pub total_length: u16,
 
-    identification: u16,
+    pub identification: u16,
 
-    flags: u8,
+    pub flags: u8,
 
-    offset: u16,
+    pub offset: u16,
 
-    ttl: u8,
+    pub ttl: u8,
 
     pub protocol: ProtocolNumber,
 
-    checksum: u16,
+    pub checksum: u16,
 
     pub source: Ipv4Addr,
 
@@ -199,17 +199,17 @@ impl TryFrom<&[u8]> for Ipv4Packet {
 
 /// Ipv6 Packet Header as specified in [RFC 8200](https://tools.ietf.org/html/rfc8200#section-3).
 /// todo: support for extension headers
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Ipv6Packet {
-    traffic_class: u8,
+    pub traffic_class: u8,
 
-    flow_label: u32,
+    pub flow_label: u32,
 
-    payload_length: u16,
+    pub payload_length: u16,
 
     pub next_header: ProtocolNumber,
 
-    hop_limit: u8,
+    pub hop_limit: u8,
 
     pub source: Ipv6Addr,
 

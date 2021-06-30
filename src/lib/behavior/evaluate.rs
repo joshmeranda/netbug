@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::Addr;
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Eq, Hash, Serialize, PartialEq)]
 pub enum PacketStatus {
     Ok, // the packet was received or not received as expected
     Received,
@@ -23,7 +23,7 @@ impl ToString for PacketStatus {
 
 /// A simple evaluation of single behavior, including a breakdown of any
 /// specific steps required by the behavior.
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct BehaviorEvaluation<'a> {
     src: Addr,
 
@@ -118,5 +118,68 @@ impl<'a> Iterator for ReportIterator<'a> {
         }
 
         eval
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+    use std::net::IpAddr;
+    use std::str::FromStr;
+
+    use crate::behavior::evaluate::{BehaviorEvaluation, PacketStatus};
+    use crate::Addr;
+
+    fn get_simple_eval() -> BehaviorEvaluation<'static> {
+        BehaviorEvaluation::new(
+            Addr::from_str("127.0.0.1").unwrap(),
+            Addr::from_str("127.0.0.1").unwrap(),
+        )
+    }
+
+    #[test]
+    fn test_passed_empty() {
+        let eval = get_simple_eval();
+
+        assert!(eval.passed());
+    }
+
+    #[test]
+    fn test_passed_simple() {
+        let mut eval = get_simple_eval();
+
+        eval.insert_status("PASSED", PacketStatus::Ok);
+        eval.insert_status("ALSO_PASSED", PacketStatus::Ok);
+
+        assert!(eval.passed());
+    }
+
+    #[test]
+    fn test_failing_not_received() {
+        let mut eval = get_simple_eval();
+
+        eval.insert_status("NOT_RECEIVED", PacketStatus::NotReceived);
+
+        assert!(!eval.passed());
+    }
+
+    #[test]
+    fn test_failing_received() {
+        let mut eval = get_simple_eval();
+
+        eval.insert_status("RECEIVED", PacketStatus::Received);
+
+        assert!(!eval.passed());
+    }
+
+    #[test]
+    fn test_mixed() {
+        let mut eval = get_simple_eval();
+
+        eval.insert_status("RECEIVED", PacketStatus::Received);
+        eval.insert_status("NOT_RECEIVED", PacketStatus::NotReceived);
+        eval.insert_status("RECEIVED", PacketStatus::Received);
+
+        assert!(!eval.passed());
     }
 }

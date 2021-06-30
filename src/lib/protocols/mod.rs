@@ -180,6 +180,7 @@ pub enum ProtocolNumber {
     Reserved         = 255,
 }
 
+#[derive(Clone)]
 pub enum ProtocolHeader {
     Icmpv4(Icmpv4Packet),
     Icmpv6(Icmpv6Packet),
@@ -201,6 +202,7 @@ impl ProtocolHeader {
     }
 }
 
+#[derive(Clone)]
 pub struct ProtocolPacket {
     pub ether: IeeEthernetPacket,
 

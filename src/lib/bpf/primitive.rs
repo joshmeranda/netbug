@@ -313,6 +313,8 @@ pub enum Qualifier {
 
     ProtoChain,
 
+    Ip6,
+
     Multicast,
     Broadcast,
 
@@ -449,6 +451,7 @@ impl AsRef<str> for Qualifier {
             Qualifier::ProtoAbbr(abbr) => abbr.as_ref(),
             Qualifier::PortRange => "portrange",
             Qualifier::ProtoChain => "protochain",
+            Qualifier::Ip6 => "ip6",
             Qualifier::Multicast => "multicast",
             Qualifier::Broadcast => "broadcast",
             Qualifier::EtherAbbr(abbr) => abbr.as_ref(),
@@ -556,6 +559,7 @@ pub enum ProtoAbbr {
     Tcp,
     Udp,
     Icmp,
+    Icmp6,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -582,6 +586,7 @@ impl AsRef<str> for ProtoAbbr {
             ProtoAbbr::Tcp => "tcp",
             ProtoAbbr::Udp => "udp",
             ProtoAbbr::Icmp => "icmp",
+            ProtoAbbr::Icmp6 => "icmp6",
         }
     }
 }
@@ -804,6 +809,7 @@ pub enum Primitive {
     Tcp,
     Udp,
     Icmp,
+    Icmp6,
 
     IpProtoChain(NetProtocol),
     Ip6ProtoChain(NetProtocol),
@@ -1060,7 +1066,8 @@ impl Into<TokenStream> for Primitive {
                 Token::Id(Identifier::Protocol(Protocol::Primitive(proto))),
             ],
             Primitive::Ip6Proto(proto) => vec![
-                Token::Qualifier(Qualifier::Proto(QualifierProtocol::Ip6)),
+                Token::Qualifier(Qualifier::Ip6),
+                Token::Qualifier(Qualifier::ProtoRaw),
                 Token::Id(Identifier::Protocol(Protocol::Primitive(proto))),
             ],
             Primitive::Proto(proto) => match proto {
@@ -1077,6 +1084,7 @@ impl Into<TokenStream> for Primitive {
             Primitive::Tcp => vec![Token::Qualifier(Qualifier::ProtoAbbr(ProtoAbbr::Tcp))],
             Primitive::Udp => vec![Token::Qualifier(Qualifier::ProtoAbbr(ProtoAbbr::Udp))],
             Primitive::Icmp => vec![Token::Qualifier(Qualifier::ProtoAbbr(ProtoAbbr::Icmp))],
+            Primitive::Icmp6 => vec![Token::Qualifier(Qualifier::ProtoAbbr(ProtoAbbr::Icmp6))],
             Primitive::IpProtoChain(proto) => vec![
                 Token::Qualifier(Qualifier::Proto(QualifierProtocol::Ip6)),
                 Token::Qualifier(Qualifier::ProtoChain),

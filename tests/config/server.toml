@@ -1,0 +1,26 @@
+pcap_dir = "tests/out/recv_pcap"
+
+report_dir = "tests/out/reports"
+
+srv_addr = "0.0.0.0:8081"
+
+[[behaviors]]
+src = "127.0.0.1"
+dst = "127.0.0.1"
+protocol = "icmp"
+
+[[behaviors]]
+src = "::1"
+dst = "::1"
+protocol = "icmp"
+command = ["/usr/bin/ping", "-c", "1", "::1"]
+
+[[behaviors]]
+src = "127.0.0.1"
+dst = "127.0.0.1:8003"
+protocol = "tcp"
+
+[[behaviors]]
+src = "127.0.0.1"
+dst = "127.0.0.1:8004"
+protocol = "udp"

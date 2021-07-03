@@ -27,13 +27,7 @@ fn run(cfg: ServerConfig) {
         },
     };
 
-    let mut receiver = match Receiver::new(listener, cfg.pcap_dir.clone()) {
-        Ok(receiver) => receiver,
-        Err(err) => {
-            eprintln!("Error creating pcap receiver: {}", err.to_string());
-            return;
-        },
-    };
+    let mut receiver = Receiver::new(listener, cfg.pcap_dir.clone());
 
     let processor = PcapProcessor::new(&cfg.behaviors, cfg.pcap_dir.to_path_buf());
 

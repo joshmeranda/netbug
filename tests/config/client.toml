@@ -1,0 +1,24 @@
+pcap_dir = "tests/out/pcap"
+
+interfaces = [ "lo" ]
+
+srv_addr = "127.0.0.1:8081"
+
+#filter = ""
+
+[[behaviors]]
+dst = "127.0.0.1"
+protocol = "icmp"
+
+[[behaviors]]
+dst = "::1"
+protocol = "ipv6icmp"
+command = ["/usr/bin/ping", "-c", "1", "::1"]
+
+[[behaviors]]
+dst = "127.0.0.1:8003"
+protocol = "tcp"
+
+[[behaviors]]
+dst = "127.0.0.1:8004"
+protocol = "udp"

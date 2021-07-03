@@ -50,8 +50,6 @@ impl TryFrom<&[u8]> for IpPacket {
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         let version = data[0] >> 4;
 
-        println!("=== Version: {}", version);
-
         match version {
             4 => Ok(IpPacket::V4(Ipv4Packet::try_from(data)?)),
             6 => Ok(IpPacket::V6(Ipv6Packet::try_from(data)?)),

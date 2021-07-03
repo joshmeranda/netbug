@@ -46,7 +46,7 @@ impl TryFrom<&[u8]> for TcpOption {
             _ =>
                 if value.len() == 1 {
                     return Err(NbugError::Packet(
-                        "Too few bytes given for tcp option, expected a length".to_owned(),
+                        "Too few bytes given for tcp option, expected a length".to_string(),
                     ));
                 } else {
                     Some(value[1])

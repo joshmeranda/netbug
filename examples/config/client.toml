@@ -16,12 +16,21 @@ interval = "1s"
 # originating from this machine. Most protocols will have default behavior
 # (tcp, udp, icmp); however, you may also define a specific command to run to
 # mock sample network traffic. To do this specify the command with each
-# argument as discrete elemnts of an array.
+# argument as discrete elemnts of an array. A source addess is not required,
+# and will be ignored if secified.
 [[behaviors]]
 dst = "127.0.0.1"
 protocol = "icmp"
 
 [[behaviors]]
-dst = "8.8.8.8"
+dst = "::1"
 protocol = "icmp"
-command = ["/usr/bin/ping", "-c", "1", "8.8.8.8"]
+command = ["/usr/bin/ping", "-c", "1", "::1"]
+
+[[behaviors]]
+dst = "127.0.0.1"
+protocol = "udp"
+
+[[behaviors]]
+dst = "127.0.0.1"
+protocol = "tcp"

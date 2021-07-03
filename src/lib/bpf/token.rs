@@ -113,24 +113,24 @@ pub enum Token {
 impl Token {
     pub fn repr(&self, options: &FilterOptions) -> String {
         match self {
-            Token::OpenParentheses => "(".to_owned(),
-            Token::CloseParentheses => ")".to_owned(),
-            Token::OpenBracket => "[".to_owned(),
-            Token::CloseBracket => "]".to_owned(),
-            Token::Colon => ":".to_owned(),
+            Token::OpenParentheses => "(".to_string(),
+            Token::CloseParentheses => ")".to_string(),
+            Token::OpenBracket => "[".to_string(),
+            Token::CloseBracket => "]".to_string(),
+            Token::Colon => ":".to_string(),
             Token::And => match options.symbol_operators {
-                true => "&&".to_owned(),
-                false => "and".to_owned(),
+                true => "&&".to_string(),
+                false => "and".to_string(),
             },
             Token::Or => match options.symbol_operators {
-                true => "||".to_owned(),
-                false => "or".to_owned(),
+                true => "||".to_string(),
+                false => "or".to_string(),
             },
             Token::Not => match options.symbol_operators {
-                true => "!".to_owned(),
-                false => "not".to_owned(),
+                true => "!".to_string(),
+                false => "not".to_string(),
             },
-            Token::Escape => "\\".to_owned(),
+            Token::Escape => "\\".to_string(),
             Token::Id(id) => id.to_string(),
             Token::Integer(n) => n.to_string(),
             Token::Operator(op) => op.as_ref().to_owned(),

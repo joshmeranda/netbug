@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::thread::{Builder, JoinHandle};
+use std::time::Duration;
 
 use pcap::{Capture, Device};
 
@@ -34,6 +35,8 @@ pub struct Client {
     behaviors: Vec<Behavior>,
 
     filter: FilterExpression,
+
+    delay: u8,
 }
 
 impl Default for Client {
@@ -46,6 +49,7 @@ impl Default for Client {
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behaviors:        vec![],
             filter:           FilterExpression::empty(),
+            delay:            1,
         }
     }
 }
@@ -74,6 +78,7 @@ impl Client {
             devices,
             filter,
             capturing: Arc::new(AtomicBool::new(false)),
+            delay: cfg.delay,
         }
     }
 
@@ -116,7 +121,7 @@ impl Client {
 
     fn run_behavior(behavior: &Behavior) {
         if let Err(err) = behavior.run() {
-            eprintln!("Error running behavior: {}", err.to_string());
+            eprintln!("Error running behavior: {}, {:?}", err.to_string(), behavior);
         }
     }
 
@@ -176,12 +181,19 @@ impl Client {
         Ok(())
     }
 
-    /// Signal the client to stop capturing network packets. Note that this
-    /// simply signals the capturing thread loops to discontinue iteration
-    /// rather than immediately stopping them. Therefore, it is possible for
-    /// extra packets to be captured and written to the resulting pcap
-    /// between the time this funciotn is called and the signal is received.
+    /// Signal the client to stop capturing network packets, after the
+    /// configured delay period. Note that this simply signals the capturing
+    /// thread loops to discontinue iteration rather than immediately
+    /// stopping them. Therefore, it is possible for extra packets to be
+    /// captured and written to the resulting pcap between the time this
+    /// function is called and the signal is received.
     pub fn stop_capture(&mut self) -> Result<()> {
+        std::thread::sleep(Duration::from_secs(self.delay as u64));
+
+        self.stop_capture_now()
+    }
+
+    fn stop_capture_now(&mut self) -> Result<()> {
         if !self.is_capturing() {
             return Err(NbugError::Client(String::from("no capture is running")));
         }
@@ -223,12 +235,6 @@ impl Client {
 
         // fill the header bytes with the relevant behavior
         stream.write(&[MESSAGE_VERSION, interface_name.len() as u8]);
-
-        println!(
-            "\n=== Sending pcap for device: ({}) '{}'",
-            stream.buffer()[1],
-            interface_name
-        );
 
         let data_len_bytes: [u8; 8] = data_len.to_be_bytes();
         stream.write(&data_len_bytes);

@@ -10,12 +10,12 @@ use netbug::bpf::filter::FilterExpression;
 use netbug::client::Client;
 use netbug::config::client::ClientConfig;
 
-fn run_scheduled(mut client: Client, delay: u8, interval: Interval) {
-    run_once(&mut client, delay);
+fn run_scheduled(mut client: Client, interval: Interval) {
+    run_once(&mut client);
 
     let mut scheduler = Scheduler::new();
 
-    scheduler.every(interval).run(move || run_once(&mut client, delay));
+    scheduler.every(interval).run(move || run_once(&mut client));
 
     let handle = scheduler.watch_thread(Duration::from_secs(1));
 
@@ -25,7 +25,7 @@ fn run_scheduled(mut client: Client, delay: u8, interval: Interval) {
     handle.stop();
 }
 
-fn run_once(client: &mut Client, delay: u8) {
+fn run_once(client: &mut Client) {
     if let Err(err) = client.start_capture() {
         eprintln!("{}", err.to_string());
         return;
@@ -41,9 +41,6 @@ fn run_once(client: &mut Client, delay: u8) {
         eprintln!("{}", err.to_string());
         return;
     }
-
-    // small delay to ensure all relevant packets are dumped
-    std::thread::sleep(std::time::Duration::from_secs(delay as u64));
 
     if let Err(err) = client.stop_capture() {
         eprintln!("Could not stop packet capture: {}", err.to_string());
@@ -79,8 +76,8 @@ fn main() {
     let mut client: Client = Client::from_config(client_cfg);
 
     if matches.is_present("scheduled") {
-        run_scheduled(client, delay, interval.0);
+        run_scheduled(client, interval.0);
     } else {
-        run_once(&mut client, delay);
+        run_once(&mut client);
     }
 }

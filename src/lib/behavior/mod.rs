@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::net::{Shutdown, TcpStream, UdpSocket};
+use std::net::{Shutdown, TcpStream, UdpSocket, SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::process::Command;
 use std::time::Duration;
 
@@ -24,6 +24,7 @@ use evaluate::PacketStatus;
 use crate::bpf::filter::{FilterBuilder, FilterExpression, FilterOptions};
 use crate::bpf::primitive::{self, EtherProtocol, Host, NetProtocol, Primitive, QualifierDirection};
 use crate::protocols::udp::UdpPacket;
+use std::io::Write;
 
 /// Simple macro to extract values from an enum struct variant. If only one
 /// value is requested only that value is returned, if multiple are requested,
@@ -76,9 +77,9 @@ macro_rules! variant_extract {
 /// For a Tcp connection's 3-way-handshake:
 ///  - In: Will always fail because no Ack will be received without the initial
 ///    Syn
-///  - Out: Will fail if the client receives and Ack for its Syn
-///  - Both: Will fail if one part of the handshake is not received
-#[derive(Deserialize, PartialEq, Eq, Hash)]
+///  - Out: Will fail if the client receives an Ack for its Syn
+///  - Both: Will fail if any part of the handshake is not received
+#[derive(Debug, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 enum Direction {
     In,
@@ -92,7 +93,7 @@ impl Default for Direction {
 
 /// A basic behavior to emulate the type of traffic
 /// todo: provide an optional description
-#[derive(Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Hash)]
 pub struct Behavior {
     #[serde(default = "defaults::client::default_addr")]
     src: Addr,
@@ -126,6 +127,9 @@ impl<'a> Behavior {
 
     const UDP_INGRESS: &'a str = "UdpIngress";
     const UDP_EGRESS: &'a str = "UdpEgress";
+
+    /// Simple test message borrowed from the the book "Fellowship of of the Rings" by JRR Tolkien.
+    const TEST_MESSAGE: &'a [u8] = "It's a dangerous business, Frodo, going out your door. You step onto the road, and if you don't keep your feet, there's no knowing where you might be swept off to.".as_bytes();
 
     /// Execute the behavior.
     /// todo: redirect stdout for commands
@@ -162,7 +166,10 @@ impl<'a> Behavior {
                     _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
                 };
 
-                let sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
+                let mut sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
+                let buffer = Behavior::TEST_MESSAGE;
+
+                sock.write(buffer);
 
                 sock.shutdown(Shutdown::Both)?;
             },
@@ -173,9 +180,14 @@ impl<'a> Behavior {
                     _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
                 };
 
-                let socket = UdpSocket::bind(&addr).unwrap();
+                let local_socket = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0));
 
-                socket.send(&[])?;
+                let socket = match UdpSocket::bind(local_socket) {
+                    Ok(sock) => sock,
+                    Err(err) => return Err(NbugError::Client(String::from(format!("Error binding to socket at '{}': {}", addr.to_string(), err.to_string()))))
+                };
+
+                socket.send_to(Behavior::TEST_MESSAGE, addr)?;
             },
 
             _ =>
@@ -315,8 +327,6 @@ impl<'a> Behavior {
             let tcp = variant_extract!(&packet.header, ProtocolHeader::Tcp(tcp), tcp);
             let control_bits = TcpControlBits::find_control_bits(tcp.control_bits);
 
-            println!("=== {} -> {:?} ===", tcp.control_bits, control_bits);
-
             if TcpControlBits::is_syn(&control_bits) {
                 has_syn = true;
             } else if TcpControlBits::is_syn_ack(&control_bits) {
@@ -327,8 +337,6 @@ impl<'a> Behavior {
                 has_fin = true;
             }
         }
-
-        println!("=== {} {} {} {} ==", has_syn, has_syn_ack, has_ack, has_fin);
 
         let mut eval = BehaviorEvaluation::new(self.src, self.dst);
 
@@ -372,7 +380,8 @@ impl<'a> Behavior {
                 );
             },
             Direction::In => {
-                // you should see incoming Syn packets and the responding SynAck, but no other packets should be receivedd.
+                // you should see incoming Syn packets and the responding SynAck, but no other
+                // packets should be receivedd.
                 eval.insert_status(
                     Self::TCP_SYN,
                     if has_syn {
@@ -405,7 +414,7 @@ impl<'a> Behavior {
                         PacketStatus::Ok
                     },
                 );
-            }
+            },
             Direction::Both => {
                 // the initial syn would still be recorded on the network if not allowed out of
                 // the network
@@ -462,8 +471,6 @@ impl<'a> Behavior {
         } else {
             0u16 // todo: consider failing or a better default source port
         };
-
-        println!("=== {} -> {} ===", behavior_src, behavior_dst);
 
         for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Udp) {
             let header = &packet.header;
@@ -577,7 +584,7 @@ impl<'a> Behavior {
             ProtocolNumber::Ipv6 => Primitive::Ip6,
             ProtocolNumber::Esp => Primitive::Proto(NetProtocol::Esp),
             ProtocolNumber::Ah => Primitive::Proto(NetProtocol::Ah),
-            ProtocolNumber::Ipv6Icmp => Primitive::Ip6Proto(NetProtocol::Icmp),
+            ProtocolNumber::Ipv6Icmp => Primitive::Icmp6,
             ProtocolNumber::IsoIp => Primitive::Iso,
             ProtocolNumber::EtherIp => Primitive::EtherProto(EtherProtocol::Ip),
             ProtocolNumber::Pim => Primitive::Proto(NetProtocol::Pim),
@@ -613,7 +620,37 @@ impl<'a> Behavior {
 }
 
 #[cfg(test)]
-mod test {
+mod test_bpf {
+    use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+
+    use crate::behavior::{Behavior, Direction};
+    use crate::bpf::filter::FilterOptions;
+    use crate::protocols::ProtocolNumber;
+    use crate::Addr;
+
+    #[test]
+    fn test_tcp_bpf() {
+        let behavior = Behavior {
+            src:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
+            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(8, 8, 8, 8), 80))),
+            protocol:  ProtocolNumber::Tcp,
+            direction: Direction::Both,
+            timeout:   None,
+            command:   None,
+        };
+
+        let options = FilterOptions::new();
+        let expr = behavior.as_filter(&options).unwrap().build();
+
+        assert_eq!(
+            expr.to_string(),
+            "tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port 80))"
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_evaluate {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
     use std::str::FromStr;
 
@@ -637,62 +674,62 @@ mod test {
 
     fn get_icmp_echo_request() -> ProtocolPacket {
         ProtocolPacket {
-            ether: IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip: IpPacket::V4(Ipv4Packet {
-                header_length: 0,
-                service_type: ServiceType::Routine,
-                low_delay: false,
-                high_throughput: false,
+            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+            ip:          IpPacket::V4(Ipv4Packet {
+                header_length:    0,
+                service_type:     ServiceType::Routine,
+                low_delay:        false,
+                high_throughput:  false,
                 high_reliability: false,
-                total_length: 0,
-                identification: 0,
-                flags: 0,
-                offset: 0,
-                ttl: 0,
-                protocol: ProtocolNumber::Icmp,
-                checksum: 0,
-                source: Ipv4Addr::new(127, 0, 0, 1),
-                destination: Ipv4Addr::new(127, 0, 0, 1),
+                total_length:     0,
+                identification:   0,
+                flags:            0,
+                offset:           0,
+                ttl:              0,
+                protocol:         ProtocolNumber::Icmp,
+                checksum:         0,
+                source:           Ipv4Addr::new(127, 0, 0, 1),
+                destination:      Ipv4Addr::new(127, 0, 0, 1),
             }),
-            header: ProtocolHeader::Icmpv4(Icmpv4Packet::EchoRequest(IcmpCommon {
-                kind: 8,
-                code: 0,
-                checksum: 0,
+            header:      ProtocolHeader::Icmpv4(Icmpv4Packet::EchoRequest(IcmpCommon {
+                kind:       8,
+                code:       0,
+                checksum:   0,
                 identifier: 0,
-                sequence: 0,
+                sequence:   0,
             })),
-            source: Addr::from_str("127.0.0.1").unwrap(),
+            source:      Addr::from_str("127.0.0.1").unwrap(),
             destination: Addr::from_str("127.0.0.1").unwrap(),
         }
     }
 
     fn get_icmp_echo_reply() -> ProtocolPacket {
         ProtocolPacket {
-            ether: IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip: IpPacket::V4(Ipv4Packet {
-                header_length: 0,
-                service_type: ServiceType::Routine,
-                low_delay: false,
-                high_throughput: false,
+            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+            ip:          IpPacket::V4(Ipv4Packet {
+                header_length:    0,
+                service_type:     ServiceType::Routine,
+                low_delay:        false,
+                high_throughput:  false,
                 high_reliability: false,
-                total_length: 0,
-                identification: 0,
-                flags: 0,
-                offset: 0,
-                ttl: 0,
-                protocol: ProtocolNumber::Icmp,
-                checksum: 0,
-                source: Ipv4Addr::new(127, 0, 0, 1),
-                destination: Ipv4Addr::new(127, 0, 0, 1),
+                total_length:     0,
+                identification:   0,
+                flags:            0,
+                offset:           0,
+                ttl:              0,
+                protocol:         ProtocolNumber::Icmp,
+                checksum:         0,
+                source:           Ipv4Addr::new(127, 0, 0, 1),
+                destination:      Ipv4Addr::new(127, 0, 0, 1),
             }),
-            header: ProtocolHeader::Icmpv4(Icmpv4Packet::EchoReply(IcmpCommon {
-                kind: 8,
-                code: 0,
-                checksum: 0,
+            header:      ProtocolHeader::Icmpv4(Icmpv4Packet::EchoReply(IcmpCommon {
+                kind:       8,
+                code:       0,
+                checksum:   0,
                 identifier: 0,
-                sequence: 0,
+                sequence:   0,
             })),
-            source: Addr::from_str("127.0.0.1").unwrap(),
+            source:      Addr::from_str("127.0.0.1").unwrap(),
             destination: Addr::from_str("127.0.0.1").unwrap(),
         }
     }
@@ -899,26 +936,6 @@ mod test {
             source:      Addr::from_str("127.0.0.1").unwrap(),
             destination: Addr::from_str("127.0.0.1").unwrap(),
         }
-    }
-
-    #[test]
-    fn test_tcp_bpf() {
-        let behavior = Behavior {
-            src:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(8, 8, 8, 8), 80))),
-            protocol:  ProtocolNumber::Tcp,
-            direction: Direction::Both,
-            timeout:   None,
-            command:   None,
-        };
-
-        let options = FilterOptions::new();
-        let expr = behavior.as_filter(&options).unwrap().build();
-
-        assert_eq!(
-            expr.to_string(),
-            "tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port 80))"
-        );
     }
 
     #[test]

@@ -1,5 +1,6 @@
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
+use std::net::IpAddr;
 
 use crate::Addr;
 
@@ -25,7 +26,7 @@ impl ToString for PacketStatus {
 /// specific steps required by the behavior.
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct BehaviorEvaluation<'a> {
-    src: Addr,
+    src: IpAddr,
 
     dst: Addr,
 
@@ -36,7 +37,7 @@ pub struct BehaviorEvaluation<'a> {
 }
 
 impl<'a> BehaviorEvaluation<'a> {
-    pub fn new(src: Addr, dst: Addr) -> BehaviorEvaluation<'a> {
+    pub fn new(src: IpAddr, dst: Addr) -> BehaviorEvaluation<'a> {
         BehaviorEvaluation {
             src,
             dst,
@@ -44,7 +45,7 @@ impl<'a> BehaviorEvaluation<'a> {
         }
     }
 
-    pub fn with_statuses(src: Addr, dst: Addr, packet_status: HashMap<&'a str, PacketStatus>) -> BehaviorEvaluation {
+    pub fn with_statuses(src: IpAddr, dst: Addr, packet_status: HashMap<&'a str, PacketStatus>) -> BehaviorEvaluation {
         BehaviorEvaluation {
             src,
             dst,
@@ -56,14 +57,14 @@ impl<'a> BehaviorEvaluation<'a> {
 
     pub fn passed(&self) -> bool { self.packet_status.values().all(|status| *status == PacketStatus::Ok) }
 
-    pub fn source(&self) -> Addr { self.src }
+    pub fn source(&self) -> IpAddr { self.src }
 
     pub fn destination(&self) -> Addr { self.dst }
 
-    pub fn data(&self) -> Iter<&'a str, PacketStatus> { self.packet_status.iter() }
+    pub fn data(&self) -> Iter<'_, &'a str, PacketStatus> { self.packet_status.iter() }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct BehaviorReport<'a> {
     passing: usize,
 
@@ -132,7 +133,7 @@ mod test {
 
     fn get_simple_eval() -> BehaviorEvaluation<'static> {
         BehaviorEvaluation::new(
-            Addr::from_str("127.0.0.1").unwrap(),
+            IpAddr::from_str("127.0.0.1").unwrap(),
             Addr::from_str("127.0.0.1").unwrap(),
         )
     }

@@ -4,14 +4,11 @@ report_dir = "nbug.d/reports"
 
 srv_addr = "0.0.0.0:8081"
 
-# Expectedd behaviors are specified same as done in the client; however, a
-# source is required. While a command can be specified for each behavior,
-# it will be ignored.
+# Expectedd behaviors are specified same as done in the client;
+# however, if a source is not specified for a behavior, it will default
+# to the localhost (127.0.0.1 or ::1). While a command can be specified
+# for each behavior, it will be ignored.
 [[behaviors]]
 src = "127.0.0.1"
 dst = "127.0.0.1"
 protocol = "icmp"
-command = ["/usr/bin/ping", "-c", "1", "8.8.8.8"]
-
-[[behaviors]]
-src = ""

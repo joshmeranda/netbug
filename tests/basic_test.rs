@@ -1,21 +1,25 @@
 mod common;
 
-use std::net::{TcpListener, Shutdown, UdpSocket};
-use std::{thread, fs};
+use std::fs::File;
+use std::io::{Read, Write};
+use std::net::{IpAddr, Shutdown, TcpListener, UdpSocket};
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::thread::Builder;
 use std::time::Duration;
+use std::{fs, thread};
 
+use crypto::curve25519::sc_reduce;
+use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport, PacketStatus};
 use netbug::client::Client;
 use netbug::config::client::ClientConfig;
 use netbug::config::server::ServerConfig;
-use netbug::receiver::Receiver;
-use std::path::{PathBuf, Path};
 use netbug::process::PcapProcessor;
-use std::fs::File;
-use std::io::{Write, Read};
+use netbug::receiver::Receiver;
+use netbug::Addr;
 
 fn run_tcp() {
-    let listener = TcpListener::bind("127.0.0.1:8003").unwrap();
+    let listener = TcpListener::bind("127.0.0.1:8083").unwrap();
     let (mut stream, _) = listener.accept().unwrap();
     let mut buffer = &mut [0u8; 163]; // the standard test message has 163 characters
 
@@ -23,7 +27,7 @@ fn run_tcp() {
 }
 
 fn run_udp() {
-    let mut socket = UdpSocket::bind("127.0.0.1:8004").unwrap();
+    let mut socket = UdpSocket::bind("127.0.0.1:8084").unwrap();
     let mut buffer = &mut [0u8; 163]; // the standard test message has 163 characters
 
     let (_, addr) = socket.recv_from(buffer).unwrap();
@@ -82,7 +86,7 @@ fn run_receiver() {
     let processor = PcapProcessor::new(&config.behaviors, config.pcap_dir.to_path_buf());
 
     let report = processor.process().unwrap();
-    let content = serde_json::to_string(&report).unwrap();
+    let content = serde_json::to_string_pretty(&report).unwrap();
     let mut path = config.report_dir.clone();
 
     fs::create_dir_all(path.clone());
@@ -94,8 +98,54 @@ fn run_receiver() {
     write!(file, "{}", content).unwrap();
 }
 
+fn build_report() -> BehaviorReport<'static> {
+    let mut udp_eval = BehaviorEvaluation::new(
+        IpAddr::from_str("127.0.0.1").unwrap(),
+        Addr::from_str("127.0.0.1:8084").unwrap(),
+    );
+    udp_eval.insert_status("UdpIngress", PacketStatus::Ok);
+    udp_eval.insert_status("UdpEgress", PacketStatus::Ok);
+
+    let mut tcp_eval = BehaviorEvaluation::new(
+        IpAddr::from_str("127.0.0.1").unwrap(),
+        Addr::from_str("127.0.0.1:8083").unwrap(),
+    );
+    tcp_eval.insert_status("TcpSynAck", PacketStatus::Ok);
+    tcp_eval.insert_status("TcpAck", PacketStatus::Ok);
+    tcp_eval.insert_status("TcpSyn", PacketStatus::Ok);
+
+    let mut icmp_eval = BehaviorEvaluation::new(
+        IpAddr::from_str("127.0.0.1").unwrap(),
+        Addr::from_str("127.0.0.1").unwrap(),
+    );
+    icmp_eval.insert_status("Icmp Echo Request", PacketStatus::Ok);
+    icmp_eval.insert_status("Icmp Echo Reply", PacketStatus::Ok);
+
+    let mut icmpv6_eval = BehaviorEvaluation::new(IpAddr::from_str("::1").unwrap(), Addr::from_str("::1").unwrap());
+    icmpv6_eval.insert_status("Icmp Echo Request", PacketStatus::Ok);
+    icmpv6_eval.insert_status("Icmp Echo Reply", PacketStatus::Ok);
+
+    let mut report = BehaviorReport::new();
+    report.add(icmp_eval);
+    report.add(udp_eval);
+    report.add(tcp_eval);
+    report.add(icmpv6_eval);
+
+    report
+}
+
+fn startup() { fs::remove_dir_all(common::get_out_root()); }
+
+fn report_eq(left: &BehaviorReport, right: &BehaviorReport) -> bool {
+    left.iter().fold(true, |acc, eval| {
+        acc || right.iter().fold(true, |acc, e| acc || eval == e)
+    })
+}
+
 #[test]
 fn test_basic() {
+    startup();
+
     let udp_thread = Builder::new().name("tcp".to_string()).spawn(run_tcp);
     let udp_thread = Builder::new().name("udp".to_string()).spawn(run_udp);
 
@@ -109,19 +159,24 @@ fn test_basic() {
     client_thread.join().unwrap();
     receiver_thread.join().unwrap();
 
-
     let mut client_pcap_path = common::get_out_root();
     client_pcap_path.push("pcap");
     client_pcap_path.push("lo.pcap");
 
-    assert!(client_pcap_path.exists(), format!("Expected file at '{}'", client_pcap_path.to_str().unwrap()));
+    assert!(
+        client_pcap_path.exists(),
+        format!("Expected file at '{}'", client_pcap_path.to_str().unwrap())
+    );
 
     let mut receiver_pcap_path = common::get_out_root();
     receiver_pcap_path.push("recv_pcap");
     receiver_pcap_path.push("127.0.0.1");
     receiver_pcap_path.push("lo.pcap");
 
-    assert!(receiver_pcap_path.exists(), format!("Expected file at '{}'", receiver_pcap_path.to_str().unwrap()));
+    assert!(
+        receiver_pcap_path.exists(),
+        format!("Expected file at '{}'", receiver_pcap_path.to_str().unwrap())
+    );
 
     let client_pcap_meta = fs::metadata(client_pcap_path).unwrap();
     let receiver_pcap_meta = fs::metadata(receiver_pcap_path).unwrap();
@@ -136,11 +191,12 @@ fn test_basic() {
     report_file_path.push("report");
 
     let content = fs::read_to_string(report_file_path).unwrap();
-    let raw = "{\"passing\":1,\"failing\":3,\"evaluations\":[{\"src\":\"127.0.0.1\",\"dst\":\"::1\",\"packet_status\":{\"Icmp Echo Reply\":\"NotReceived\",\"Icmp Echo Request\":\"Ok\"}},{\"src\":\"127.0.0.1\",\"dst\":\"127.0.0.1\",\"packet_status\":{\"TcpAck\":\"Ok\",\"TcpSyn\":\"Ok\",\"TcpSynAck\":\"Ok\",\"TcpFin\":\"Ok\"}},{\"src\":\"127.0.0.1\",\"dst\":\"127.0.0.1\",\"packet_status\":{\"Icmp Echo Reply\":\"Ok\",\"Icmp Echo Request\":\"Ok\"}},{\"src\":\"127.0.0.1\",\"dst\":\"127.0.0.1\",\"packet_status\":{\"UdpEgress\":\"Ok\",\"UdpIngress\":\"Ok\"}}]}";
-    assert_eq!(content, raw);
+    let report: BehaviorReport = serde_json::from_str(content.as_str()).unwrap();
+    let expected = build_report();
+    assert!(report_eq(&expected, &report));
 
     let out_path = common::get_out_root();
     assert!(out_path.exists());
 
-    // fs::remove_dir_all(out_path);
+    fs::remove_dir_all(out_path);
 }

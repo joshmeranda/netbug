@@ -4,8 +4,6 @@ interfaces = [ "lo" ]
 
 srv_addr = "127.0.0.1:8081"
 
-#filter = ""
-
 [[behaviors]]
 dst = "127.0.0.1"
 protocol = "icmp"
@@ -16,9 +14,9 @@ protocol = "ipv6icmp"
 command = ["/usr/bin/ping", "-c", "1", "::1"]
 
 [[behaviors]]
-dst = "127.0.0.1:8003"
+dst = "127.0.0.1:8083"
 protocol = "tcp"
 
 [[behaviors]]
-dst = "127.0.0.1:8004"
+dst = "127.0.0.1:8084"
 protocol = "udp"

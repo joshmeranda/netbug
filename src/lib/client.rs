@@ -279,7 +279,7 @@ mod test {
     #[test]
     fn test_filter_builder() {
         let icmp: Behavior = toml::from_str("src = \"127.0.0.1\"\ndst = \"8.8.8.8\"\nprotocol = \"icmp\"").unwrap();
-        let tcp: Behavior = toml::from_str("src = \"127.0.0.1:80\"\ndst = \"8.8.8.8:80\"\nprotocol = \"tcp\"").unwrap();
+        let tcp: Behavior = toml::from_str("src = \"127.0.0.1\"\ndst = \"8.8.8.8:80\"\nprotocol = \"tcp\"").unwrap();
 
         let mut behaviors = Vec::new();
         behaviors.push(icmp);

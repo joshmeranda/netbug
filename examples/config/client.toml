@@ -17,7 +17,7 @@ interval = "1s"
 # (tcp, udp, icmp); however, you may also define a specific command to run to
 # mock sample network traffic. To do this specify the command with each
 # argument as discrete elemnts of an array. A source addess is not required,
-# and will be ignored if secified.
+# and will be ignored if specified.
 [[behaviors]]
 dst = "127.0.0.1"
 protocol = "icmp"

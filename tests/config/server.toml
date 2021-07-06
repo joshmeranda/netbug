@@ -12,15 +12,15 @@ protocol = "icmp"
 [[behaviors]]
 src = "::1"
 dst = "::1"
-protocol = "icmp"
+protocol = "ipv6icmp"
 command = ["/usr/bin/ping", "-c", "1", "::1"]
 
 [[behaviors]]
 src = "127.0.0.1"
-dst = "127.0.0.1:8003"
+dst = "127.0.0.1:8083"
 protocol = "tcp"
 
 [[behaviors]]
 src = "127.0.0.1"
-dst = "127.0.0.1:8004"
+dst = "127.0.0.1:8084"
 protocol = "udp"

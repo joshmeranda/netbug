@@ -59,7 +59,7 @@ pub mod client {
 
     pub fn default_delay() -> u8 { 1 }
 
-    pub fn default_addr() -> Addr { Addr::Internet(IpAddr::V4(Ipv4Addr::UNSPECIFIED)) }
+    pub fn default_addr() -> IpAddr { IpAddr::V4(Ipv4Addr::LOCALHOST) }
 
     pub fn default_interval() -> CaptureInterval { CaptureInterval(Interval::Minutes(10)) }
 }

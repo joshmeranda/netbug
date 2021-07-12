@@ -9,12 +9,12 @@ use clokwerk::{Interval, Scheduler};
 use netbug::client::Client;
 use netbug::config::client::ClientConfig;
 
-fn run_scheduled(mut client: Client, interval: Interval) {
-    run_once(&mut client);
+fn run_scheduled(mut client: Client, delay: Duration,  interval: Interval) {
+    run_once(&mut client, delay);
 
     let mut scheduler = Scheduler::new();
 
-    scheduler.every(interval).run(move || run_once(&mut client));
+    scheduler.every(interval).run(move || run_once(&mut client, delay));
 
     let handle = scheduler.watch_thread(Duration::from_secs(1));
 
@@ -24,7 +24,7 @@ fn run_scheduled(mut client: Client, interval: Interval) {
     handle.stop();
 }
 
-fn run_once(client: &mut Client) {
+fn run_once(client: &mut Client, delay: Duration) {
     if let Err(err) = client.start_capture() {
         eprintln!("{}", err.to_string());
         return;
@@ -40,6 +40,8 @@ fn run_once(client: &mut Client) {
         eprintln!("{}", err.to_string());
         return;
     }
+
+    std::thread::sleep(delay);
 
     if let Err(err) = client.stop_capture() {
         eprintln!("Could not stop packet capture: {}", err.to_string());
@@ -69,14 +71,14 @@ fn main() {
         },
     };
 
-    let delay = client_cfg.delay;
+    let delay = Duration::from_secs(client_cfg.delay as u64);
     let interval = client_cfg.interval;
 
     let mut client: Client = Client::from_config(client_cfg);
 
     if matches.is_present("scheduled") {
-        run_scheduled(client, interval.0);
+        run_scheduled(client, delay, interval.0);
     } else {
-        run_once(&mut client);
+        run_once(&mut client, delay);
     }
 }

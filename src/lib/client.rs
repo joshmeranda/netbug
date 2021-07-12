@@ -233,16 +233,16 @@ impl Client {
         let data_len = fs::metadata(&pcap_path)?.len();
 
         // fill the header bytes with the relevant behavior
-        stream.write(&[MESSAGE_VERSION, interface_name.len() as u8]);
+        stream.write(&[MESSAGE_VERSION, interface_name.len() as u8])?;
 
         let data_len_bytes: [u8; 8] = data_len.to_be_bytes();
-        stream.write(&data_len_bytes);
+        stream.write(&data_len_bytes)?;
 
         // add the interface name to the buffer
         let name_bytes = interface_name.as_bytes();
-        stream.write(&name_bytes);
+        stream.write(&name_bytes)?;
 
-        io::copy(&mut pcap_file, stream);
+        io::copy(&mut pcap_file, stream)?;
 
         Ok(())
     }

@@ -29,10 +29,8 @@ impl<'a> BehaviorCollector<'a> {
     }
 
     /// Insert a new behavior into the collector.
-    pub fn insert_behavior(&mut self, behavior: &'a Behavior) -> Result<()> {
+    pub fn insert_behavior(&mut self, behavior: &'a Behavior) {
         self.behavior_map.insert(behavior, vec![]);
-
-        Ok(())
     }
 
     /// Insert a new header to the collector, if no matching behavior is found

@@ -31,7 +31,9 @@ fn run(cfg: ServerConfig) {
     let processor = PcapProcessor::new(&cfg.behaviors, cfg.pcap_dir.to_path_buf());
 
     if !cfg.report_dir.exists() {
-        fs::create_dir_all(cfg.report_dir.clone());
+        if let Err(err) = fs::create_dir_all(cfg.report_dir.clone()) {
+            eprintln!("Unable to create report directory art '{}': {}", cfg.report_dir.to_str().unwrap(), err.to_string());
+        }
     }
 
     loop {

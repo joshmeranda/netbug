@@ -30,7 +30,7 @@ impl Receiver {
         dir.push(peer.ip().to_string());
 
         if !dir.exists() {
-            fs::create_dir_all(&dir);
+            fs::create_dir_all(&dir)?;
         }
 
         let mut received = vec![];

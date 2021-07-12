@@ -5,7 +5,6 @@ pub mod bpf;
 pub mod client;
 pub mod config;
 pub mod error;
-pub mod message;
 pub mod process;
 pub mod protocols;
 pub mod receiver;

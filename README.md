@@ -34,6 +34,7 @@ interval | the time between each round of behavior traffic generation in the for
 filter | a custom Berkley Packet Filter to apply when recording traffic, the client will make a best effort attempt to filter out any extraneous data. omit to use the client generated filter, or provide an empty string to allow ALL traffic through
 behaviors | a list of the behaviors to generate traffic for the client to generate, while you can specify a src address it will be ignored.
 allow_concurrent | allow the client to generate all network traffic in parallel or sequentially | False
+delay | the amount of seconds to wait until stopping the capture | 1
 
 ### Server
 The server is responsible for receiving recorded network traffic from clients while also producing reports on the
@@ -42,10 +43,14 @@ in the server configuration. The good news, is that you can simply copy+paste al
 all non-relevant fields such as command will simply be ignored.
 
 #### Configuration
-Field | Description
------ | -----------
-pcap_dir | the directory to store the pcaps received from clients separated first by host / ip adn teh by interface | `/etc/netbug.d/pcaps
+Field | Description | Default
+----- | ----------- | -------
+pcap_dir | the directory to store the pcaps received from clients separated first by host / ip adn teh by interface | `/etc/netbug.d/pcaps`
 srv_addr | the address to bind teh sever to | 127.0.0.1:8081
 behaviors | the list of behaviors to use for pcap analysis
 report_dir | the directory in which the generated reports will be stored | `etc/nbug.d/report`
-overwrite_report | continuously overwrite the old report, ro create  a new report each time identified with a unique timestamp
+overwrite_report | continuously overwrite the old report, ro create  a new report each time identified with a unique timestamp | False
+
+## Running
+Netbug relies upon libpcap and therefore running the client and some tests will need to be run as root, or grant the
+target user access to the dumpcap binary.

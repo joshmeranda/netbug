@@ -168,7 +168,7 @@ impl<'a> Behavior {
                 let mut sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
                 let buffer = Behavior::TEST_MESSAGE;
 
-                sock.write(buffer);
+                sock.write(buffer)?;
 
                 sock.shutdown(Shutdown::Both)?;
             },

@@ -3,7 +3,6 @@ use std::convert::TryFrom;
 use crate::error::NbugError;
 use crate::protocols::icmp::icmpv4::Icmpv4Packet;
 use crate::protocols::icmp::icmpv6::Icmpv6Packet;
-use crate::protocols::ProtocolNumber;
 
 pub static ICMP_KIND_KEY: &str = "IcmpKind";
 
@@ -81,16 +80,14 @@ impl TryFrom<&[u8]> for IcmpCommon {
 
 pub mod icmpv4 {
     use std::cmp::PartialEq;
-    use std::collections::HashMap;
     use std::convert::TryFrom;
     use std::net::Ipv4Addr;
 
     use num_traits::FromPrimitive;
 
     use crate::error::NbugError;
-    use crate::protocols::icmp::{IcmpCommon, ICMP_KIND_KEY, MIN_ICMP_HEADER_LEN};
+    use crate::protocols::icmp::{IcmpCommon, MIN_ICMP_HEADER_LEN};
     use crate::protocols::ip::Ipv4Packet;
-    use crate::protocols::ProtocolNumber;
 
     /// Maps variants to icmp message types as defined in [RFC 792 Summary of Message Types](https://tools.ietf.org/html/rfc792#page-20)
     #[derive(Clone, Debug, FromPrimitive, PartialEq)]
@@ -279,14 +276,12 @@ pub mod icmpv4 {
 }
 
 pub mod icmpv6 {
-    use std::collections::HashMap;
     use std::convert::TryFrom;
 
     use num_traits::FromPrimitive;
 
     use crate::error::NbugError;
-    use crate::protocols::icmp::{IcmpCommon, ICMP_KIND_KEY, MIN_ICMP_HEADER_LEN};
-    use crate::protocols::ProtocolNumber;
+    use crate::protocols::icmp::{IcmpCommon, MIN_ICMP_HEADER_LEN};
 
     /// Map variants to icmp v6 message types as defined in [RFC 4443 2.1](https://tools.ietf.org/html/rfc4443#section-2.1).
     #[derive(Clone, Debug, FromPrimitive, PartialEq)]

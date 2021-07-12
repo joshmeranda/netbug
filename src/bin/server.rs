@@ -1,13 +1,12 @@
 #[macro_use]
 extern crate clap;
 
-use std::error::Error;
 use std::fs;
-use std::fs::{DirEntry, File, OpenOptions};
+use std::fs::{DirEntry, File};
 use std::io::Write;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
@@ -91,7 +90,7 @@ enum ReportFilter {
 
 fn get_report_path(report_dir: PathBuf, offset: usize) -> Option<PathBuf> {
     let read = match fs::read_dir(report_dir) {
-        Err(err) => return None,
+        Err(_) => return None,
         Ok(read) => read,
     };
 
@@ -232,7 +231,7 @@ fn main() {
         let offset = match sub_matches.value_of("offset") {
             Some(offset) => match offset.parse::<usize>() {
                 Ok(offset) => offset,
-                Err(err) => {
+                Err(_) => {
                     eprintln!("Bad offset value");
                     return;
                 },

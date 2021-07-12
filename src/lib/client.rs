@@ -1,6 +1,6 @@
 use std::default::Default;
 use std::fs::{self, File};
-use std::io::{self, BufWriter, Read, Write};
+use std::io::{self, BufWriter, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -13,11 +13,10 @@ use pcap::{Capture, Device};
 
 use crate::behavior::Behavior;
 use crate::bpf::filter::{FilterBuilder, FilterExpression, FilterOptions};
-use crate::bpf::primitive::Primitive;
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
 use crate::error::{NbugError, Result};
-use crate::{BUFFER_SIZE, HEADER_LENGTH, MESSAGE_VERSION};
+use crate::{BUFFER_SIZE, MESSAGE_VERSION};
 
 /// The main Netbug client to capture network and dump network traffic to pcap
 /// files.
@@ -208,14 +207,14 @@ impl Client {
 
     /// Transfer all pcaps to the server.
     pub fn transfer_all(&self) -> Result<()> {
-        let mut stream = TcpStream::connect(self.srv_addr)?;
+        let stream = TcpStream::connect(self.srv_addr)?;
         let mut writer = BufWriter::with_capacity(BUFFER_SIZE, stream);
 
         for device in &self.devices {
             self.transfer_pcap(device.name.as_str(), &mut writer)?;
         }
 
-        let mut stream = writer.into_inner().unwrap();
+        let stream = writer.into_inner().unwrap();
         stream.shutdown(Shutdown::Both)?;
 
         Ok(())

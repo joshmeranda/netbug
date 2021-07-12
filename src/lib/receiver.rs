@@ -1,11 +1,9 @@
 use std::convert::TryInto;
 use std::fs;
 use std::fs::File;
-use std::hash::BuildHasherDefault;
 use std::io::{BufReader, BufWriter, Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
 
 use crate::error::{NbugError, Result};
 use crate::{BUFFER_SIZE, HEADER_LENGTH};
@@ -25,7 +23,7 @@ impl Receiver {
     /// The receiver blocks until either a pcap is receiver from the client, or
     /// an error occurs.
     pub fn receive(&mut self) -> Result<Vec<PathBuf>> {
-        let (mut stream, peer) = self.listener.accept()?;
+        let (stream, peer) = self.listener.accept()?;
 
         // ensure that a pcap directory for the peer exists
         let mut dir = self.pcap_dir.clone();
@@ -65,7 +63,7 @@ impl Receiver {
 
         let mut pcap_path = dir.clone();
         pcap_path.push(format!("{}.pcap", name));
-        let mut pcap_file = File::create(&pcap_path)?;
+        let pcap_file = File::create(&pcap_path)?;
 
         let mut writer = BufWriter::new(pcap_file);
 

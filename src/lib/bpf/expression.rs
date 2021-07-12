@@ -1,9 +1,3 @@
-use std::collections::VecDeque;
-use std::iter::FromIterator;
-use std::slice::Iter;
-use std::vec::IntoIter;
-
-use crate::bpf::filter::FilterBuilder;
 use crate::bpf::primitive::{Qualifier, QualifierProtocol};
 use crate::bpf::token::{Token, TokenStream};
 

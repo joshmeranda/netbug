@@ -1,8 +1,6 @@
-use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use crate::error::NbugError;
-use crate::protocols::{ProtocolNumber, ProtocolPacket, DST_PORT_KEY, SRC_PORT_KEY};
 
 /// The UDP Packet a s specified in [RFC 768](https://tools.ietf.org/html/rfc768).
 #[derive(Clone, Debug, PartialEq)]

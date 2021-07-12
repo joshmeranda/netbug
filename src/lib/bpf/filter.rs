@@ -1,7 +1,5 @@
-use std::str::FromStr;
-
 use crate::bpf::primitive::{Primitive, Qualifier};
-use crate::bpf::token::{Token, TokenStream, TokenStreamIntoIter, TokenStreamIterator};
+use crate::bpf::token::{Token, TokenStream, TokenStreamIterator};
 
 /// Used to control the verbosity of some primitives when an expression is
 /// built.

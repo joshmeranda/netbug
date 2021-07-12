@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use crate::error::{NbugError, Result};
-use crate::protocols::{ProtocolNumber, ProtocolPacket};
+use crate::protocols::ProtocolNumber;
 
 /// An ethernet packet, conforming to either IEE 802.2 or 802.3.
 #[derive(Clone, Debug, Eq, PartialEq)]

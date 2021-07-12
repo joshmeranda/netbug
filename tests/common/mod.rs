@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub fn get_tests_root() -> PathBuf {
     let mut p = PathBuf::new();

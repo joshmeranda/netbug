@@ -1,8 +1,6 @@
-use std::iter;
 use std::iter::FromIterator;
 use std::net::IpAddr;
 use std::ops::Range;
-use std::slice::Iter;
 
 use crate::bpf::expression::{BinOp, Expression};
 use crate::bpf::token::{Token, TokenStream};

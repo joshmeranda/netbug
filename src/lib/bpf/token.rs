@@ -1,7 +1,6 @@
 use std::iter::FromIterator;
-use std::vec::IntoIter;
 
-use crate::bpf::expression::{BinOp, Operand};
+use crate::bpf::expression::BinOp;
 use crate::bpf::filter::FilterOptions;
 use crate::bpf::primitive::{Identifier, Primitive, Qualifier, RelOp};
 

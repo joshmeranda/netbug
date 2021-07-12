@@ -1,10 +1,6 @@
 /// Provides default values used to generate default configurations
 use std::path::PathBuf;
 
-use clokwerk::Interval;
-
-use crate::config::client::CaptureInterval;
-
 const NETBUG_BASE_DIR: &str = "/etc/nbug.d";
 
 const NETBUG_CONFIG_FILE_NAME: &str = "/etc/conf.toml";
@@ -13,7 +9,7 @@ const NETBUG_PCAP_SUB_DIR_NAME: &str = "pcap";
 
 const NETBUG_SCRIPTS_SUB_DIR_NAME: &str = "scripts";
 
-const NETBUG_REPORT_DIR_NAME: &str = "report";
+const NETBUG_REPORT_DIR_NAME: &str = "reports";
 
 // Common Values
 pub fn default_config_file_path() -> PathBuf {
@@ -53,7 +49,6 @@ pub mod client {
     use clokwerk::Interval;
 
     use crate::config::client::CaptureInterval;
-    use crate::Addr;
 
     pub fn default_concurrent_run() -> bool { false }
 

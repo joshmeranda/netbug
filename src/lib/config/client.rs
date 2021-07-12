@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -7,13 +6,12 @@ use std::str::FromStr;
 use clokwerk::Interval;
 use regex::Regex;
 use serde::de::Error;
-use serde::{de, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer};
 
 use super::defaults;
 use super::error::{ConfigError, Result};
 use crate::behavior::Behavior;
 use crate::bpf::filter::FilterExpression;
-use crate::error::NbugError;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CaptureInterval(pub Interval);
@@ -28,7 +26,7 @@ impl FromStr for CaptureInterval {
             Some(captures) => {
                 let size: u32 = captures.get(1).unwrap().as_str().parse().unwrap();
 
-                let mut unit = match captures.get(2) {
+                let unit = match captures.get(2) {
                     Some(u) => u.as_str(),
                     None => "M",
                 };

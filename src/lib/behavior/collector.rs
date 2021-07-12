@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use crate::behavior::evaluate::BehaviorReport;
 use crate::behavior::Behavior;
 use crate::error::{NbugError, Result};
-use crate::protocols::tcp::TcpControlBits;
-use crate::protocols::{ProtocolHeader, ProtocolNumber, ProtocolPacket};
-use crate::Addr;
+use crate::protocols::{ProtocolHeader, ProtocolPacket};
 
 /// A basic collector for [Behavior]s and their corresponding
 /// [ProtocolPackets].

@@ -1,16 +1,15 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
 use num_traits::FromPrimitive;
 
 use crate::error::NbugError;
-use crate::protocols::{ProtocolNumber, ProtocolPacket};
 
 pub static CONTROL_BITS_KEY: &str = "CONTROL_BITS";
 
-static SEQUENCE_NUMBER: &str = "SEQUENCE_NUMBER";
+// static SEQUENCE_NUMBER: &str = "SEQUENCE_NUMBER";
 
-static ACKNOWLEDGEMENT_NUMBER: &str = "ACKNOWLEDGEMENT_NUMBER";
+// static ACKNOWLEDGEMENT_NUMBER: &str = "ACKNOWLEDGEMENT_NUMBER";
 
 #[derive(Clone, Debug, FromPrimitive, PartialEq)]
 pub enum TcpOptionKind {

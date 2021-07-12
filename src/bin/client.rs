@@ -4,9 +4,8 @@ extern crate netbug;
 
 use std::time::Duration;
 
-use clap::{App, Arg, SubCommand};
-use clokwerk::{Interval, ScheduleHandle, Scheduler};
-use netbug::bpf::filter::FilterExpression;
+use clap::{App, Arg};
+use clokwerk::{Interval, Scheduler};
 use netbug::client::Client;
 use netbug::config::client::ClientConfig;
 

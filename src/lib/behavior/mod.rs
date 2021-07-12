@@ -1,19 +1,14 @@
-use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpStream, UdpSocket};
 use std::process::Command;
 use std::time::Duration;
-
-use num_traits::FromPrimitive;
 
 use crate::behavior::evaluate::BehaviorEvaluation;
 use crate::config::defaults;
 use crate::error::{NbugError, Result};
 use crate::protocols::icmp::icmpv4::Icmpv4MessageKind;
 use crate::protocols::icmp::icmpv6::Icmpv6MessageKind;
-use crate::protocols::icmp::ICMP_KIND_KEY;
-use crate::protocols::tcp::{TcpControlBits, CONTROL_BITS_KEY};
-use crate::protocols::{ProtocolHeader, ProtocolNumber, ProtocolPacket, DST_PORT_KEY, SRC_PORT_KEY};
+use crate::protocols::tcp::TcpControlBits;
+use crate::protocols::{ProtocolHeader, ProtocolNumber, ProtocolPacket};
 use crate::Addr;
 
 pub mod collector;
@@ -23,8 +18,8 @@ use std::io::Write;
 
 use evaluate::PacketStatus;
 
-use crate::bpf::filter::{FilterBuilder, FilterExpression, FilterOptions};
-use crate::bpf::primitive::{self, EtherProtocol, Host, NetProtocol, Primitive, QualifierDirection};
+use crate::bpf::filter::{FilterBuilder, FilterOptions};
+use crate::bpf::primitive::{EtherProtocol, Host, NetProtocol, Primitive};
 use crate::protocols::udp::UdpPacket;
 
 /// Simple macro to extract values from an enum struct variant. If only one

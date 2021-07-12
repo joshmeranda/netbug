@@ -5,7 +5,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
 use crate::error::NbugError;
-use crate::protocols::{ProtocolNumber, ProtocolPacket};
+use crate::protocols::ProtocolNumber;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum IpPacket {

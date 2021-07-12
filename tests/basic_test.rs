@@ -2,14 +2,12 @@ mod common;
 
 use std::fs::File;
 use std::io::{Read, Write};
-use std::net::{IpAddr, Shutdown, TcpListener, UdpSocket};
-use std::path::{Path, PathBuf};
+use std::net::{IpAddr, TcpListener, UdpSocket};
 use std::str::FromStr;
 use std::thread::Builder;
 use std::time::Duration;
 use std::{fs, thread};
 
-use crypto::curve25519::sc_reduce;
 use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport, PacketStatus};
 use netbug::client::Client;
 use netbug::config::client::ClientConfig;
@@ -21,14 +19,14 @@ use netbug::Addr;
 fn run_tcp() {
     let listener = TcpListener::bind("127.0.0.1:8083").unwrap();
     let (mut stream, _) = listener.accept().unwrap();
-    let mut buffer = &mut [0u8; 163]; // the standard test message has 163 characters
+    let buffer = &mut [0u8; 163]; // the standard test message has 163 characters
 
     stream.read(buffer);
 }
 
 fn run_udp() {
-    let mut socket = UdpSocket::bind("127.0.0.1:8084").unwrap();
-    let mut buffer = &mut [0u8; 163]; // the standard test message has 163 characters
+    let socket = UdpSocket::bind("127.0.0.1:8084").unwrap();
+    let buffer = &mut [0u8; 163]; // the standard test message has 163 characters
 
     let (_, addr) = socket.recv_from(buffer).unwrap();
 

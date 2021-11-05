@@ -61,7 +61,7 @@ impl Receiver {
             Err(_) => return Err(NbugError::Packet(String::from("Capture file name is not valid utf8"))),
         };
 
-        let mut pcap_path = dir.clone();
+        let mut pcap_path = dir;
         pcap_path.push(format!("{}.pcap", name));
         let pcap_file = File::create(&pcap_path)?;
 

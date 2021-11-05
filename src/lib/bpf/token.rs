@@ -10,7 +10,9 @@ use crate::bpf::primitive::{Identifier, Primitive, Qualifier, RelOp};
 pub struct TokenStream(Vec<Token>);
 
 impl TokenStream {
-    pub fn new() -> TokenStream { Self(vec![]) }
+    pub fn new() -> TokenStream {
+        Self::default()
+    }
 
     pub fn push(&mut self, token: Token) { self.0.push(token); }
 
@@ -21,6 +23,12 @@ impl TokenStream {
     }
 
     pub fn len(&self) -> usize { self.0.len() }
+
+    pub fn is_empty(&self) -> bool { self.0.is_empty() }
+}
+
+impl Default for TokenStream {
+    fn default() -> Self { Self(vec![]) }
 }
 
 impl FromIterator<Token> for TokenStream {
@@ -39,6 +47,12 @@ impl<'a> IntoIterator for &'a TokenStream {
     type IntoIter = TokenStreamIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter { TokenStreamIterator::new(&self.0) }
+}
+
+impl From<Vec<Token>> for TokenStream {
+    fn from(v: Vec<Token>) -> Self {
+        Self(v)
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -66,12 +80,12 @@ impl Iterator for TokenStreamIntoIter {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct TokenStreamIterator<'a> {
-    tokens: &'a Vec<Token>,
+    tokens: &'a [Token],
     index:  usize,
 }
 
 impl<'a> TokenStreamIterator<'a> {
-    fn new(tokens: &'a Vec<Token>) -> TokenStreamIterator { Self { tokens, index: 0 } }
+    fn new(tokens: &'a [Token]) -> TokenStreamIterator { Self { tokens, index: 0 } }
 }
 
 impl<'a> Iterator for TokenStreamIterator<'a> {

@@ -71,7 +71,7 @@ impl FromStr for Addr {
         SocketAddr::from_str(s).map(Addr::Socket).or_else(move |_| {
             IpAddr::from_str(s)
                 .map(Addr::Internet)
-                .or_else(move |err| Err(NbugError::Config(ConfigError::Addr(err))))
+                .map_err(move |err| NbugError::Config(ConfigError::Addr(err)))
         })
     }
 }

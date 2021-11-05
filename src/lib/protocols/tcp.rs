@@ -58,12 +58,12 @@ impl TryFrom<&[u8]> for TcpOption {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TcpControlBits {
-    Urg = 0b00_100000,
-    Ack = 0b00_010000,
-    Psh = 0b00_001000,
-    Rst = 0b00_000100,
-    Syn = 0b00_000010,
-    Fin = 0b00_000001,
+    Urg = 0b0010_0000,
+    Ack = 0b0001_0000,
+    Psh = 0b0000_1000,
+    Rst = 0b0000_0100,
+    Syn = 0b0000_0010,
+    Fin = 0b0000_0001,
 }
 
 impl TcpControlBits {
@@ -153,10 +153,10 @@ impl TryFrom<&[u8]> for TcpPacket {
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         if data.len() < TcpPacket::MIN_BYTES {
-            return Err(NbugError::Packet(String::from(format!(
+            return Err(NbugError::Packet(format!(
                 "Too few bytes, expected at least {}",
                 TcpPacket::MIN_BYTES
-            ))));
+            )));
         }
 
         let mut source_bytes = [0u8; 2];

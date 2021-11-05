@@ -112,11 +112,7 @@ pub struct FilterOptions {
 impl FilterOptions {
     /// Create a new [`FilterOptions`] object with the default value.
     pub fn new() -> FilterOptions {
-        Self {
-            whitespace:       true,
-            symbol_operators: false,
-            verbosity:        PrimitiveVerbosity::Exact,
-        }
+        Self::default()
     }
 
     pub fn use_whitespace(&mut self, whitespace: bool) { self.whitespace = whitespace; }
@@ -124,6 +120,16 @@ impl FilterOptions {
     pub fn use_symbols(&mut self, symbols: bool) { self.symbol_operators = symbols; }
 
     pub fn use_verbosity(&mut self, verbosity: PrimitiveVerbosity) { self.verbosity = verbosity; }
+}
+
+impl Default for FilterOptions {
+    fn default() -> Self {
+        Self {
+            whitespace: true,
+            symbol_operators: false,
+            verbosity: PrimitiveVerbosity::Exact,
+        }
+    }
 }
 
 /// Programatically build a [`FilterExpression`]. Some of the behavior of this
@@ -314,15 +320,8 @@ impl<'a> FilterBuilder<'a> {
             },
             Token::RelationalOperator(_) => self.options.whitespace,
             Token::Qualifier(qualifier) => match qualifier {
-                Qualifier::Proto(_) => match next.unwrap() {
-                    // the special case of a packet data access expression
-                    Token::OpenBracket | Token::CloseParentheses => false,
-                    _ => true,
-                },
-                _ => match next.unwrap() {
-                    Token::CloseParentheses => false,
-                    _ => true,
-                },
+                Qualifier::Proto(_) => !matches!(next.unwrap(), Token::OpenBracket | Token::CloseParentheses),
+                _ => !matches!(next.unwrap(), Token::CloseParentheses),
             },
         }
     }
@@ -347,8 +346,10 @@ impl<'a> FilterBuilder<'a> {
     }
 }
 
-impl Into<TokenStream> for FilterBuilder<'_> {
-    fn into(self) -> TokenStream { self.tokens }
+impl From<FilterBuilder<'_>> for TokenStream {
+    fn from(builder: FilterBuilder<'_>) -> Self {
+        builder.tokens
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]

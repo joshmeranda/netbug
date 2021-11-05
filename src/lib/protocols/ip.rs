@@ -53,10 +53,10 @@ impl TryFrom<&[u8]> for IpPacket {
         match version {
             4 => Ok(IpPacket::V4(Ipv4Packet::try_from(data)?)),
             6 => Ok(IpPacket::V6(Ipv6Packet::try_from(data)?)),
-            version => Err(NbugError::Packet(String::from(format!(
+            version => Err(NbugError::Packet(format!(
                 "Invalid Ip packet version number '{}'",
                 version
-            )))),
+            ))),
         }
     }
 }
@@ -116,27 +116,25 @@ impl TryFrom<&[u8]> for Ipv4Packet {
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         if data.len() < Ipv4Packet::MIN_BYTES {
-            return Err(NbugError::Packet(String::from(format!(
+            return Err(NbugError::Packet(format!(
                 "Too few bytes, expected at least {}",
                 Ipv4Packet::MIN_BYTES
-            ))));
+            )));
         };
 
         let version = data[0] >> 4;
 
         if version != 4 {
-            return Err(NbugError::Packet(String::from(format!(
+            return Err(NbugError::Packet(format!(
                 "Wrong version number, expected '4' received: {}",
                 version
-            ))));
+            )));
         }
 
         let header_length = (data[0] as u16 & 0xF) * 4;
 
         if header_length as usize != Ipv4Packet::MIN_BYTES {
-            return Err(NbugError::Packet(String::from(format!(
-                "Ipv4 options are not yet supported"
-            ))));
+            return Err(NbugError::Packet("Ipv4 options are not yet supported".to_string()));
         }
 
         let service_type = FromPrimitive::from_u8(data[1] & 0b0111).unwrap();
@@ -225,14 +223,14 @@ impl TryFrom<&[u8]> for Ipv6Packet {
         let version = data[0] >> 4;
 
         if version != 6 {
-            return Err(NbugError::Packet(String::from(format!(
+            return Err(NbugError::Packet(format!(
                 "Wrong version number, expected '6' received: {}",
                 version
-            ))));
+            )));
         }
 
         let mut traffic_class: u8 = 0;
-        traffic_class |= data[0] & 0x0 | data[1] >> 4; // last 4 of first byte, and first 4 of second byte
+        traffic_class |= data[0] & 0b1111_0000 | data[1] >> 4; // last 4 of first byte, and first 4 of second byte
 
         let mut flow_label: u32 = data[1] as u32 & 0x0f;
         flow_label <<= 8;

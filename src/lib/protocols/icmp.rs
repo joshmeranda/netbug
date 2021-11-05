@@ -47,10 +47,10 @@ impl TryFrom<&[u8]> for IcmpCommon {
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         if data.len() < 6 {
-            return Err(NbugError::Packet(String::from(format!(
+            return Err(NbugError::Packet(format!(
                 "Too few bytes, expected at least {}",
                 6
-            ))));
+            )));
         }
 
         let icmp_type = data[0];
@@ -118,10 +118,10 @@ pub mod icmpv4 {
 
         fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
             if data.len() < 18 {
-                return Err(NbugError::Packet(String::from(format!(
+                return Err(NbugError::Packet(format!(
                     "Too few bytes, expected at least {}",
                     18
-                ))));
+                )));
             }
 
             let common = IcmpCommon::try_from(data)?;
@@ -233,10 +233,10 @@ pub mod icmpv4 {
 
         fn try_from(data: &[u8]) -> Result<Icmpv4Packet, Self::Error> {
             if data.len() < MIN_ICMP_HEADER_LEN {
-                return Err(NbugError::Packet(String::from(format!(
+                return Err(NbugError::Packet(format!(
                     "Too few bytes, expected at least: {}",
                     MIN_ICMP_HEADER_LEN
-                ))));
+                )));
             }
 
             let kind =
@@ -353,10 +353,10 @@ pub mod icmpv6 {
 
         fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
             if data.len() < MIN_ICMP_HEADER_LEN {
-                return Err(NbugError::Packet(String::from(format!(
+                return Err(NbugError::Packet(format!(
                     "Too few bytes, expected at least: {}",
                     MIN_ICMP_HEADER_LEN
-                ))));
+                )));
             }
 
             let kind =
@@ -365,10 +365,10 @@ pub mod icmpv6 {
             match kind {
                 Icmpv6MessageKind::EchoRequest => Ok(Icmpv6Packet::EchoRequest(IcmpCommon::try_from(data)?)),
                 Icmpv6MessageKind::EchoReply => Ok(Icmpv6Packet::EchoReply(IcmpCommon::try_from(data)?)),
-                _ => Err(NbugError::Packet(String::from(format!(
+                _ => Err(NbugError::Packet(format!(
                     "unhandled message type '{}'",
                     data[0]
-                )))),
+                ))),
             }
         }
     }

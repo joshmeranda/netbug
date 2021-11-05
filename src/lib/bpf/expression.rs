@@ -169,7 +169,7 @@ impl ExpressionBuilder {
 
         Into::<TokenStream>::into(expr)
             .into_iter()
-            .for_each(|token| self.tokens.push(token.clone()));
+            .for_each(|token| self.tokens.push(token));
 
         if parenthesis {
             self.tokens.push(Token::CloseParentheses);
@@ -232,10 +232,8 @@ impl ExpressionBuilder {
 
     /// Build the expression and return a [String] representation of the
     /// constructed expression.
-    pub fn build(&self) -> Expression {
-        let tokens = self.tokens.iter().map(|token| token.clone()).collect();
-
-        Expression(tokens)
+    pub fn build(self) -> Expression {
+        Expression(self.tokens.into())
     }
 }
 
@@ -244,6 +242,8 @@ impl ExpressionBuilder {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expression(TokenStream);
 
-impl Into<TokenStream> for Expression {
-    fn into(self) -> TokenStream { self.0 }
+impl From<Expression> for TokenStream {
+    fn from(expr: Expression) -> Self {
+        expr.0
+    }
 }

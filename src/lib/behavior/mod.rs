@@ -168,7 +168,7 @@ impl<'a> Behavior {
                 let mut sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
                 let buffer = Behavior::TEST_MESSAGE;
 
-                sock.write(buffer)?;
+                sock.write_all(buffer)?;
 
                 sock.shutdown(Shutdown::Both)?;
             },
@@ -184,21 +184,21 @@ impl<'a> Behavior {
                 let socket = match UdpSocket::bind(local_socket) {
                     Ok(sock) => sock,
                     Err(err) =>
-                        return Err(NbugError::Client(String::from(format!(
+                        return Err(NbugError::Client(format!(
                             "Error binding to socket at '{}': {}",
                             addr.to_string(),
                             err.to_string()
-                        )))),
+                        ))),
                 };
 
                 socket.send_to(Behavior::TEST_MESSAGE, addr)?;
             },
 
             _ =>
-                return Err(NbugError::Client(String::from(format!(
+                return Err(NbugError::Client(format!(
                     "found unsupported protocol number: {}",
                     self.protocol as u8
-                )))),
+                ))),
         };
 
         Ok(())

@@ -16,12 +16,12 @@ fn run_scheduled(mut client: Client, delay: Duration,  interval: Interval) {
 
     scheduler.every(interval).run(move || run_once(&mut client, delay));
 
-    let handle = scheduler.watch_thread(Duration::from_secs(1));
+    let _handle = scheduler.watch_thread(Duration::from_secs(1));
 
     // todo: handle interrupts
     loop { /* keep blocking for scheduled stuff */ }
 
-    handle.stop();
+    _handle.stop();
 }
 
 fn run_once(client: &mut Client, delay: Duration) {

@@ -39,7 +39,7 @@ impl FromStr for CaptureInterval {
                 }
             },
             None => Err(ConfigError::Other(
-                format!("could not parse an Interval from the string {}", s).to_owned(),
+                format!("could not parse an Interval from the string {}", s),
             )),
         }
     }

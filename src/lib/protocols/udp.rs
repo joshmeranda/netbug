@@ -23,10 +23,10 @@ impl TryFrom<&[u8]> for UdpPacket {
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         if data.len() < UdpPacket::BYTES {
-            return Err(NbugError::Packet(String::from(format!(
+            return Err(NbugError::Packet(format!(
                 "Too few bytes, expected at least {}",
                 UdpPacket::BYTES
-            ))));
+            )));
         }
 
         let mut source_bytes = [0u8; 2];

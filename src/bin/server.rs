@@ -106,10 +106,7 @@ fn get_report_path(report_dir: PathBuf, offset: usize) -> Option<PathBuf> {
         left_time.cmp(&right_time)
     });
 
-    match entries.get(offset) {
-        None => None,
-        Some(entry) => Some(entry.path()),
-    }
+    entries.get(offset).map(|entry| entry.path())
 }
 
 fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {

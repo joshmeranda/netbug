@@ -77,11 +77,7 @@ pub struct BehaviorReport<'a> {
 /// A collection of [BehaviorEvaluation]s
 impl<'a> BehaviorReport<'a> {
     pub fn new() -> Self {
-        BehaviorReport {
-            passing:     0,
-            failing:     0,
-            evaluations: vec![],
-        }
+        Self::default()
     }
 
     /// Add another evaluation to the report.
@@ -97,13 +93,23 @@ impl<'a> BehaviorReport<'a> {
     pub fn iter(&'a self) -> ReportIterator<'a> { ReportIterator::new(&self.evaluations) }
 }
 
+impl Default for BehaviorReport<'_> {
+    fn default() -> Self {
+        BehaviorReport {
+            passing:     0,
+            failing:     0,
+            evaluations: vec![],
+        }
+    }
+}
+
 pub struct ReportIterator<'a> {
-    evaluations: &'a Vec<BehaviorEvaluation<'a>>,
+    evaluations: &'a [BehaviorEvaluation<'a>],
     index:       usize,
 }
 
 impl<'a> ReportIterator<'a> {
-    pub fn new(evaluations: &'a Vec<BehaviorEvaluation>) -> ReportIterator<'a> {
+    pub fn new(evaluations: &'a [BehaviorEvaluation]) -> ReportIterator<'a> {
         ReportIterator { evaluations, index: 0 }
     }
 }

@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use pcap::Capture;
 
@@ -64,7 +64,7 @@ impl PcapProcessor<'_> {
 
     /// Process a single pcap file, by adding the found [ProtocolPacket]s
     /// into the given [BehaviorCollector].
-    fn process_pcap(&self, path: &PathBuf, collector: &mut BehaviorCollector) -> Result<()> {
+    fn process_pcap(&self, path: &Path, collector: &mut BehaviorCollector) -> Result<()> {
         let mut capture = Capture::from_file(path)?;
 
         while let Ok(packet) = capture.next() {

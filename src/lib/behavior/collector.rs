@@ -11,11 +11,17 @@ pub struct BehaviorCollector<'a> {
     behavior_map: HashMap<&'a Behavior, Vec<ProtocolPacket>>,
 }
 
-impl<'a> BehaviorCollector<'a> {
-    pub fn new() -> BehaviorCollector<'a> {
+impl Default for BehaviorCollector<'_> {
+    fn default() -> Self {
         BehaviorCollector {
             behavior_map: HashMap::new(),
         }
+    }
+}
+
+impl<'a> BehaviorCollector<'a> {
+    pub fn new() -> BehaviorCollector<'a> {
+        Self::default()
     }
 
     pub fn with_behaviors(behaviors: &'a [&Behavior]) -> BehaviorCollector<'a> {
@@ -44,12 +50,12 @@ impl<'a> BehaviorCollector<'a> {
             }
         }
 
-        Err(NbugError::Processing(String::from(format!(
+        Err(NbugError::Processing(format!(
             "no behavior matches header: {} src: {} and dst: {}",
             packet.header.protocol() as u8,
             packet.source.to_string(),
             packet.destination.to_string()
-        ))))
+        )))
     }
 
     fn packet_matches(behavior: &'a Behavior, packet: &'a ProtocolPacket) -> bool {

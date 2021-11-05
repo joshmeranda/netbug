@@ -110,7 +110,7 @@ impl Client {
         }
 
         for handle in handles {
-            if let Err(_) = handle.join() {
+            if handle.join().is_err() {
                 eprintln!("Error waiting for behavior thread to finish");
             }
         }
@@ -145,13 +145,13 @@ impl Client {
 
         for device in &self.devices {
             let capture_flag = Arc::clone(&self.capturing);
-            let device_name = String::from(device.name.clone());
+            let device_name = device.name.clone();
 
             let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
             if let Err(err) = capture.filter(self.filter.to_string().as_str()) {
                 return Err(NbugError::Client(
-                    format!("Error adding filter to capture: {}", err.to_string()).to_owned(),
+                    format!("Error adding filter to capture: {}", err.to_string()),
                 ));
             }
 
@@ -164,9 +164,9 @@ impl Client {
             let builder = Builder::new().name(device_name.clone());
             builder.spawn(move || {
                 while capture_flag.load(Ordering::SeqCst) {
-                    match capture.next() {
-                        Ok(packet) => save_file.write(&packet),
-                        Err(_) => {}, // todo: these errors should be handled
+                    // todo: errors should be handled / logged
+                    if let Ok(packet) = capture.next() {
+                        save_file.write(&packet)
                     }
                 }
 
@@ -233,14 +233,14 @@ impl Client {
         let data_len = fs::metadata(&pcap_path)?.len();
 
         // fill the header bytes with the relevant behavior
-        stream.write(&[MESSAGE_VERSION, interface_name.len() as u8])?;
+        stream.write_all(&[MESSAGE_VERSION, interface_name.len() as u8])?;
 
         let data_len_bytes: [u8; 8] = data_len.to_be_bytes();
-        stream.write(&data_len_bytes)?;
+        stream.write_all(&data_len_bytes)?;
 
         // add the interface name to the buffer
         let name_bytes = interface_name.as_bytes();
-        stream.write(&name_bytes)?;
+        stream.write_all(&name_bytes)?;
 
         io::copy(&mut pcap_file, stream)?;
 
@@ -258,7 +258,8 @@ impl Client {
         let mut iter = behaviors.iter().map(|behavior| behavior.as_filter(&options));
 
         let mut builder = FilterBuilder::with_filter(iter.next().unwrap().unwrap());
-        while let Some(filter) = iter.next() {
+
+        for filter in iter {
             match filter {
                 Some(f) => builder.or_filter(f),
                 None => eprintln!("Could not build a BPF filter "),

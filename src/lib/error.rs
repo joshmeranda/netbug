@@ -3,8 +3,6 @@ use std::fmt::{self, Display, Formatter};
 use std::io;
 use std::net::AddrParseError;
 
-use pcap;
-
 use super::config::error::ConfigError;
 
 pub type Result<T> = std::result::Result<T, NbugError>;

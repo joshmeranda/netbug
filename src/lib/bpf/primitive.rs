@@ -993,6 +993,7 @@ impl Primitive {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<TokenStream> for Primitive {
     fn into(self) -> TokenStream {
         let tokens = match self {

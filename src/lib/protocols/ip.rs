@@ -230,7 +230,7 @@ impl TryFrom<&[u8]> for Ipv6Packet {
         }
 
         let mut traffic_class: u8 = 0;
-        traffic_class |= data[0] & 0b1111_0000 | data[1] >> 4; // last 4 of first byte, and first 4 of second byte
+        traffic_class |= data[0] & 0b0000_1111 | data[1] >> 4; // last 4 of first byte, and first 4 of second byte
 
         let mut flow_label: u32 = data[1] as u32 & 0x0f;
         flow_label <<= 8;

@@ -5,11 +5,13 @@ use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
+use std::{future, thread};
+use std::task::Poll;
 use std::thread::{Builder, JoinHandle};
 use std::time::Duration;
 
 use pcap::{Capture, Device};
+use tokio::runtime::Runtime;
 
 use crate::behavior::Behavior;
 use crate::bpf::filter::{FilterBuilder, FilterExpression, FilterOptions};
@@ -83,45 +85,57 @@ impl Client {
 
     /// Run all client behaviors sequentially.
     pub fn run_behaviors(&self) -> Result<()> {
-        for behavior in &self.behaviors {
-            Client::run_behavior(behavior);
-        }
+        let runtime = Runtime::new().unwrap();
 
-        Ok(())
+        runtime.block_on(async {
+            for behavior in &self.behaviors {
+                behavior.run()?;
+            }
+
+            Ok(())
+        })
     }
 
     /// Run all client behaviors concurrently. Note that this function blocks
     /// until all behaviors have finished.
     pub fn run_behaviors_concurrent(&self) -> Result<()> {
         if !self.allow_concurrent {
-            return Err(NbugError::Client(String::from(
+            Err(NbugError::Client(String::from(
                 "Cannot run client behaviors concurrently when 'allow_concurrent' is false",
-            )));
-        }
+            )))
+        } else {
+            let mut behaviors = vec![];
 
-        let mut handles = Vec::<JoinHandle<()>>::with_capacity(self.behaviors.len());
-        for behavior in &self.behaviors {
-            let builder = thread::Builder::new();
-
-            unsafe {
-                // this is safe since all threads are joined before the method returns
-                handles.push(builder.spawn_unchecked(move || Client::run_behavior(&behavior))?);
+            for behavior in &self.behaviors {
+                match behavior.run() {
+                    Ok(f) => behaviors.push(f),
+                    Err(err) => eprintln!("Error running behavior: {}, {:?}", err.to_string(), behavior),
+                }
             }
-        }
 
-        for handle in handles {
-            if handle.join().is_err() {
-                eprintln!("Error waiting for behavior thread to finish");
-            }
-        }
+            let mut runtime = Runtime::new().unwrap();
 
-        Ok(())
+            runtime.block_on(async {
+                let parent_future = futures::future::join_all(behaviors);
+
+                todo!("this needs a much better error message (definitely better than a blank one");
+
+                match parent_future.await.iter().find(|r| r.is_err()) {
+                    Some(Err(err)) => Err(NbugError::Client("".to_string())),
+                    None => Ok(()),
+                    _ => unreachable!()
+                }
+            })
+        }
     }
 
     fn run_behavior(behavior: &Behavior) {
-        if let Err(err) = behavior.run() {
-            eprintln!("Error running behavior: {}, {:?}", err.to_string(), behavior);
-        }
+        let mut runtime = Runtime::new().unwrap();
+        runtime.block_on(async {
+            if let Err(err) = behavior.run() {
+                eprintln!("Error running behavior: {}, {:?}", err.to_string(), behavior);
+            }
+        })
     }
 
     /// Begin capturing packets on the configured network devices. Note that

@@ -5,8 +5,7 @@ use crate::behavior::Behavior;
 use crate::error::{NbugError, Result};
 use crate::protocols::{ProtocolHeader, ProtocolPacket};
 
-/// A basic collector for [Behavior]s and their corresponding
-/// [ProtocolPackets].
+/// A basic collector for [Behavior]s and their corresponding s[ProtocolPackets].
 pub struct BehaviorCollector<'a> {
     behavior_map: HashMap<&'a Behavior, Vec<ProtocolPacket>>,
 }

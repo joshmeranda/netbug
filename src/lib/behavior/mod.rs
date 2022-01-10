@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpStream, UdpSocket};
 use std::process::Command;
 use std::time::Duration;
@@ -15,12 +16,28 @@ pub mod collector;
 pub mod evaluate;
 
 use std::io::Write;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::task::JoinHandle;
 
 use evaluate::PacketStatus;
 
 use crate::bpf::filter::{FilterBuilder, FilterOptions};
 use crate::bpf::primitive::{EtherProtocol, Host, NetProtocol, Primitive};
 use crate::protocols::udp::UdpPacket;
+
+/// A future for running behaviors with async.
+struct BehaviorFuture<'a> {
+    runner: Box<dyn FnOnce() -> Result<()> + 'a>
+}
+
+impl <'a> BehaviorFuture<'a> {
+    fn new(f: impl FnOnce() -> Result<()> + 'a) -> BehaviorFuture<'a> {
+        BehaviorFuture {
+            runner: Box::new(f)
+        }
+    }
+}
 
 /// Simple macro to extract values from an enum struct variant. If only one
 /// value is requested only that value is returned, if multiple are requested,
@@ -38,7 +55,7 @@ use crate::protocols::udp::UdpPacket;
 /// let sample = Sample::Variant(0, 1, 2);
 /// assert_eq!(variant_extract!(sample, Sample::Variant(_, m, _), m), 1);
 /// # }
-/// ```2
+/// ```
 ///
 /// ```should_panic
 /// #  #[macro_use] extern crate netbug;
@@ -111,7 +128,7 @@ pub struct Behavior {
     command: Option<Vec<String>>,
 }
 
-impl<'a> Behavior {
+impl <'a> Behavior {
     // todo: consider using static for less memory usage
     const ICMP_ECHO_REPLY: &'a str = "Icmp Echo Reply";
     const ICMP_ECHO_REQUEST: &'a str = "Icmp Echo Request";
@@ -132,7 +149,7 @@ impl<'a> Behavior {
 
     /// Execute the behavior.
     /// todo: redirect stdout for commands
-    pub fn run(&self) -> Result<()> {
+    pub fn run(&self) -> Result<JoinHandle<Result<()>>> {
         let timeout = if let Some(duration) = self.timeout {
             duration
         } else {
@@ -140,68 +157,95 @@ impl<'a> Behavior {
         };
 
         if let Some(command) = &self.command {
-            let mut handle = Command::new(&command[0]).args(&command.as_slice()[1..]).spawn()?;
-            handle.wait()?;
+            Ok(tokio::task::spawn( {
+                let mut command = command.clone();
 
-            return Ok(());
+                async move {
+                    let mut handle = Command::new(command[0].as_str()).args(&command.as_slice()[1..]).spawn()?;
+
+                    handle.wait()?;
+
+                    Ok(())
+                }
+            }))
+        } else {
+            match self.protocol {
+                ProtocolNumber::Icmp => Ok(tokio::task::spawn({
+                    let addr = self.dst.to_string();
+
+                    async move {
+                        let mut handle = Command::new("ping").args(&["-c", "1", addr.as_str()]).spawn()?;
+                        handle.wait()?;
+
+                        Ok(())
+                    }
+                })),
+
+                ProtocolNumber::Ipv6Icmp => Ok(tokio::task::spawn({
+                    let addr = self.dst.to_string();
+
+                    async move {
+                        let mut handle = Command::new("ping").args(&["-6", "-c", "1", addr.as_str()]).spawn()?;
+                        handle.wait()?;
+
+                        Ok(())
+                    }
+                })),
+
+                ProtocolNumber::Tcp => Ok(tokio::task::spawn({
+                    let dst = self.dst;
+
+                    async move {
+                        let addr = match dst {
+                            Addr::Socket(addr) => addr,
+                          _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
+                        };
+
+                        let mut sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
+                        let buffer = Behavior::TEST_MESSAGE;
+
+                        sock.write_all(buffer)?;
+
+                        sock.shutdown(Shutdown::Both)?;
+
+                        Ok(())
+                    }
+                })),
+
+                ProtocolNumber::Udp => Ok(tokio::task::spawn({
+                    let dst = self.dst;
+
+                    async move {
+                        let addr = match dst {
+                            Addr::Socket(addr) => addr,
+                            _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
+                        };
+
+                        let local_socket = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0));
+
+                        let socket = match UdpSocket::bind(local_socket) {
+                            Ok(sock) => sock,
+                            Err(err) =>
+                                return Err(NbugError::Client(format!(
+                                    "Error binding to socket at '{}': {}",
+                                    addr.to_string(),
+                                    err.to_string()
+                                ))),
+                        };
+
+                        socket.send_to(Behavior::TEST_MESSAGE, addr)?;
+
+                        Ok(())
+                    }
+                })),
+
+                _ =>
+                    return Err(NbugError::Client(format!(
+                        "found unsupported protocol number: {}",
+                        self.protocol as u8
+                    ))),
+            }
         }
-
-        match self.protocol {
-            ProtocolNumber::Icmp => {
-                let mut handle = Command::new("ping").args(&["-c", "1", &self.dst.to_string()]).spawn()?;
-                handle.wait()?;
-            },
-
-            ProtocolNumber::Ipv6Icmp => {
-                let mut handle = Command::new("ping")
-                    .args(&["-6", "-c", "1", &self.dst.to_string()])
-                    .spawn()?;
-                handle.wait()?;
-            },
-
-            ProtocolNumber::Tcp => {
-                let addr = match self.dst {
-                    Addr::Socket(addr) => addr,
-                    _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
-                };
-
-                let mut sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
-                let buffer = Behavior::TEST_MESSAGE;
-
-                sock.write_all(buffer)?;
-
-                sock.shutdown(Shutdown::Both)?;
-            },
-
-            ProtocolNumber::Udp => {
-                let addr = match self.dst {
-                    Addr::Socket(addr) => addr,
-                    _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
-                };
-
-                let local_socket = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0));
-
-                let socket = match UdpSocket::bind(local_socket) {
-                    Ok(sock) => sock,
-                    Err(err) =>
-                        return Err(NbugError::Client(format!(
-                            "Error binding to socket at '{}': {}",
-                            addr.to_string(),
-                            err.to_string()
-                        ))),
-                };
-
-                socket.send_to(Behavior::TEST_MESSAGE, addr)?;
-            },
-
-            _ =>
-                return Err(NbugError::Client(format!(
-                    "found unsupported protocol number: {}",
-                    self.protocol as u8
-                ))),
-        };
-
-        Ok(())
     }
 
     /// Determine if a list off packets satisfies the expected behavior, and

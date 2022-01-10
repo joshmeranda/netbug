@@ -3,6 +3,12 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 use crate::Addr;
+use crate::behavior::Direction;
+use crate::protocols::{ProtocolNumber, ProtocolPacket};
+use crate::protocols::icmp::icmpv4::Icmpv4MessageKind;
+use crate::protocols::icmp::icmpv6::Icmpv6MessageKind;
+use crate::protocols::tcp::TcpControlBits;
+use crate::protocols::udp::UdpPacket;
 
 #[derive(Debug, Deserialize, Eq, Hash, Serialize, PartialEq)]
 pub enum PacketStatus {
@@ -21,6 +27,321 @@ impl ToString for PacketStatus {
         .to_owned()
     }
 }
+
+/*struct BehaviorEvaluator {
+
+}
+
+impl BehaviorEvaluator {
+        /// Determine if a list off packets satisfies the expected behavior, and
+        /// build a description of which steps of the behavior passed  and which
+        /// failed.
+        pub fn evaluate(&self, packets: &[ProtocolPacket]) -> BehaviorEvaluation {
+            match self.protocol {
+                ProtocolNumber::Icmp => self.evaluate_icmp(packets),
+                ProtocolNumber::Ipv6Icmp => self.evaluate_icmpv6(packets),
+                ProtocolNumber::Tcp => self.evaluate_tcp(packets),
+                ProtocolNumber::Udp => self.evaluate_udp(packets),
+                _ => todo!(),
+            }
+        }
+
+        /// evaluate behavior as icmpv4
+        fn evaluate_icmp(&self, packets: &[ProtocolPacket]) -> BehaviorEvaluation {
+            let mut has_request = false;
+            let mut has_reply = false;
+
+            for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Icmp) {
+                let icmp = variant_extract!(&packet.header, ProtocolHeader::Icmpv4(icmp), icmp);
+
+                match icmp.message_kind() {
+                    Icmpv4MessageKind::EchoReply => has_request = true,
+                    Icmpv4MessageKind::EchoRequest => has_reply = true,
+                    _ => {},
+                }
+            }
+
+            self.build_icmp_evaluation(has_reply, has_request)
+        }
+
+        /// evaluate behavior as icmpv6
+        fn evaluate_icmpv6(&self, packets: &[ProtocolPacket]) -> BehaviorEvaluation {
+            let mut has_request = false;
+            let mut has_reply = false;
+
+            for packet in packets
+                .iter()
+                .filter(|p| p.header.protocol() == ProtocolNumber::Ipv6Icmp)
+            {
+                let icmp = variant_extract!(&packet.header, ProtocolHeader::Icmpv6(icmp), icmp);
+
+                match icmp.message_kind() {
+                    Icmpv6MessageKind::EchoReply => has_request = true,
+                    Icmpv6MessageKind::EchoRequest => has_reply = true,
+                    _ => {},
+                }
+            }
+
+            self.build_icmp_evaluation(has_reply, has_request)
+        }
+
+        fn build_icmp_evaluation(&self, has_reply: bool, has_request: bool) -> BehaviorEvaluation {
+            let mut eval = BehaviorEvaluation::new(self.src, self.dst);
+
+            match self.direction {
+                Direction::Out => {
+                    eval.insert_status(
+                        Self::ICMP_ECHO_REPLY,
+                        if has_reply {
+                            PacketStatus::NotReceived
+                        } else {
+                            PacketStatus::Ok
+                        },
+                    );
+                    eval.insert_status(
+                        Self::ICMP_ECHO_REQUEST,
+                        if has_request {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                },
+                Direction::In => {
+                    eval.insert_status(
+                        Self::ICMP_ECHO_REPLY,
+                        if has_reply {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+
+                    // Receiving a request should not fail the behavior
+                    eval.insert_status(
+                        Self::ICMP_ECHO_REQUEST,
+                        if has_request {
+                            PacketStatus::Received
+                        } else {
+                            PacketStatus::Ok
+                        },
+                    );
+                },
+                Direction::Both => {
+                    eval.insert_status(
+                        Self::ICMP_ECHO_REPLY,
+                        if has_reply {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                    eval.insert_status(
+                        Self::ICMP_ECHO_REQUEST,
+                        if has_request {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                },
+            }
+
+            eval
+        }
+
+        fn evaluate_tcp(&self, packets: &[ProtocolPacket]) -> BehaviorEvaluation {
+            let mut has_syn = false;
+            let mut has_syn_ack = false;
+            let mut has_ack = false;
+
+            for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Tcp) {
+                let tcp = variant_extract!(&packet.header, ProtocolHeader::Tcp(tcp), tcp);
+                let control_bits = TcpControlBits::find_control_bits(tcp.control_bits);
+
+                if TcpControlBits::is_syn(&control_bits) {
+                    has_syn = true;
+                } else if TcpControlBits::is_syn_ack(&control_bits) {
+                    has_syn_ack = true;
+                } else if TcpControlBits::is_ack(&control_bits) {
+                    has_ack = true;
+                }
+            }
+
+            let mut eval = BehaviorEvaluation::new(self.src, self.dst);
+
+            match self.direction {
+                Direction::Out => {
+                    // the initial syn would still be recorded on the network if not allowed out of
+                    // the network,  but no other packets should be received
+                    // todo: consider using protocols to find the direction of travel rather than
+                    //   control bits?
+                    eval.insert_status(
+                        Self::TCP_SYN,
+                        if has_syn {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                    eval.insert_status(
+                        Self::TCP_SYN_ACK,
+                        if has_syn_ack {
+                            PacketStatus::Received
+                        } else {
+                            PacketStatus::Ok
+                        },
+                    );
+                    eval.insert_status(
+                        Self::TCP_ACK,
+                        if has_ack {
+                            PacketStatus::Received
+                        } else {
+                            PacketStatus::Ok
+                        },
+                    );
+                },
+                Direction::In => {
+                    // you should see incoming Syn packets and the responding SynAck, but no other
+                    // packets should be receivedd.
+                    eval.insert_status(
+                        Self::TCP_SYN,
+                        if has_syn {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                    eval.insert_status(
+                        Self::TCP_SYN_ACK,
+                        if has_syn_ack {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                    eval.insert_status(
+                        Self::TCP_ACK,
+                        if has_ack {
+                            PacketStatus::Received
+                        } else {
+                            PacketStatus::Ok
+                        },
+                    );
+                },
+                Direction::Both => {
+                    // the initial syn would still be recorded on the network if not allowed out of
+                    // the network
+                    eval.insert_status(
+                        Self::TCP_SYN,
+                        if has_syn {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                    eval.insert_status(
+                        Self::TCP_SYN_ACK,
+                        if has_syn_ack {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                    eval.insert_status(
+                        Self::TCP_ACK,
+                        if has_ack {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                },
+            }
+
+            eval
+        }
+
+        fn evaluate_udp(&self, packets: &[ProtocolPacket]) -> BehaviorEvaluation {
+            let mut has_egress = false;
+            let mut has_ingress = false;
+
+            let destination_port = self.dst.port().unwrap();
+
+            for packet in packets.iter().filter(|p| p.header.protocol() == ProtocolNumber::Udp) {
+                let header = &packet.header;
+                let udp: &UdpPacket = variant_extract!(header, ProtocolHeader::Udp(udp), udp);
+
+                if udp.destination_port == destination_port {
+                    has_egress = true;
+                } else {
+                    has_ingress = true;
+                }
+            }
+
+            let mut eval = BehaviorEvaluation::new(self.src, self.dst);
+
+            match self.direction {
+                Direction::Out => {
+                    eval.insert_status(
+                        Self::UDP_EGRESS,
+                        if has_egress {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                    eval.insert_status(
+                        Self::UDP_INGRESS,
+                        if has_ingress {
+                            PacketStatus::Received
+                        } else {
+                            PacketStatus::Ok
+                        },
+                    );
+                },
+                Direction::In => {
+                    eval.insert_status(
+                        Self::UDP_EGRESS,
+                        if has_egress {
+                            PacketStatus::Received
+                        } else {
+                            PacketStatus::Ok
+                        },
+                    );
+                    eval.insert_status(
+                        Self::UDP_INGRESS,
+                        if has_ingress {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                },
+                Direction::Both => {
+                    eval.insert_status(
+                        Self::UDP_EGRESS,
+                        if has_egress {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                    eval.insert_status(
+                        Self::UDP_INGRESS,
+                        if has_ingress {
+                            PacketStatus::Ok
+                        } else {
+                            PacketStatus::NotReceived
+                        },
+                    );
+                },
+            }
+
+            eval
+        }
+    }
+}*/
 
 /// A simple evaluation of single behavior, including a breakdown of any
 /// specific steps required by the behavior.

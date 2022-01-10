@@ -1,5 +1,3 @@
-#![feature(thread_spawn_unchecked)]
-
 pub mod behavior;
 pub mod bpf;
 pub mod client;

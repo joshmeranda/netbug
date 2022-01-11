@@ -38,9 +38,10 @@ impl FromStr for CaptureInterval {
                     _ => Err(ConfigError::Other(format!("Bad interval unit: {}", unit))),
                 }
             },
-            None => Err(ConfigError::Other(
-                format!("could not parse an Interval from the string {}", s),
-            )),
+            None => Err(ConfigError::Other(format!(
+                "could not parse an Interval from the string {}",
+                s
+            ))),
         }
     }
 }

@@ -5,23 +5,15 @@ use crate::behavior::Behavior;
 use crate::error::{NbugError, Result};
 use crate::protocols::{ProtocolHeader, ProtocolPacket};
 
-/// A basic collector for [Behavior]s and their corresponding s[ProtocolPackets].
+/// A basic collector for [Behavior]s and their corresponding
+/// s[ProtocolPackets].
+#[derive(Default)]
 pub struct BehaviorCollector<'a> {
     behavior_map: HashMap<&'a Behavior, Vec<ProtocolPacket>>,
 }
 
-impl Default for BehaviorCollector<'_> {
-    fn default() -> Self {
-        BehaviorCollector {
-            behavior_map: HashMap::new(),
-        }
-    }
-}
-
 impl<'a> BehaviorCollector<'a> {
-    pub fn new() -> BehaviorCollector<'a> {
-        Self::default()
-    }
+    pub fn new() -> BehaviorCollector<'a> { Self::default() }
 
     pub fn with_behaviors(behaviors: &'a [&Behavior]) -> BehaviorCollector<'a> {
         let mut behavior_map = HashMap::new();
@@ -34,9 +26,7 @@ impl<'a> BehaviorCollector<'a> {
     }
 
     /// Insert a new behavior into the collector.
-    pub fn insert_behavior(&mut self, behavior: &'a Behavior) {
-        self.behavior_map.insert(behavior, vec![]);
-    }
+    pub fn insert_behavior(&mut self, behavior: &'a Behavior) { self.behavior_map.insert(behavior, vec![]); }
 
     /// Insert a new header to the collector, if no matching behavior is found
     /// Err is returned.

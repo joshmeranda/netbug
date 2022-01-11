@@ -5,9 +5,7 @@ use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{future, thread};
-use std::task::Poll;
-use std::thread::{Builder, JoinHandle};
+use std::thread::Builder;
 use std::time::Duration;
 
 use pcap::{Capture, Device};
@@ -113,29 +111,19 @@ impl Client {
                 }
             }
 
-            let mut runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap();
 
             runtime.block_on(async {
                 let parent_future = futures::future::join_all(behaviors);
 
-                todo!("this needs a much better error message (definitely better than a blank one");
-
+                // todo: this needs a much bette error message (ideally it would show why the behavior failed)
                 match parent_future.await.iter().find(|r| r.is_err()) {
-                    Some(Err(err)) => Err(NbugError::Client("".to_string())),
+                    Some(Err(err)) => Err(NbugError::Client(format!("An error occurred running behaviors: {:?}", err))),
                     None => Ok(()),
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 }
             })
         }
-    }
-
-    fn run_behavior(behavior: &Behavior) {
-        let mut runtime = Runtime::new().unwrap();
-        runtime.block_on(async {
-            if let Err(err) = behavior.run() {
-                eprintln!("Error running behavior: {}, {:?}", err.to_string(), behavior);
-            }
-        })
     }
 
     /// Begin capturing packets on the configured network devices. Note that
@@ -164,9 +152,10 @@ impl Client {
             let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
             if let Err(err) = capture.filter(self.filter.to_string().as_str()) {
-                return Err(NbugError::Client(
-                    format!("Error adding filter to capture: {}", err.to_string()),
-                ));
+                return Err(NbugError::Client(format!(
+                    "Error adding filter to capture: {}",
+                    err.to_string()
+                )));
             }
 
             let mut pcap_path = PathBuf::from(&self.pcap_dir);
@@ -254,7 +243,7 @@ impl Client {
 
         // add the interface name to the buffer
         let name_bytes = interface_name.as_bytes();
-        stream.write_all(&name_bytes)?;
+        stream.write_all(name_bytes)?;
 
         io::copy(&mut pcap_file, stream)?;
 

@@ -26,7 +26,7 @@ impl PcapProcessor<'_> {
         let mut collector = BehaviorCollector::new();
 
         for behavior in self.behaviors {
-            collector.insert_behavior(&behavior);
+            collector.insert_behavior(behavior);
         }
 
         for entry in fs::read_dir(&self.pcap_dir)? {

@@ -232,9 +232,7 @@ impl ExpressionBuilder {
 
     /// Build the expression and return a [String] representation of the
     /// constructed expression.
-    pub fn build(self) -> Expression {
-        Expression(self.tokens.into())
-    }
+    pub fn build(self) -> Expression { Expression(self.tokens.into()) }
 }
 
 /// A representation of an arithmetic expression, to be used with a
@@ -243,7 +241,5 @@ impl ExpressionBuilder {
 pub struct Expression(TokenStream);
 
 impl From<Expression> for TokenStream {
-    fn from(expr: Expression) -> Self {
-        expr.0
-    }
+    fn from(expr: Expression) -> Self { expr.0 }
 }

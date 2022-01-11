@@ -9,7 +9,7 @@ use clokwerk::{Interval, Scheduler};
 use netbug::client::Client;
 use netbug::config::client::ClientConfig;
 
-fn run_scheduled(mut client: Client, delay: Duration,  interval: Interval) {
+fn run_scheduled(mut client: Client, delay: Duration, interval: Interval) {
     run_once(&mut client, delay);
 
     let mut scheduler = Scheduler::new();

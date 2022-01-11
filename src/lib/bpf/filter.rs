@@ -111,9 +111,7 @@ pub struct FilterOptions {
 
 impl FilterOptions {
     /// Create a new [`FilterOptions`] object with the default value.
-    pub fn new() -> FilterOptions {
-        Self::default()
-    }
+    pub fn new() -> FilterOptions { Self::default() }
 
     pub fn use_whitespace(&mut self, whitespace: bool) { self.whitespace = whitespace; }
 
@@ -125,9 +123,9 @@ impl FilterOptions {
 impl Default for FilterOptions {
     fn default() -> Self {
         Self {
-            whitespace: true,
+            whitespace:       true,
             symbol_operators: false,
-            verbosity: PrimitiveVerbosity::Exact,
+            verbosity:        PrimitiveVerbosity::Exact,
         }
     }
 }
@@ -333,7 +331,7 @@ impl<'a> FilterBuilder<'a> {
         let mut next = iter.next();
 
         while let Some(token) = next {
-            filter.push_str(token.repr(&self.options).as_str());
+            filter.push_str(token.repr(self.options).as_str());
 
             next = iter.next();
 
@@ -347,9 +345,7 @@ impl<'a> FilterBuilder<'a> {
 }
 
 impl From<FilterBuilder<'_>> for TokenStream {
-    fn from(builder: FilterBuilder<'_>) -> Self {
-        builder.tokens
-    }
+    fn from(builder: FilterBuilder<'_>) -> Self { builder.tokens }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]

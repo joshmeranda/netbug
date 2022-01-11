@@ -6,13 +6,11 @@ use crate::bpf::primitive::{Identifier, Primitive, Qualifier, RelOp};
 
 /// A simple collection of BPF filter tokens. Should never be handled directly
 /// by the user, and be hidden behind the abstraction of a [`FilterBuilder`].
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TokenStream(Vec<Token>);
 
 impl TokenStream {
-    pub fn new() -> TokenStream {
-        Self::default()
-    }
+    pub fn new() -> TokenStream { Self::default() }
 
     pub fn push(&mut self, token: Token) { self.0.push(token); }
 
@@ -25,10 +23,6 @@ impl TokenStream {
     pub fn len(&self) -> usize { self.0.len() }
 
     pub fn is_empty(&self) -> bool { self.0.is_empty() }
-}
-
-impl Default for TokenStream {
-    fn default() -> Self { Self(vec![]) }
 }
 
 impl FromIterator<Token> for TokenStream {
@@ -50,9 +44,7 @@ impl<'a> IntoIterator for &'a TokenStream {
 }
 
 impl From<Vec<Token>> for TokenStream {
-    fn from(v: Vec<Token>) -> Self {
-        Self(v)
-    }
+    fn from(v: Vec<Token>) -> Self { Self(v) }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

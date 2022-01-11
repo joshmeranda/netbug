@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpStream, UdpSocket};
 use std::process::Command;
 use std::time::Duration;
@@ -16,28 +15,13 @@ pub mod collector;
 pub mod evaluate;
 
 use std::io::Write;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use tokio::task::JoinHandle;
 
 use evaluate::PacketStatus;
+use tokio::task::JoinHandle;
 
 use crate::bpf::filter::{FilterBuilder, FilterOptions};
 use crate::bpf::primitive::{EtherProtocol, Host, NetProtocol, Primitive};
 use crate::protocols::udp::UdpPacket;
-
-/// A future for running behaviors with async.
-struct BehaviorFuture<'a> {
-    runner: Box<dyn FnOnce() -> Result<()> + 'a>
-}
-
-impl <'a> BehaviorFuture<'a> {
-    fn new(f: impl FnOnce() -> Result<()> + 'a) -> BehaviorFuture<'a> {
-        BehaviorFuture {
-            runner: Box::new(f)
-        }
-    }
-}
 
 /// Simple macro to extract values from an enum struct variant. If only one
 /// value is requested only that value is returned, if multiple are requested,
@@ -128,7 +112,7 @@ pub struct Behavior {
     command: Option<Vec<String>>,
 }
 
-impl <'a> Behavior {
+impl<'a> Behavior {
     // todo: consider using static for less memory usage
     const ICMP_ECHO_REPLY: &'a str = "Icmp Echo Reply";
     const ICMP_ECHO_REQUEST: &'a str = "Icmp Echo Request";
@@ -157,11 +141,13 @@ impl <'a> Behavior {
         };
 
         if let Some(command) = &self.command {
-            Ok(tokio::task::spawn( {
-                let mut command = command.clone();
+            Ok(tokio::task::spawn({
+                let command = command.clone();
 
                 async move {
-                    let mut handle = Command::new(command[0].as_str()).args(&command.as_slice()[1..]).spawn()?;
+                    let mut handle = Command::new(command[0].as_str())
+                        .args(&command.as_slice()[1..])
+                        .spawn()?;
 
                     handle.wait()?;
 
@@ -198,7 +184,7 @@ impl <'a> Behavior {
                     async move {
                         let addr = match dst {
                             Addr::Socket(addr) => addr,
-                          _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
+                            _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
                         };
 
                         let mut sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
@@ -418,7 +404,7 @@ impl <'a> Behavior {
             },
             Direction::In => {
                 // you should see incoming Syn packets and the responding SynAck, but no other
-                // packets should be receivedd.
+                // packets should be received.
                 eval.insert_status(
                     Self::TCP_SYN,
                     if has_syn {

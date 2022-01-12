@@ -11,7 +11,7 @@ use std::time::Duration;
 use pcap::{Capture, Device};
 use tokio::runtime::Runtime;
 
-use crate::behavior::Behavior;
+use crate::behavior::{Behavior, BehaviorRunner};
 use crate::bpf::filter::{FilterBuilder, FilterExpression, FilterOptions};
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
@@ -20,6 +20,10 @@ use crate::{BUFFER_SIZE, MESSAGE_VERSION};
 
 /// The main Netbug client to capture network and dump network traffic to pcap
 /// files.
+///
+/// todo: move the `run_behaviors` and `run_behaviors_concurrent` method's
+///       internal `runtime`s out so we don't waste resource building a new
+///       runtime each time we need to capture network data
 pub struct Client {
     pcap_dir: PathBuf,
 
@@ -31,7 +35,7 @@ pub struct Client {
 
     srv_addr: SocketAddr,
 
-    behaviors: Vec<Behavior>,
+    behavior_runners: Vec<BehaviorRunner>,
 
     filter: FilterExpression,
 
@@ -46,14 +50,14 @@ impl Default for Client {
             devices:          vec![],
             capturing:        Arc::new(AtomicBool::new(false)),
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
-            behaviors:        vec![],
+            behavior_runners:        vec![],
             filter:           FilterExpression::empty(),
             delay:            1,
         }
     }
 }
 
-impl Client {
+impl <'a> Client {
     pub fn new() -> Client { Client::default() }
 
     /// Construct a client from a [ClientConfig] which is consumed.
@@ -66,14 +70,18 @@ impl Client {
             .collect();
         let filter = match cfg.filter {
             Some(filter) => filter,
-            None => Client::bpf_filter(&cfg.behaviors),
+            None => {
+                let behaviors = cfg.behavior_runners.iter().map(|runner| &runner.behavior);
+
+                Client::bpf_filter(behaviors)
+            },
         };
 
         Client {
             pcap_dir: cfg.pcap_dir,
             allow_concurrent: cfg.allow_concurrent,
             srv_addr: cfg.srv_addr,
-            behaviors: cfg.behaviors,
+            behavior_runners: cfg.behavior_runners,
             devices,
             filter,
             capturing: Arc::new(AtomicBool::new(false)),
@@ -86,8 +94,8 @@ impl Client {
         let runtime = Runtime::new().unwrap();
 
         runtime.block_on(async {
-            for behavior in &self.behaviors {
-                behavior.run()?;
+            for runner in &self.behavior_runners {
+                runner.run()?;
             }
 
             Ok(())
@@ -104,10 +112,10 @@ impl Client {
         } else {
             let mut behaviors = vec![];
 
-            for behavior in &self.behaviors {
-                match behavior.run() {
+            for runner in &self.behavior_runners {
+                match runner.run() {
                     Ok(f) => behaviors.push(f),
-                    Err(err) => eprintln!("Error running behavior: {}, {:?}", err.to_string(), behavior),
+                    Err(err) => eprintln!("Error running behavior: {}, {:?}", err.to_string(), runner.behavior),
                 }
             }
 
@@ -252,13 +260,16 @@ impl Client {
 
     /// Generate the bpf filter to use to minimize the data captured by the
     /// client.
-    fn bpf_filter(behaviors: &[Behavior]) -> FilterExpression {
-        if behaviors.is_empty() {
+    fn bpf_filter<I>(behaviors: I) -> FilterExpression
+        where I: Iterator<Item = &'a Behavior> + ExactSizeIterator
+    {
+        // using len here since `ExactSizeIterator::is_empty` is unstable
+        if behaviors.len() == 0 {
             return FilterExpression::empty();
         }
 
         let options = FilterOptions::new();
-        let mut iter = behaviors.iter().map(|behavior| behavior.as_filter(&options));
+        let mut iter = behaviors.map(|behavior| behavior.as_filter(&options));
 
         let mut builder = FilterBuilder::with_filter(iter.next().unwrap().unwrap());
 

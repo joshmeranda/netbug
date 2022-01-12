@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer};
 
 use super::defaults;
 use super::error::{ConfigError, Result};
-use crate::behavior::Behavior;
+use crate::behavior::BehaviorRunner;
 use crate::bpf::filter::FilterExpression;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -93,7 +93,7 @@ pub struct ClientConfig {
     /// The host / ip and port pair of the target socket
     pub srv_addr: SocketAddr,
 
-    pub behaviors: Vec<Behavior>,
+    pub behavior_runners: Vec<BehaviorRunner>,
 
     /// If present, the given BPF filter is used when filtering packets. If not
     /// specified netbug will generate its own.

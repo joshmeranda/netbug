@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpStream, UdpSocket};
 use std::process::Command;
 use std::time::Duration;
@@ -103,19 +104,19 @@ pub struct Behavior {
     #[serde(default = "std::default::Default::default")]
     direction: Direction,
 
-    timeout: Option<Duration>,
+    /*timeout: Option<Duration>,
 
     /// The optional user specified command to cause the specific behavior
     /// rather than allowing netbug to take the appropriate actions. The
     /// first element is the command or path to executable to run, and the
     /// following elements are the arguments to pass to it.
-    command: Option<Vec<String>>,
+    command: Option<Vec<String>>,*/
 }
 
 impl<'a> Behavior {
     // todo: consider using static for less memory usage
-    const ICMP_ECHO_REPLY: &'a str = "Icmp Echo Reply";
-    const ICMP_ECHO_REQUEST: &'a str = "Icmp Echo Request";
+    const ICMP_ECHO_REPLY: &'a str = "IcmpEchoReply";
+    const ICMP_ECHO_REQUEST: &'a str = "IcmpEchoRequest";
 
     const TCP_SYN: &'a str = "TcpSyn";
     const TCP_ACK: &'a str = "TcpAck";
@@ -130,109 +131,6 @@ impl<'a> Behavior {
                                     and if you don't keep your feet, there's no knowing where you might be swept off \
                                     to."
     .as_bytes();
-
-    /// Execute the behavior.
-    /// todo: redirect stdout for commands
-    pub fn run(&self) -> Result<JoinHandle<Result<()>>> {
-        let timeout = if let Some(duration) = self.timeout {
-            duration
-        } else {
-            Duration::from_secs(1)
-        };
-
-        if let Some(command) = &self.command {
-            Ok(tokio::task::spawn({
-                let command = command.clone();
-
-                async move {
-                    let mut handle = Command::new(command[0].as_str())
-                        .args(&command.as_slice()[1..])
-                        .spawn()?;
-
-                    handle.wait()?;
-
-                    Ok(())
-                }
-            }))
-        } else {
-            match self.protocol {
-                ProtocolNumber::Icmp => Ok(tokio::task::spawn({
-                    let addr = self.dst.to_string();
-
-                    async move {
-                        let mut handle = Command::new("ping").args(&["-c", "1", addr.as_str()]).spawn()?;
-                        handle.wait()?;
-
-                        Ok(())
-                    }
-                })),
-
-                ProtocolNumber::Ipv6Icmp => Ok(tokio::task::spawn({
-                    let addr = self.dst.to_string();
-
-                    async move {
-                        let mut handle = Command::new("ping").args(&["-6", "-c", "1", addr.as_str()]).spawn()?;
-                        handle.wait()?;
-
-                        Ok(())
-                    }
-                })),
-
-                ProtocolNumber::Tcp => Ok(tokio::task::spawn({
-                    let dst = self.dst;
-
-                    async move {
-                        let addr = match dst {
-                            Addr::Socket(addr) => addr,
-                            _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
-                        };
-
-                        let mut sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
-                        let buffer = Behavior::TEST_MESSAGE;
-
-                        sock.write_all(buffer)?;
-
-                        sock.shutdown(Shutdown::Both)?;
-
-                        Ok(())
-                    }
-                })),
-
-                ProtocolNumber::Udp => Ok(tokio::task::spawn({
-                    let dst = self.dst;
-
-                    async move {
-                        let addr = match dst {
-                            Addr::Socket(addr) => addr,
-                            _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
-                        };
-
-                        let local_socket = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0));
-
-                        let socket = match UdpSocket::bind(local_socket) {
-                            Ok(sock) => sock,
-                            Err(err) =>
-                                return Err(NbugError::Client(format!(
-                                    "Error binding to socket at '{}': {}",
-                                    addr.to_string(),
-                                    err.to_string()
-                                ))),
-                        };
-
-                        socket.send_to(Behavior::TEST_MESSAGE, addr)?;
-
-                        Ok(())
-                    }
-                })),
-
-                _ =>
-                    return Err(NbugError::Client(format!(
-                        "found unsupported protocol number: {}",
-                        self.protocol as u8
-                    ))),
-            }
-        }
-    }
 
     /// Determine if a list off packets satisfies the expected behavior, and
     /// build a description of which steps of the behavior passed  and which
@@ -611,527 +509,644 @@ impl<'a> Behavior {
     }
 }
 
-#[cfg(test)]
-mod test_bpf {
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+pub struct BehaviorRunner {
+    #[serde(flatten)]
+    pub behavior: Behavior,
 
-    use crate::behavior::{Behavior, Direction};
-    use crate::bpf::filter::FilterOptions;
-    use crate::protocols::ProtocolNumber;
-    use crate::Addr;
+    timeout: Option<Duration>,
 
-    #[test]
-    fn test_tcp_bpf() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(8, 8, 8, 8), 80))),
-            protocol:  ProtocolNumber::Tcp,
-            direction: Direction::Both,
-            timeout:   None,
-            command:   None,
-        };
+    /// The optional user specified command to cause the specific behavior
+    /// rather than allowing netbug to take the appropriate actions. The
+    /// first element is the command or path to executable to run, and the
+    /// following elements are the arguments to pass to it.
+    command: Option<Vec<String>>,
+}
 
-        let options = FilterOptions::new();
-        let expr = behavior.as_filter(&options).unwrap().build();
+impl BehaviorRunner {
+    /// Execute the behavior.
+    ///
+    /// todo: redirect stdout for commands
+    pub fn run(&self) -> Result<JoinHandle<Result<()>>> {
+        if let Some(command) = &self.command {
+            Ok(tokio::task::spawn({
+                let command = command.clone();
 
-        assert_eq!(
-            expr.to_string(),
-            "tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port 80))"
-        );
+                async move {
+                    let mut handle = Command::new(command[0].as_str())
+                        .args(&command.as_slice()[1..])
+                        .spawn()?;
+
+                    handle.wait()?;
+
+                    Ok(())
+                }
+            }))
+        } else {
+            match self.behavior.protocol {
+                ProtocolNumber::Icmp => Ok(tokio::task::spawn({
+                    let addr = self.behavior.dst.to_string();
+
+                    async move {
+                        let mut handle = Command::new("ping").args(&["-c", "1", addr.as_str()]).spawn()?;
+                        handle.wait()?;
+
+                        Ok(())
+                    }
+                })),
+
+                ProtocolNumber::Ipv6Icmp => Ok(tokio::task::spawn({
+                    let addr = self.behavior.dst.to_string();
+
+                    async move {
+                        let mut handle = Command::new("ping").args(&["-6", "-c", "1", addr.as_str()]).spawn()?;
+                        handle.wait()?;
+
+                        Ok(())
+                    }
+                })),
+
+                ProtocolNumber::Tcp => Ok(tokio::task::spawn({
+                    let dst = self.behavior.dst;
+                    let timeout = self.timeout.unwrap_or_else(|| Duration::from_secs(1));
+
+                    async move {
+                        let addr = match dst {
+                            Addr::Socket(addr) => addr,
+                            _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
+                        };
+
+                        let mut sock = TcpStream::connect_timeout(&addr, timeout).unwrap();
+
+                        let buffer = Behavior::TEST_MESSAGE;
+
+                        sock.write_all(buffer)?;
+
+                        sock.shutdown(Shutdown::Both)?;
+
+                        Ok(())
+                    }
+                })),
+
+                ProtocolNumber::Udp => Ok(tokio::task::spawn({
+                    let dst = self.behavior.dst;
+
+                    async move {
+                        let addr = match dst {
+                            Addr::Socket(addr) => addr,
+                            _ => return Err(NbugError::Client(String::from("Expected socket address for behavior"))),
+                        };
+
+                        let local_socket = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0));
+
+                        let socket = match UdpSocket::bind(local_socket) {
+                            Ok(sock) => sock,
+                            Err(err) =>
+                                return Err(NbugError::Client(format!(
+                                    "Error binding to socket at '{}': {}",
+                                    addr.to_string(),
+                                    err.to_string()
+                                ))),
+                        };
+
+                        socket.send_to(Behavior::TEST_MESSAGE, addr)?;
+
+                        Ok(())
+                    }
+                })),
+
+                _ =>
+                    return Err(NbugError::Client(format!(
+                        "found unsupported protocol number: {}",
+                        self.behavior.protocol as u8
+                    ))),
+            }
+        }
     }
 }
 
 #[cfg(test)]
-mod test_evaluate {
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
-    use std::str::FromStr;
+mod test {
+    mod bpf {
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 
-    use super::Direction;
-    use crate::behavior::evaluate::{BehaviorEvaluation, PacketStatus};
-    use crate::behavior::Behavior;
-    use crate::bpf::filter::{FilterBuilder, FilterOptions};
-    use crate::bpf::primitive::Identifier::Protocol;
-    use crate::protocols::ethernet::{Ethernet2Packet, IeeEthernetPacket};
-    use crate::protocols::icmp::icmpv4::Icmpv4Packet;
-    use crate::protocols::icmp::IcmpCommon;
-    use crate::protocols::ip::{IpPacket, Ipv4Packet, ServiceType};
-    use crate::protocols::tcp::{TcpControlBits, TcpPacket};
-    use crate::protocols::udp::UdpPacket;
-    use crate::protocols::{ProtocolHeader, ProtocolNumber, ProtocolPacket};
-    use crate::Addr;
+        use crate::behavior::{Behavior, Direction};
+        use crate::bpf::filter::FilterOptions;
+        use crate::protocols::ProtocolNumber;
+        use crate::Addr;
 
-    static LOCAL_PORT: u16 = u16::MIN;
+        #[test]
+        fn test_tcp_bpf() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(8, 8, 8, 8), 80))),
+                protocol:  ProtocolNumber::Tcp,
+                direction: Direction::Both,
+                timeout:   None,
+                command:   None,
+            };
 
-    static REMOTE_PORT: u16 = u16::MAX;
+            let options = FilterOptions::new();
+            let expr = behavior.as_filter(&options).unwrap().build();
 
-    fn get_icmp_echo_request() -> ProtocolPacket {
-        ProtocolPacket {
-            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip:          IpPacket::V4(Ipv4Packet {
-                header_length:    0,
-                service_type:     ServiceType::Routine,
-                low_delay:        false,
-                high_throughput:  false,
-                high_reliability: false,
-                total_length:     0,
-                identification:   0,
-                flags:            0,
-                offset:           0,
-                ttl:              0,
-                protocol:         ProtocolNumber::Icmp,
-                checksum:         0,
-                source:           Ipv4Addr::new(127, 0, 0, 1),
-                destination:      Ipv4Addr::new(127, 0, 0, 1),
-            }),
-            header:      ProtocolHeader::Icmpv4(Icmpv4Packet::EchoRequest(IcmpCommon {
-                kind:       8,
-                code:       0,
-                checksum:   0,
-                identifier: 0,
-                sequence:   0,
-            })),
-            source:      Addr::from_str("127.0.0.1").unwrap(),
-            destination: Addr::from_str("127.0.0.1").unwrap(),
+            assert_eq!(
+                expr.to_string(),
+                "tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port 80))"
+            );
         }
     }
 
-    fn get_icmp_echo_reply() -> ProtocolPacket {
-        ProtocolPacket {
-            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip:          IpPacket::V4(Ipv4Packet {
-                header_length:    0,
-                service_type:     ServiceType::Routine,
-                low_delay:        false,
-                high_throughput:  false,
-                high_reliability: false,
-                total_length:     0,
-                identification:   0,
-                flags:            0,
-                offset:           0,
-                ttl:              0,
-                protocol:         ProtocolNumber::Icmp,
-                checksum:         0,
-                source:           Ipv4Addr::new(127, 0, 0, 1),
-                destination:      Ipv4Addr::new(127, 0, 0, 1),
-            }),
-            header:      ProtocolHeader::Icmpv4(Icmpv4Packet::EchoReply(IcmpCommon {
-                kind:       8,
-                code:       0,
-                checksum:   0,
-                identifier: 0,
-                sequence:   0,
-            })),
-            source:      Addr::from_str("127.0.0.1").unwrap(),
-            destination: Addr::from_str("127.0.0.1").unwrap(),
+    mod evaluate {
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+        use std::str::FromStr;
+
+        use super::Direction;
+        use crate::behavior::evaluate::{BehaviorEvaluation, PacketStatus};
+        use crate::behavior::Behavior;
+        use crate::bpf::filter::{FilterBuilder, FilterOptions};
+        use crate::bpf::primitive::Identifier::Protocol;
+        use crate::protocols::ethernet::{Ethernet2Packet, IeeEthernetPacket};
+        use crate::protocols::icmp::icmpv4::Icmpv4Packet;
+        use crate::protocols::icmp::IcmpCommon;
+        use crate::protocols::ip::{IpPacket, Ipv4Packet, ServiceType};
+        use crate::protocols::tcp::{TcpControlBits, TcpPacket};
+        use crate::protocols::udp::UdpPacket;
+        use crate::protocols::{ProtocolHeader, ProtocolNumber, ProtocolPacket};
+        use crate::Addr;
+
+        static LOCAL_PORT: u16 = u16::MIN;
+
+        static REMOTE_PORT: u16 = u16::MAX;
+
+        fn get_icmp_echo_request() -> ProtocolPacket {
+            ProtocolPacket {
+                ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+                ip:          IpPacket::V4(Ipv4Packet {
+                    header_length:    0,
+                    service_type:     ServiceType::Routine,
+                    low_delay:        false,
+                    high_throughput:  false,
+                    high_reliability: false,
+                    total_length:     0,
+                    identification:   0,
+                    flags:            0,
+                    offset:           0,
+                    ttl:              0,
+                    protocol:         ProtocolNumber::Icmp,
+                    checksum:         0,
+                    source:           Ipv4Addr::new(127, 0, 0, 1),
+                    destination:      Ipv4Addr::new(127, 0, 0, 1),
+                }),
+                header:      ProtocolHeader::Icmpv4(Icmpv4Packet::EchoRequest(IcmpCommon {
+                    kind:       8,
+                    code:       0,
+                    checksum:   0,
+                    identifier: 0,
+                    sequence:   0,
+                })),
+                source:      Addr::from_str("127.0.0.1").unwrap(),
+                destination: Addr::from_str("127.0.0.1").unwrap(),
+            }
         }
-    }
 
-    fn get_tcp_syn() -> ProtocolPacket {
-        ProtocolPacket {
-            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip:          IpPacket::V4(Ipv4Packet {
-                header_length:    0,
-                service_type:     ServiceType::Routine,
-                low_delay:        false,
-                high_throughput:  false,
-                high_reliability: false,
-                total_length:     0,
-                identification:   0,
-                flags:            0,
-                offset:           0,
-                ttl:              0,
-                protocol:         ProtocolNumber::Tcp,
-                checksum:         0,
-                source:           Ipv4Addr::new(127, 0, 0, 1),
-                destination:      Ipv4Addr::new(127, 0, 0, 1),
-            }),
-            header:      ProtocolHeader::Tcp(TcpPacket {
-                source_port:            LOCAL_PORT,
-                destination_port:       REMOTE_PORT,
-                sequence_number:        0,
-                acknowledgement_number: 0,
-                offset:                 0,
-                control_bits:           TcpControlBits::Syn as u8,
-                window:                 0,
-                checksum:               0,
-                urgent_pointer:         0,
-                options:                None,
-            }),
-            source:      Addr::from_str("127.0.0.1").unwrap(),
-            destination: Addr::from_str("127.0.0.1").unwrap(),
+        fn get_icmp_echo_reply() -> ProtocolPacket {
+            ProtocolPacket {
+                ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+                ip:          IpPacket::V4(Ipv4Packet {
+                    header_length:    0,
+                    service_type:     ServiceType::Routine,
+                    low_delay:        false,
+                    high_throughput:  false,
+                    high_reliability: false,
+                    total_length:     0,
+                    identification:   0,
+                    flags:            0,
+                    offset:           0,
+                    ttl:              0,
+                    protocol:         ProtocolNumber::Icmp,
+                    checksum:         0,
+                    source:           Ipv4Addr::new(127, 0, 0, 1),
+                    destination:      Ipv4Addr::new(127, 0, 0, 1),
+                }),
+                header:      ProtocolHeader::Icmpv4(Icmpv4Packet::EchoReply(IcmpCommon {
+                    kind:       8,
+                    code:       0,
+                    checksum:   0,
+                    identifier: 0,
+                    sequence:   0,
+                })),
+                source:      Addr::from_str("127.0.0.1").unwrap(),
+                destination: Addr::from_str("127.0.0.1").unwrap(),
+            }
         }
-    }
 
-    fn get_tcp_syn_ack() -> ProtocolPacket {
-        ProtocolPacket {
-            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip:          IpPacket::V4(Ipv4Packet {
-                header_length:    0,
-                service_type:     ServiceType::Routine,
-                low_delay:        false,
-                high_throughput:  false,
-                high_reliability: false,
-                total_length:     0,
-                identification:   0,
-                flags:            0,
-                offset:           0,
-                ttl:              0,
-                protocol:         ProtocolNumber::Tcp,
-                checksum:         0,
-                source:           Ipv4Addr::new(127, 0, 0, 1),
-                destination:      Ipv4Addr::new(127, 0, 0, 1),
-            }),
-            header:      ProtocolHeader::Tcp(TcpPacket {
-                source_port:            REMOTE_PORT,
-                destination_port:       LOCAL_PORT,
-                sequence_number:        0,
-                acknowledgement_number: 0,
-                offset:                 0,
-                control_bits:           TcpControlBits::Syn as u8 | TcpControlBits::Ack as u8,
-                window:                 0,
-                checksum:               0,
-                urgent_pointer:         0,
-                options:                None,
-            }),
-            source:      Addr::from_str("127.0.0.1").unwrap(),
-            destination: Addr::from_str("127.0.0.1").unwrap(),
+        fn get_tcp_syn() -> ProtocolPacket {
+            ProtocolPacket {
+                ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+                ip:          IpPacket::V4(Ipv4Packet {
+                    header_length:    0,
+                    service_type:     ServiceType::Routine,
+                    low_delay:        false,
+                    high_throughput:  false,
+                    high_reliability: false,
+                    total_length:     0,
+                    identification:   0,
+                    flags:            0,
+                    offset:           0,
+                    ttl:              0,
+                    protocol:         ProtocolNumber::Tcp,
+                    checksum:         0,
+                    source:           Ipv4Addr::new(127, 0, 0, 1),
+                    destination:      Ipv4Addr::new(127, 0, 0, 1),
+                }),
+                header:      ProtocolHeader::Tcp(TcpPacket {
+                    source_port:            LOCAL_PORT,
+                    destination_port:       REMOTE_PORT,
+                    sequence_number:        0,
+                    acknowledgement_number: 0,
+                    offset:                 0,
+                    control_bits:           TcpControlBits::Syn as u8,
+                    window:                 0,
+                    checksum:               0,
+                    urgent_pointer:         0,
+                    options:                None,
+                }),
+                source:      Addr::from_str("127.0.0.1").unwrap(),
+                destination: Addr::from_str("127.0.0.1").unwrap(),
+            }
         }
-    }
 
-    fn get_tcp_ack() -> ProtocolPacket {
-        ProtocolPacket {
-            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip:          IpPacket::V4(Ipv4Packet {
-                header_length:    0,
-                service_type:     ServiceType::Routine,
-                low_delay:        false,
-                high_throughput:  false,
-                high_reliability: false,
-                total_length:     0,
-                identification:   0,
-                flags:            0,
-                offset:           0,
-                ttl:              0,
-                protocol:         ProtocolNumber::Tcp,
-                checksum:         0,
-                source:           Ipv4Addr::new(127, 0, 0, 1),
-                destination:      Ipv4Addr::new(127, 0, 0, 1),
-            }),
-            header:      ProtocolHeader::Tcp(TcpPacket {
-                source_port:            REMOTE_PORT,
-                destination_port:       LOCAL_PORT,
-                sequence_number:        0,
-                acknowledgement_number: 0,
-                offset:                 0,
-                control_bits:           TcpControlBits::Ack as u8,
-                window:                 0,
-                checksum:               0,
-                urgent_pointer:         0,
-                options:                None,
-            }),
-            source:      Addr::from_str("127.0.0.1").unwrap(),
-            destination: Addr::from_str("127.0.0.1").unwrap(),
+        fn get_tcp_syn_ack() -> ProtocolPacket {
+            ProtocolPacket {
+                ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+                ip:          IpPacket::V4(Ipv4Packet {
+                    header_length:    0,
+                    service_type:     ServiceType::Routine,
+                    low_delay:        false,
+                    high_throughput:  false,
+                    high_reliability: false,
+                    total_length:     0,
+                    identification:   0,
+                    flags:            0,
+                    offset:           0,
+                    ttl:              0,
+                    protocol:         ProtocolNumber::Tcp,
+                    checksum:         0,
+                    source:           Ipv4Addr::new(127, 0, 0, 1),
+                    destination:      Ipv4Addr::new(127, 0, 0, 1),
+                }),
+                header:      ProtocolHeader::Tcp(TcpPacket {
+                    source_port:            REMOTE_PORT,
+                    destination_port:       LOCAL_PORT,
+                    sequence_number:        0,
+                    acknowledgement_number: 0,
+                    offset:                 0,
+                    control_bits:           TcpControlBits::Syn as u8 | TcpControlBits::Ack as u8,
+                    window:                 0,
+                    checksum:               0,
+                    urgent_pointer:         0,
+                    options:                None,
+                }),
+                source:      Addr::from_str("127.0.0.1").unwrap(),
+                destination: Addr::from_str("127.0.0.1").unwrap(),
+            }
         }
-    }
 
-    fn get_udp_in() -> ProtocolPacket {
-        ProtocolPacket {
-            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip:          IpPacket::V4(Ipv4Packet {
-                header_length:    0,
-                service_type:     ServiceType::Routine,
-                low_delay:        false,
-                high_throughput:  false,
-                high_reliability: false,
-                total_length:     0,
-                identification:   0,
-                flags:            0,
-                offset:           0,
-                ttl:              0,
-                protocol:         ProtocolNumber::Udp,
-                checksum:         0,
-                source:           Ipv4Addr::new(127, 0, 0, 1),
-                destination:      Ipv4Addr::new(127, 0, 0, 1),
-            }),
-            header:      ProtocolHeader::Udp(UdpPacket {
-                source_port:      REMOTE_PORT,
-                destination_port: LOCAL_PORT,
-                length:           0,
-                checksum:         0,
-            }),
-            source:      Addr::from_str("127.0.0.1").unwrap(),
-            destination: Addr::from_str("127.0.0.1").unwrap(),
+        fn get_tcp_ack() -> ProtocolPacket {
+            ProtocolPacket {
+                ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+                ip:          IpPacket::V4(Ipv4Packet {
+                    header_length:    0,
+                    service_type:     ServiceType::Routine,
+                    low_delay:        false,
+                    high_throughput:  false,
+                    high_reliability: false,
+                    total_length:     0,
+                    identification:   0,
+                    flags:            0,
+                    offset:           0,
+                    ttl:              0,
+                    protocol:         ProtocolNumber::Tcp,
+                    checksum:         0,
+                    source:           Ipv4Addr::new(127, 0, 0, 1),
+                    destination:      Ipv4Addr::new(127, 0, 0, 1),
+                }),
+                header:      ProtocolHeader::Tcp(TcpPacket {
+                    source_port:            REMOTE_PORT,
+                    destination_port:       LOCAL_PORT,
+                    sequence_number:        0,
+                    acknowledgement_number: 0,
+                    offset:                 0,
+                    control_bits:           TcpControlBits::Ack as u8,
+                    window:                 0,
+                    checksum:               0,
+                    urgent_pointer:         0,
+                    options:                None,
+                }),
+                source:      Addr::from_str("127.0.0.1").unwrap(),
+                destination: Addr::from_str("127.0.0.1").unwrap(),
+            }
         }
-    }
 
-    fn get_udp_out() -> ProtocolPacket {
-        ProtocolPacket {
-            ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
-            ip:          IpPacket::V4(Ipv4Packet {
-                header_length:    0,
-                service_type:     ServiceType::Routine,
-                low_delay:        false,
-                high_throughput:  false,
-                high_reliability: false,
-                total_length:     0,
-                identification:   0,
-                flags:            0,
-                offset:           0,
-                ttl:              0,
-                protocol:         ProtocolNumber::Udp,
-                checksum:         0,
-                source:           Ipv4Addr::new(127, 0, 0, 1),
-                destination:      Ipv4Addr::new(127, 0, 0, 1),
-            }),
-            header:      ProtocolHeader::Udp(UdpPacket {
-                source_port:      LOCAL_PORT,
-                destination_port: REMOTE_PORT,
-                length:           0,
-                checksum:         0,
-            }),
-            source:      Addr::from_str("127.0.0.1").unwrap(),
-            destination: Addr::from_str("127.0.0.1").unwrap(),
+        fn get_udp_in() -> ProtocolPacket {
+            ProtocolPacket {
+                ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+                ip:          IpPacket::V4(Ipv4Packet {
+                    header_length:    0,
+                    service_type:     ServiceType::Routine,
+                    low_delay:        false,
+                    high_throughput:  false,
+                    high_reliability: false,
+                    total_length:     0,
+                    identification:   0,
+                    flags:            0,
+                    offset:           0,
+                    ttl:              0,
+                    protocol:         ProtocolNumber::Udp,
+                    checksum:         0,
+                    source:           Ipv4Addr::new(127, 0, 0, 1),
+                    destination:      Ipv4Addr::new(127, 0, 0, 1),
+                }),
+                header:      ProtocolHeader::Udp(UdpPacket {
+                    source_port:      REMOTE_PORT,
+                    destination_port: LOCAL_PORT,
+                    length:           0,
+                    checksum:         0,
+                }),
+                source:      Addr::from_str("127.0.0.1").unwrap(),
+                destination: Addr::from_str("127.0.0.1").unwrap(),
+            }
         }
-    }
 
-    #[test]
-    fn test_icmp_in_out() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
-            protocol:  ProtocolNumber::Icmp,
-            direction: Direction::Both,
-            timeout:   None,
-            command:   None,
-        };
+        fn get_udp_out() -> ProtocolPacket {
+            ProtocolPacket {
+                ether:       IeeEthernetPacket::Ieee8022(Ethernet2Packet::new([0; 6], [0; 6], ProtocolNumber::Icmp)),
+                ip:          IpPacket::V4(Ipv4Packet {
+                    header_length:    0,
+                    service_type:     ServiceType::Routine,
+                    low_delay:        false,
+                    high_throughput:  false,
+                    high_reliability: false,
+                    total_length:     0,
+                    identification:   0,
+                    flags:            0,
+                    offset:           0,
+                    ttl:              0,
+                    protocol:         ProtocolNumber::Udp,
+                    checksum:         0,
+                    source:           Ipv4Addr::new(127, 0, 0, 1),
+                    destination:      Ipv4Addr::new(127, 0, 0, 1),
+                }),
+                header:      ProtocolHeader::Udp(UdpPacket {
+                    source_port:      LOCAL_PORT,
+                    destination_port: REMOTE_PORT,
+                    length:           0,
+                    checksum:         0,
+                }),
+                source:      Addr::from_str("127.0.0.1").unwrap(),
+                destination: Addr::from_str("127.0.0.1").unwrap(),
+            }
+        }
 
-        let mut actual = behavior.evaluate(&[get_icmp_echo_reply(), get_icmp_echo_request()]);
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
-        );
-        expected.insert_status(Behavior::ICMP_ECHO_REQUEST, PacketStatus::Ok);
-        expected.insert_status(Behavior::ICMP_ECHO_REPLY, PacketStatus::Ok);
+        #[test]
+        fn test_icmp_in_out() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
+                protocol:  ProtocolNumber::Icmp,
+                direction: Direction::Both,
+                timeout:   None,
+                command:   None,
+            };
 
-        assert_eq!(expected, actual);
-    }
+            let mut actual = behavior.evaluate(&[get_icmp_echo_reply(), get_icmp_echo_request()]);
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
+            );
+            expected.insert_status(Behavior::ICMP_ECHO_REQUEST, PacketStatus::Ok);
+            expected.insert_status(Behavior::ICMP_ECHO_REPLY, PacketStatus::Ok);
 
-    #[test]
-    fn test_icmp_in() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
-            protocol:  ProtocolNumber::Icmp,
-            direction: Direction::In,
-            timeout:   None,
-            command:   None,
-        };
+            assert_eq!(expected, actual);
+        }
 
-        let actual = behavior.evaluate(&[get_icmp_echo_request()]);
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
-        );
+        #[test]
+        fn test_icmp_in() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
+                protocol:  ProtocolNumber::Icmp,
+                direction: Direction::In,
+                timeout:   None,
+                command:   None,
+            };
 
-        expected.insert_status(Behavior::ICMP_ECHO_REQUEST, PacketStatus::Ok);
-        expected.insert_status(Behavior::ICMP_ECHO_REPLY, PacketStatus::Ok);
+            let actual = behavior.evaluate(&[get_icmp_echo_request()]);
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
+            );
 
-        assert_eq!(actual, expected);
-    }
+            expected.insert_status(Behavior::ICMP_ECHO_REQUEST, PacketStatus::Ok);
+            expected.insert_status(Behavior::ICMP_ECHO_REPLY, PacketStatus::Ok);
 
-    #[test]
-    fn test_icmp_out() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
-            protocol:  ProtocolNumber::Icmp,
-            direction: Direction::Out,
-            timeout:   None,
-            command:   None,
-        };
+            assert_eq!(actual, expected);
+        }
 
-        let actual = behavior.evaluate(&[get_icmp_echo_reply()]);
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
-        );
+        #[test]
+        fn test_icmp_out() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
+                protocol:  ProtocolNumber::Icmp,
+                direction: Direction::Out,
+                timeout:   None,
+                command:   None,
+            };
 
-        expected.insert_status(Behavior::ICMP_ECHO_REQUEST, PacketStatus::Ok);
-        expected.insert_status(Behavior::ICMP_ECHO_REPLY, PacketStatus::Ok);
+            let actual = behavior.evaluate(&[get_icmp_echo_reply()]);
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
+            );
 
-        assert_eq!(actual, expected);
-    }
+            expected.insert_status(Behavior::ICMP_ECHO_REQUEST, PacketStatus::Ok);
+            expected.insert_status(Behavior::ICMP_ECHO_REPLY, PacketStatus::Ok);
 
-    #[test]
-    fn test_tcp_in_out() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-            protocol:  ProtocolNumber::Tcp,
-            direction: Direction::Both,
-            timeout:   None,
-            command:   None,
-        };
+            assert_eq!(actual, expected);
+        }
 
-        let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-        );
+        #[test]
+        fn test_tcp_in_out() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+                protocol:  ProtocolNumber::Tcp,
+                direction: Direction::Both,
+                timeout:   None,
+                command:   None,
+            };
 
-        expected.insert_status(Behavior::TCP_SYN, PacketStatus::Ok);
-        expected.insert_status(Behavior::TCP_SYN_ACK, PacketStatus::Ok);
-        expected.insert_status(Behavior::TCP_ACK, PacketStatus::Ok);
+            let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+            );
 
-        assert_eq!(expected, actual);
-    }
+            expected.insert_status(Behavior::TCP_SYN, PacketStatus::Ok);
+            expected.insert_status(Behavior::TCP_SYN_ACK, PacketStatus::Ok);
+            expected.insert_status(Behavior::TCP_ACK, PacketStatus::Ok);
 
-    #[test]
-    fn test_tcp_in() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-            protocol:  ProtocolNumber::Tcp,
-            direction: Direction::In,
-            timeout:   None,
-            command:   None,
-        };
+            assert_eq!(expected, actual);
+        }
 
-        let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-        );
-        expected.insert_status(Behavior::TCP_SYN, PacketStatus::Ok);
-        expected.insert_status(Behavior::TCP_SYN_ACK, PacketStatus::Ok);
-        expected.insert_status(Behavior::TCP_ACK, PacketStatus::Received);
+        #[test]
+        fn test_tcp_in() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+                protocol:  ProtocolNumber::Tcp,
+                direction: Direction::In,
+                timeout:   None,
+                command:   None,
+            };
 
-        assert_eq!(expected, actual);
-    }
+            let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+            );
+            expected.insert_status(Behavior::TCP_SYN, PacketStatus::Ok);
+            expected.insert_status(Behavior::TCP_SYN_ACK, PacketStatus::Ok);
+            expected.insert_status(Behavior::TCP_ACK, PacketStatus::Received);
 
-    #[test]
-    fn test_tcp_out() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-            protocol:  ProtocolNumber::Tcp,
-            direction: Direction::Out,
-            timeout:   None,
-            command:   None,
-        };
+            assert_eq!(expected, actual);
+        }
 
-        let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
+        #[test]
+        fn test_tcp_out() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+                protocol:  ProtocolNumber::Tcp,
+                direction: Direction::Out,
+                timeout:   None,
+                command:   None,
+            };
 
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-        );
-        expected.insert_status(Behavior::TCP_SYN, PacketStatus::Ok);
-        expected.insert_status(Behavior::TCP_SYN_ACK, PacketStatus::Received);
-        expected.insert_status(Behavior::TCP_ACK, PacketStatus::Received);
+            let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
 
-        assert_eq!(expected, actual);
-    }
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+            );
+            expected.insert_status(Behavior::TCP_SYN, PacketStatus::Ok);
+            expected.insert_status(Behavior::TCP_SYN_ACK, PacketStatus::Received);
+            expected.insert_status(Behavior::TCP_ACK, PacketStatus::Received);
 
-    #[test]
-    fn test_udp_in_out() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-            protocol:  ProtocolNumber::Udp,
-            direction: Direction::Both,
-            timeout:   None,
-            command:   None,
-        };
+            assert_eq!(expected, actual);
+        }
 
-        let actual = behavior.evaluate(&[get_udp_in(), get_udp_out()]);
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-        );
-        expected.insert_status(Behavior::UDP_INGRESS, PacketStatus::Ok);
-        expected.insert_status(Behavior::UDP_EGRESS, PacketStatus::Ok);
+        #[test]
+        fn test_udp_in_out() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+                protocol:  ProtocolNumber::Udp,
+                direction: Direction::Both,
+                timeout:   None,
+                command:   None,
+            };
 
-        assert_eq!(expected, actual);
-    }
+            let actual = behavior.evaluate(&[get_udp_in(), get_udp_out()]);
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+            );
+            expected.insert_status(Behavior::UDP_INGRESS, PacketStatus::Ok);
+            expected.insert_status(Behavior::UDP_EGRESS, PacketStatus::Ok);
 
-    #[test]
-    fn test_udp_in() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-            protocol:  ProtocolNumber::Udp,
-            direction: Direction::In,
-            timeout:   None,
-            command:   None,
-        };
+            assert_eq!(expected, actual);
+        }
 
-        let actual = behavior.evaluate(&[get_udp_in()]);
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-        );
-        expected.insert_status(Behavior::UDP_INGRESS, PacketStatus::Ok);
-        expected.insert_status(Behavior::UDP_EGRESS, PacketStatus::Ok);
+        #[test]
+        fn test_udp_in() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+                protocol:  ProtocolNumber::Udp,
+                direction: Direction::In,
+                timeout:   None,
+                command:   None,
+            };
 
-        assert_eq!(expected, actual);
-    }
+            let actual = behavior.evaluate(&[get_udp_in()]);
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+            );
+            expected.insert_status(Behavior::UDP_INGRESS, PacketStatus::Ok);
+            expected.insert_status(Behavior::UDP_EGRESS, PacketStatus::Ok);
 
-    #[test]
-    fn test_udp_out() {
-        let behavior = Behavior {
-            src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-            protocol:  ProtocolNumber::Udp,
-            direction: Direction::Out,
-            timeout:   None,
-            command:   None,
-        };
+            assert_eq!(expected, actual);
+        }
 
-        let mut actual = behavior.evaluate(&[get_udp_out()]);
-        let mut expected = BehaviorEvaluation::new(
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
-                Ipv4Addr::new(127, 0, 0, 1),
-                REMOTE_PORT,
-            ))),
-        );
-        expected.insert_status(Behavior::UDP_INGRESS, PacketStatus::Ok);
-        expected.insert_status(Behavior::UDP_EGRESS, PacketStatus::Ok);
+        #[test]
+        fn test_udp_out() {
+            let behavior = Behavior {
+                src:       IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+                protocol:  ProtocolNumber::Udp,
+                direction: Direction::Out,
+                timeout:   None,
+                command:   None,
+            };
 
-        assert_eq!(expected, actual);
+            let mut actual = behavior.evaluate(&[get_udp_out()]);
+            let mut expected = BehaviorEvaluation::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                Addr::Socket(SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    REMOTE_PORT,
+                ))),
+            );
+            expected.insert_status(Behavior::UDP_INGRESS, PacketStatus::Ok);
+            expected.insert_status(Behavior::UDP_EGRESS, PacketStatus::Ok);
+
+            assert_eq!(expected, actual);
+        }
     }
 }

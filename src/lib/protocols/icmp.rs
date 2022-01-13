@@ -371,7 +371,7 @@ mod test {
 
     use crate::protocols::icmp::icmpv4::Icmpv4Packet;
     use crate::protocols::icmp::icmpv6::Icmpv6Packet;
-    use crate::protocols::icmp::{IcmpCommon, IcmpPacket};
+    use crate::protocols::icmp::IcmpCommon;
 
     const SAMPLE_ICMP_V4_DATA: &[u8] = &[
         0x00, // type (echo reply)

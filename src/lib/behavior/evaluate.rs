@@ -116,7 +116,6 @@ impl<'a> Iterator for ReportIterator<'a> {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use std::net::IpAddr;
     use std::str::FromStr;
 

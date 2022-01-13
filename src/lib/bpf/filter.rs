@@ -362,10 +362,9 @@ impl ToString for FilterExpression {
 
 #[cfg(test)]
 mod test {
-    use crate::bpf::expression::{Expression, ExpressionBuilder, Operand};
-    use crate::bpf::filter::{FilterBuilder, FilterExpression, FilterOptions, PrimitiveVerbosity};
+    use crate::bpf::expression::{ExpressionBuilder, Operand};
+    use crate::bpf::filter::{FilterBuilder, FilterOptions, PrimitiveVerbosity};
     use crate::bpf::primitive::{EtherProtocol, IsoProtocol, NetProtocol, Primitive, QualifierProtocol, RelOp};
-    use crate::bpf::token::Token::RelationalOperator;
 
     ///////////////////////////////////////////////////////////////////////////
 

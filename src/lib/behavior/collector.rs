@@ -237,8 +237,6 @@ mod test {
             dst:       Addr::Internet(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             protocol:  ProtocolNumber::Icmp,
             direction: Direction::Both,
-            timeout:   None,
-            command:   None,
         };
 
         assert!(BehaviorCollector::packet_matches(&behavior, &get_icmp_packet()));
@@ -254,8 +252,6 @@ mod test {
             dst:       Addr::Internet(IpAddr::V6(Ipv6Addr::from_str("::1").unwrap())),
             protocol:  ProtocolNumber::Ipv6Icmp,
             direction: Direction::Both,
-            timeout:   None,
-            command:   None,
         };
 
         assert!(!BehaviorCollector::packet_matches(&behavior, &get_icmp_packet()));
@@ -274,8 +270,6 @@ mod test {
             ))),
             protocol:  ProtocolNumber::Tcp,
             direction: Direction::Both,
-            timeout:   None,
-            command:   None,
         };
 
         assert!(!BehaviorCollector::packet_matches(&behavior, &get_icmp_packet()));
@@ -294,8 +288,6 @@ mod test {
             ))),
             protocol:  ProtocolNumber::Udp,
             direction: Direction::In,
-            timeout:   None,
-            command:   None,
         };
 
         assert!(!BehaviorCollector::packet_matches(&behavior, &get_icmp_packet()));

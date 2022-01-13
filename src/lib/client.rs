@@ -288,7 +288,6 @@ impl <'a> Client {
 mod test {
     use crate::behavior::Behavior;
     use crate::client::Client;
-    use crate::protocols::ProtocolNumber;
 
     #[test]
     fn test_filter_builder() {
@@ -300,7 +299,7 @@ mod test {
         behaviors.push(tcp);
 
         assert_eq!(
-            Client::bpf_filter(behaviors.as_slice()).to_string(),
+            Client::bpf_filter(behaviors.iter()).to_string(),
             "(icmp and ((host 127.0.0.1) or (host 8.8.8.8))) or (tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port \
              80)))"
         );

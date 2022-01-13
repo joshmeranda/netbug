@@ -642,8 +642,6 @@ mod test {
                 dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(8, 8, 8, 8), 80))),
                 protocol:  ProtocolNumber::Tcp,
                 direction: Direction::Both,
-                timeout:   None,
-                command:   None,
             };
 
             let options = FilterOptions::new();
@@ -660,11 +658,8 @@ mod test {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
         use std::str::FromStr;
 
-        use super::Direction;
         use crate::behavior::evaluate::{BehaviorEvaluation, PacketStatus};
-        use crate::behavior::Behavior;
-        use crate::bpf::filter::{FilterBuilder, FilterOptions};
-        use crate::bpf::primitive::Identifier::Protocol;
+        use crate::behavior::{Behavior, Direction};
         use crate::protocols::ethernet::{Ethernet2Packet, IeeEthernetPacket};
         use crate::protocols::icmp::icmpv4::Icmpv4Packet;
         use crate::protocols::icmp::IcmpCommon;
@@ -915,11 +910,9 @@ mod test {
                 dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
                 protocol:  ProtocolNumber::Icmp,
                 direction: Direction::Both,
-                timeout:   None,
-                command:   None,
             };
 
-            let mut actual = behavior.evaluate(&[get_icmp_echo_reply(), get_icmp_echo_request()]);
+            let actual = behavior.evaluate(&[get_icmp_echo_reply(), get_icmp_echo_request()]);
             let mut expected = BehaviorEvaluation::new(
                 IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
@@ -937,8 +930,6 @@ mod test {
                 dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
                 protocol:  ProtocolNumber::Icmp,
                 direction: Direction::In,
-                timeout:   None,
-                command:   None,
             };
 
             let actual = behavior.evaluate(&[get_icmp_echo_request()]);
@@ -960,8 +951,6 @@ mod test {
                 dst:       Addr::Socket(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 80))),
                 protocol:  ProtocolNumber::Icmp,
                 direction: Direction::Out,
-                timeout:   None,
-                command:   None,
             };
 
             let actual = behavior.evaluate(&[get_icmp_echo_reply()]);
@@ -986,8 +975,6 @@ mod test {
                 ))),
                 protocol:  ProtocolNumber::Tcp,
                 direction: Direction::Both,
-                timeout:   None,
-                command:   None,
             };
 
             let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
@@ -1016,8 +1003,6 @@ mod test {
                 ))),
                 protocol:  ProtocolNumber::Tcp,
                 direction: Direction::In,
-                timeout:   None,
-                command:   None,
             };
 
             let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
@@ -1045,8 +1030,6 @@ mod test {
                 ))),
                 protocol:  ProtocolNumber::Tcp,
                 direction: Direction::Out,
-                timeout:   None,
-                command:   None,
             };
 
             let actual = behavior.evaluate(&[get_tcp_syn(), get_tcp_syn_ack(), get_tcp_ack()]);
@@ -1075,8 +1058,6 @@ mod test {
                 ))),
                 protocol:  ProtocolNumber::Udp,
                 direction: Direction::Both,
-                timeout:   None,
-                command:   None,
             };
 
             let actual = behavior.evaluate(&[get_udp_in(), get_udp_out()]);
@@ -1103,8 +1084,6 @@ mod test {
                 ))),
                 protocol:  ProtocolNumber::Udp,
                 direction: Direction::In,
-                timeout:   None,
-                command:   None,
             };
 
             let actual = behavior.evaluate(&[get_udp_in()]);
@@ -1131,11 +1110,9 @@ mod test {
                 ))),
                 protocol:  ProtocolNumber::Udp,
                 direction: Direction::Out,
-                timeout:   None,
-                command:   None,
             };
 
-            let mut actual = behavior.evaluate(&[get_udp_out()]);
+            let actual = behavior.evaluate(&[get_udp_out()]);
             let mut expected = BehaviorEvaluation::new(
                 IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
                 Addr::Socket(SocketAddr::V4(SocketAddrV4::new(

@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use clokwerk::Interval;
 use regex::Regex;
-use serde::de::Error;
+use serde::de::{Error, Unexpected};
 use serde::{Deserialize, Deserializer};
 
 use super::defaults;
@@ -24,7 +24,14 @@ impl FromStr for CaptureInterval {
 
         match re.captures(s) {
             Some(captures) => {
-                let size: u32 = captures.get(1).unwrap().as_str().parse().unwrap();
+
+                let size: u32 = match captures.get(1) {
+                    Some(value) => match value.as_str().parse() {
+                        Ok(size) => size,
+                        Err(err) => return Err(ConfigError::Toml(Error::custom(format!("could not parse duration from '{}': {}", s, err)))),
+                    },
+                    None => return Err(ConfigError::Toml(Error::invalid_value(Unexpected::Str(s), &"missing quantity for unit")))
+                };
 
                 let unit = match captures.get(2) {
                     Some(u) => u.as_str(),
@@ -125,11 +132,11 @@ impl ClientConfig {
 #[cfg(test)]
 mod test {
     use clokwerk::Interval;
-    use serde::de::Error;
+    use toml::de::Error;
 
     use crate::config::client::CaptureInterval;
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Debug, PartialEq)]
     struct IntervalWrapper {
         interval: CaptureInterval,
     }
@@ -168,30 +175,34 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
     fn test_missing_size() {
         let content = "interval = \"s\"";
-        let wrapper: IntervalWrapper = toml::from_str(content).unwrap();
+        let wrapper: Result<IntervalWrapper, Error> = toml::from_str(content);
+
+        assert!(wrapper.is_err())
     }
 
     #[test]
-    #[should_panic]
     fn test_invalid_size() {
         let content = "interval = \"5.5s\"";
-        let wrapper: IntervalWrapper = toml::from_str(content).unwrap();
+        let wrapper: Result<IntervalWrapper, Error> = toml::from_str(content);
+
+        assert!(wrapper.is_err())
     }
 
     #[test]
-    #[should_panic]
     fn test_missing_unit() {
         let content = "interval = \"5\"";
-        let wrapper: IntervalWrapper = toml::from_str(content).unwrap();
+        let wrapper: Result<IntervalWrapper, Error> = toml::from_str(content);
+
+        assert!(wrapper.is_err())
     }
 
     #[test]
-    #[should_panic]
     fn test_invalid_unit() {
         let content = "interval = \"5z\"";
-        let wrapper: IntervalWrapper = toml::from_str(content).unwrap();
+        let wrapper: Result<IntervalWrapper, Error> = toml::from_str(content);
+
+        assert!(wrapper.is_err());
     }
 }

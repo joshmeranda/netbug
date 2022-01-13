@@ -32,7 +32,11 @@ fn run(cfg: ServerConfig) {
 
     if !cfg.report_dir.exists() {
         if let Err(err) = fs::create_dir_all(cfg.report_dir.clone()) {
-            eprintln!("Unable to create report directory art '{}': {}", cfg.report_dir.to_str().unwrap(), err.to_string());
+            eprintln!(
+                "Unable to create report directory art '{}': {}",
+                cfg.report_dir.to_str().unwrap(),
+                err.to_string()
+            );
         }
     }
 

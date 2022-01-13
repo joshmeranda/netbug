@@ -64,7 +64,7 @@ impl<'a> BehaviorEvaluation<'a> {
     pub fn data(&self) -> Iter<'_, &'a str, PacketStatus> { self.packet_status.iter() }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct BehaviorReport<'a> {
     passing: usize,
 
@@ -76,9 +76,7 @@ pub struct BehaviorReport<'a> {
 
 /// A collection of [BehaviorEvaluation]s
 impl<'a> BehaviorReport<'a> {
-    pub fn new() -> Self {
-        Self::default()
-    }
+    pub fn new() -> Self { Self::default() }
 
     /// Add another evaluation to the report.
     pub fn add(&mut self, evaluation: BehaviorEvaluation<'a>) {
@@ -93,25 +91,13 @@ impl<'a> BehaviorReport<'a> {
     pub fn iter(&'a self) -> ReportIterator<'a> { ReportIterator::new(&self.evaluations) }
 }
 
-impl Default for BehaviorReport<'_> {
-    fn default() -> Self {
-        BehaviorReport {
-            passing:     0,
-            failing:     0,
-            evaluations: vec![],
-        }
-    }
-}
-
 pub struct ReportIterator<'a> {
     evaluations: &'a [BehaviorEvaluation<'a>],
     index:       usize,
 }
 
 impl<'a> ReportIterator<'a> {
-    pub fn new(evaluations: &'a [BehaviorEvaluation]) -> ReportIterator<'a> {
-        ReportIterator { evaluations, index: 0 }
-    }
+    pub fn new(evaluations: &'a [BehaviorEvaluation]) -> ReportIterator<'a> { ReportIterator { evaluations, index: 0 } }
 }
 
 impl<'a> Iterator for ReportIterator<'a> {
@@ -130,7 +116,6 @@ impl<'a> Iterator for ReportIterator<'a> {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use std::net::IpAddr;
     use std::str::FromStr;
 

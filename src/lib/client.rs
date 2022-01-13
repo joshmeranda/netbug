@@ -5,13 +5,13 @@ use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread;
-use std::thread::{Builder, JoinHandle};
+use std::thread::Builder;
 use std::time::Duration;
 
 use pcap::{Capture, Device};
+use tokio::runtime::Runtime;
 
-use crate::behavior::Behavior;
+use crate::behavior::{Behavior, BehaviorRunner};
 use crate::bpf::filter::{FilterBuilder, FilterExpression, FilterOptions};
 use crate::config::client::ClientConfig;
 use crate::config::defaults;
@@ -20,6 +20,10 @@ use crate::{BUFFER_SIZE, MESSAGE_VERSION};
 
 /// The main Netbug client to capture network and dump network traffic to pcap
 /// files.
+///
+/// todo: move the `run_behaviors` and `run_behaviors_concurrent` method's
+///       internal `runtime`s out so we don't waste resource building a new
+///       runtime each time we need to capture network data
 pub struct Client {
     pcap_dir: PathBuf,
 
@@ -31,7 +35,7 @@ pub struct Client {
 
     srv_addr: SocketAddr,
 
-    behaviors: Vec<Behavior>,
+    behavior_runners: Vec<BehaviorRunner>,
 
     filter: FilterExpression,
 
@@ -46,14 +50,14 @@ impl Default for Client {
             devices:          vec![],
             capturing:        Arc::new(AtomicBool::new(false)),
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
-            behaviors:        vec![],
+            behavior_runners:        vec![],
             filter:           FilterExpression::empty(),
             delay:            1,
         }
     }
 }
 
-impl Client {
+impl <'a> Client {
     pub fn new() -> Client { Client::default() }
 
     /// Construct a client from a [ClientConfig] which is consumed.
@@ -66,14 +70,18 @@ impl Client {
             .collect();
         let filter = match cfg.filter {
             Some(filter) => filter,
-            None => Client::bpf_filter(&cfg.behaviors),
+            None => {
+                let behaviors = cfg.behavior_runners.iter().map(|runner| &runner.behavior);
+
+                Client::bpf_filter(behaviors)
+            },
         };
 
         Client {
             pcap_dir: cfg.pcap_dir,
             allow_concurrent: cfg.allow_concurrent,
             srv_addr: cfg.srv_addr,
-            behaviors: cfg.behaviors,
+            behavior_runners: cfg.behavior_runners,
             devices,
             filter,
             capturing: Arc::new(AtomicBool::new(false)),
@@ -83,44 +91,46 @@ impl Client {
 
     /// Run all client behaviors sequentially.
     pub fn run_behaviors(&self) -> Result<()> {
-        for behavior in &self.behaviors {
-            Client::run_behavior(behavior);
-        }
+        let runtime = Runtime::new().unwrap();
 
-        Ok(())
+        runtime.block_on(async {
+            for runner in &self.behavior_runners {
+                runner.run()?;
+            }
+
+            Ok(())
+        })
     }
 
     /// Run all client behaviors concurrently. Note that this function blocks
     /// until all behaviors have finished.
     pub fn run_behaviors_concurrent(&self) -> Result<()> {
         if !self.allow_concurrent {
-            return Err(NbugError::Client(String::from(
+            Err(NbugError::Client(String::from(
                 "Cannot run client behaviors concurrently when 'allow_concurrent' is false",
-            )));
-        }
+            )))
+        } else {
+            let mut behaviors = vec![];
 
-        let mut handles = Vec::<JoinHandle<()>>::with_capacity(self.behaviors.len());
-        for behavior in &self.behaviors {
-            let builder = thread::Builder::new();
-
-            unsafe {
-                // this is safe since all threads are joined before the method returns
-                handles.push(builder.spawn_unchecked(move || Client::run_behavior(&behavior))?);
+            for runner in &self.behavior_runners {
+                match runner.run() {
+                    Ok(f) => behaviors.push(f),
+                    Err(err) => eprintln!("Error running behavior: {}, {:?}", err.to_string(), runner.behavior),
+                }
             }
-        }
 
-        for handle in handles {
-            if handle.join().is_err() {
-                eprintln!("Error waiting for behavior thread to finish");
-            }
-        }
+            let runtime = Runtime::new().unwrap();
 
-        Ok(())
-    }
+            runtime.block_on(async {
+                let parent_future = futures::future::join_all(behaviors);
 
-    fn run_behavior(behavior: &Behavior) {
-        if let Err(err) = behavior.run() {
-            eprintln!("Error running behavior: {}, {:?}", err.to_string(), behavior);
+                // todo: this needs a much bette error message (ideally it would show why the behavior failed)
+                match parent_future.await.iter().find(|r| r.is_err()) {
+                    Some(Err(err)) => Err(NbugError::Client(format!("An error occurred running behaviors: {:?}", err))),
+                    None => Ok(()),
+                    _ => unreachable!(),
+                }
+            })
         }
     }
 
@@ -150,9 +160,10 @@ impl Client {
             let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
             if let Err(err) = capture.filter(self.filter.to_string().as_str()) {
-                return Err(NbugError::Client(
-                    format!("Error adding filter to capture: {}", err.to_string()),
-                ));
+                return Err(NbugError::Client(format!(
+                    "Error adding filter to capture: {}",
+                    err.to_string()
+                )));
             }
 
             let mut pcap_path = PathBuf::from(&self.pcap_dir);
@@ -240,7 +251,7 @@ impl Client {
 
         // add the interface name to the buffer
         let name_bytes = interface_name.as_bytes();
-        stream.write_all(&name_bytes)?;
+        stream.write_all(name_bytes)?;
 
         io::copy(&mut pcap_file, stream)?;
 
@@ -249,13 +260,16 @@ impl Client {
 
     /// Generate the bpf filter to use to minimize the data captured by the
     /// client.
-    fn bpf_filter(behaviors: &[Behavior]) -> FilterExpression {
-        if behaviors.is_empty() {
+    fn bpf_filter<I>(behaviors: I) -> FilterExpression
+        where I: Iterator<Item = &'a Behavior> + ExactSizeIterator
+    {
+        // using len here since `ExactSizeIterator::is_empty` is unstable
+        if behaviors.len() == 0 {
             return FilterExpression::empty();
         }
 
         let options = FilterOptions::new();
-        let mut iter = behaviors.iter().map(|behavior| behavior.as_filter(&options));
+        let mut iter = behaviors.map(|behavior| behavior.as_filter(&options));
 
         let mut builder = FilterBuilder::with_filter(iter.next().unwrap().unwrap());
 
@@ -274,7 +288,6 @@ impl Client {
 mod test {
     use crate::behavior::Behavior;
     use crate::client::Client;
-    use crate::protocols::ProtocolNumber;
 
     #[test]
     fn test_filter_builder() {
@@ -286,7 +299,7 @@ mod test {
         behaviors.push(tcp);
 
         assert_eq!(
-            Client::bpf_filter(behaviors.as_slice()).to_string(),
+            Client::bpf_filter(behaviors.iter()).to_string(),
             "(icmp and ((host 127.0.0.1) or (host 8.8.8.8))) or (tcp and ((host 127.0.0.1) or (host 8.8.8.8 and port \
              80)))"
         );

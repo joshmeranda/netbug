@@ -333,7 +333,7 @@ mod test {
 
     #[test]
     fn ethernet_from_raw_too_small() {
-        if let Ok(n) = Ethernet3Packet::try_from(&SAMPLE_IEE_802_3_DATA[1..]) {
+        if let Ok(_) = Ethernet3Packet::try_from(&SAMPLE_IEE_802_3_DATA[1..]) {
             panic!("too few bytes were provided, try_from should have failed");
         }
     }

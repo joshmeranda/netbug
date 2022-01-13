@@ -278,10 +278,11 @@ impl TryFrom<&[u8]> for ProtocolPacket {
             ProtocolNumber::Ipv6Icmp => ProtocolHeader::Icmpv6(Icmpv6Packet::try_from(&data[offset..])?),
             ProtocolNumber::Tcp => ProtocolHeader::Tcp(TcpPacket::try_from(&data[offset..])?),
             ProtocolNumber::Udp => ProtocolHeader::Udp(UdpPacket::try_from(&data[offset..])?),
-            number => return Err(NbugError::Packet(format!(
-                "Unsupported or invalid protocol number: {}",
-                number as u8
-            ))),
+            number =>
+                return Err(NbugError::Packet(format!(
+                    "Unsupported or invalid protocol number: {}",
+                    number as u8
+                ))),
         };
 
         Ok(ProtocolPacket::new(ether, ip, header))

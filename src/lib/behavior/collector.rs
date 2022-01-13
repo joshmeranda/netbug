@@ -6,23 +6,14 @@ use crate::error::{NbugError, Result};
 use crate::protocols::{ProtocolHeader, ProtocolPacket};
 
 /// A basic collector for [Behavior]s and their corresponding
-/// [ProtocolPackets].
+/// s[ProtocolPackets].
+#[derive(Default)]
 pub struct BehaviorCollector<'a> {
     behavior_map: HashMap<&'a Behavior, Vec<ProtocolPacket>>,
 }
 
-impl Default for BehaviorCollector<'_> {
-    fn default() -> Self {
-        BehaviorCollector {
-            behavior_map: HashMap::new(),
-        }
-    }
-}
-
 impl<'a> BehaviorCollector<'a> {
-    pub fn new() -> BehaviorCollector<'a> {
-        Self::default()
-    }
+    pub fn new() -> BehaviorCollector<'a> { Self::default() }
 
     pub fn with_behaviors(behaviors: &'a [&Behavior]) -> BehaviorCollector<'a> {
         let mut behavior_map = HashMap::new();
@@ -35,9 +26,7 @@ impl<'a> BehaviorCollector<'a> {
     }
 
     /// Insert a new behavior into the collector.
-    pub fn insert_behavior(&mut self, behavior: &'a Behavior) {
-        self.behavior_map.insert(behavior, vec![]);
-    }
+    pub fn insert_behavior(&mut self, behavior: &'a Behavior) { self.behavior_map.insert(behavior, vec![]); }
 
     /// Insert a new header to the collector, if no matching behavior is found
     /// Err is returned.
@@ -248,8 +237,6 @@ mod test {
             dst:       Addr::Internet(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             protocol:  ProtocolNumber::Icmp,
             direction: Direction::Both,
-            timeout:   None,
-            command:   None,
         };
 
         assert!(BehaviorCollector::packet_matches(&behavior, &get_icmp_packet()));
@@ -265,8 +252,6 @@ mod test {
             dst:       Addr::Internet(IpAddr::V6(Ipv6Addr::from_str("::1").unwrap())),
             protocol:  ProtocolNumber::Ipv6Icmp,
             direction: Direction::Both,
-            timeout:   None,
-            command:   None,
         };
 
         assert!(!BehaviorCollector::packet_matches(&behavior, &get_icmp_packet()));
@@ -285,8 +270,6 @@ mod test {
             ))),
             protocol:  ProtocolNumber::Tcp,
             direction: Direction::Both,
-            timeout:   None,
-            command:   None,
         };
 
         assert!(!BehaviorCollector::packet_matches(&behavior, &get_icmp_packet()));
@@ -305,8 +288,6 @@ mod test {
             ))),
             protocol:  ProtocolNumber::Udp,
             direction: Direction::In,
-            timeout:   None,
-            command:   None,
         };
 
         assert!(!BehaviorCollector::packet_matches(&behavior, &get_icmp_packet()));

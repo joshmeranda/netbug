@@ -98,7 +98,6 @@ pub struct Behavior {
 
     dst: Addr,
 
-    #[serde(rename = "protocol")]
     protocol: ProtocolNumber,
 
     #[serde(default = "std::default::Default::default")]
@@ -605,7 +604,7 @@ impl BehaviorRunner {
                                 return Err(NbugError::Client(format!(
                                     "Error binding to socket at '{}': {}",
                                     addr.to_string(),
-                                    err.to_string()
+                                    err
                                 ))),
                         };
 

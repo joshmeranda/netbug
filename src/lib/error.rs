@@ -24,9 +24,9 @@ impl Display for NbugError {
             NbugError::Client(msg) => write!(f, "Client error: {}", msg),
             NbugError::Server(msg) => write!(f, "Server error: {}", msg),
             NbugError::Processing(msg) => write!(f, "Processing error: {}", msg),
-            NbugError::Io(err) => write!(f, "System io error: {}", err.to_string()),
-            NbugError::Config(err) => write!(f, "{}", err.to_string()),
-            NbugError::Pcap(err) => write!(f, "Pcap Error: {}", err.to_string()),
+            NbugError::Io(err) => write!(f, "System io error: {}", err),
+            NbugError::Config(err) => write!(f, "{}", err),
+            NbugError::Pcap(err) => write!(f, "Pcap Error: {}", err),
             NbugError::Packet(msg) => write!(f, "Client error: {}", msg),
         }
     }

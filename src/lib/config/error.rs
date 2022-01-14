@@ -18,10 +18,10 @@ impl Display for ConfigError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ConfigError::Io(err) => {
-                write!(f, "Error reading configuration file: {}", err.to_string())
+                write!(f, "Error reading configuration file: {}", err)
             },
-            ConfigError::Toml(err) => write!(f, "Error parsing configuration: {}", err.to_string()),
-            ConfigError::Addr(err) => write!(f, "Bad address: {}", err.to_string()),
+            ConfigError::Toml(err) => write!(f, "Error parsing configuration: {}", err),
+            ConfigError::Addr(err) => write!(f, "Bad address: {}", err),
             ConfigError::Other(s) => write!(f, "{}", s),
         }
     }

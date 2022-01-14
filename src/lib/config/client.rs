@@ -61,7 +61,7 @@ impl<'de> Deserialize<'de> for CaptureInterval {
 
         match CaptureInterval::from_str(s) {
             Ok(interval) => Ok(interval),
-            Err(err) => Err(<D as Deserializer<'de>>::Error::custom(err.to_string())),
+            Err(err) => Err(<D as Deserializer<'de>>::Error::custom(err)),
         }
     }
 }
@@ -100,6 +100,7 @@ pub struct ClientConfig {
     /// The host / ip and port pair of the target socket
     pub srv_addr: SocketAddr,
 
+    #[serde(rename = "behaviors")]
     pub behavior_runners: Vec<BehaviorRunner>,
 
     /// If present, the given BPF filter is used when filtering packets. If not

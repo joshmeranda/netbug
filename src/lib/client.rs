@@ -1,14 +1,12 @@
+use std::collections::HashMap;
 use std::default::Default;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::thread::Builder;
 use std::time::Duration;
 
-use pcap::{Capture, Device};
+use pcap::{Active, Capture, Device};
 use tokio::runtime::Runtime;
 
 use crate::behavior::{Behavior, BehaviorRunner};
@@ -24,14 +22,21 @@ use crate::{BUFFER_SIZE, MESSAGE_VERSION};
 /// todo: move the `run_behaviors` and `run_behaviors_concurrent` method's
 ///       internal `runtime`s out so we don't waste resource building a new
 ///       runtime each time we need to capture network data
+/// todo: might make more sense to change `allow_concurrent` to a group of
+///       sequential and a group of concurrent behaviors
+/// todo: we need an actual logging framework rather than just printing to stdout
 pub struct Client {
     pcap_dir: PathBuf,
 
     pub allow_concurrent: bool,
 
+    // todo: this duplication of Device with a reference is likely a pretty bad idea
+    //       might be better to store the capture along with its pcap or add the save_file when
     devices: Vec<Device>,
 
-    capturing: Arc<AtomicBool>,
+    /// It may be counterintuitive for the save file path to be the key, it is
+    /// cleaner since [Capture] is not hashtable.
+    captures: HashMap<PathBuf, Capture<Active>>,
 
     srv_addr: SocketAddr,
 
@@ -48,7 +53,7 @@ impl Default for Client {
             pcap_dir:         defaults::default_pcap_dir(),
             allow_concurrent: defaults::client::default_concurrent_run(),
             devices:          vec![],
-            capturing:        Arc::new(AtomicBool::new(false)),
+            captures: HashMap::new(),
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behavior_runners:        vec![],
             filter:           FilterExpression::empty(),
@@ -64,10 +69,11 @@ impl <'a> Client {
     pub fn from_config(cfg: ClientConfig) -> Client {
         // find the list of valid devices on which to start a packet capture
         let devices = Device::list().unwrap();
-        let devices: Vec<Device> = devices
+        let devices:Vec<Device> = devices
             .into_iter()
             .filter(|device| cfg.interfaces.contains(&device.name))
             .collect();
+
         let filter = match cfg.filter {
             Some(filter) => filter,
             None => {
@@ -83,8 +89,8 @@ impl <'a> Client {
             srv_addr: cfg.srv_addr,
             behavior_runners: cfg.behavior_runners,
             devices,
+            captures: HashMap::new(),
             filter,
-            capturing: Arc::new(AtomicBool::new(false)),
             delay: cfg.delay,
         }
     }
@@ -139,6 +145,9 @@ impl <'a> Client {
     /// output, be mindful of your client's scoping to prevent capturing
     /// unnecessary packets. The resulting captures will always be in sequential
     /// order.
+    ///
+    /// todo: make the two errors at the top distinct, to allow the user more
+    ///       control over how to handle each unique situation
     pub fn start_capture(&mut self) -> Result<()> {
         if self.is_capturing() {
             return Err(NbugError::Client(String::from("capture is already running")));
@@ -151,41 +160,20 @@ impl <'a> Client {
             fs::create_dir_all(self.pcap_dir.clone())?;
         }
 
-        self.capturing.store(true, Ordering::SeqCst);
-
         for device in &self.devices {
-            let capture_flag = Arc::clone(&self.capturing);
-            let device_name = device.name.clone();
-
+            let save_file_path = self.pcap_dir.join(format!("{}.pcap", device.name));
             let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
             if let Err(err) = capture.filter(self.filter.to_string().as_str()) {
                 return Err(NbugError::Client(format!(
                     "Error adding filter to capture: {}",
-                    err.to_string()
-                )));
+                    err
+                )))
             }
 
-            let mut pcap_path = PathBuf::from(&self.pcap_dir);
-            pcap_path.push(format!("{}.pcap", &device_name));
+            self.captures.insert(save_file_path, capture);
 
-            let mut save_file = capture.savefile(pcap_path).unwrap();
-
-            // todo: add timestamp to end of pcap name
-            let builder = Builder::new().name(device_name.clone());
-            builder.spawn(move || {
-                while capture_flag.load(Ordering::SeqCst) {
-                    // todo: errors should be handled / logged
-                    if let Ok(packet) = capture.next() {
-                        save_file.write(&packet)
-                    }
-                }
-
-                // force immediate pcap dump
-                std::mem::drop(save_file);
-            })?;
-
-            println!("Started capture for device '{}'", device_name)
+            println!("Started capture for device '{}'", device.name.as_str());
         }
 
         Ok(())
@@ -204,17 +192,23 @@ impl <'a> Client {
     }
 
     fn stop_capture_now(&mut self) -> Result<()> {
-        if !self.is_capturing() {
-            return Err(NbugError::Client(String::from("no capture is running")));
-        }
+        // each save file should be dropped and flushed since they will go out
+        // of scope after their use in this loops
+        for (save_file_path, mut capture) in self.captures.drain() {
+            let mut save_file = capture.savefile(save_file_path).unwrap(); // todo: we need to handle this error eventually
 
-        self.capturing.store(false, Ordering::SeqCst);
+            while let Ok(packet) = capture.next() {
+                save_file.write(&packet);
+            }
+        }
 
         Ok(())
     }
 
     /// Determine if the client is capturing network traffic.
-    pub fn is_capturing(&self) -> bool { self.capturing.load(Ordering::SeqCst) }
+    pub fn is_capturing(&self) -> bool {
+        ! self.captures.is_empty()
+    }
 
     /// Transfer all pcaps to the server.
     pub fn transfer_all(&self) -> Result<()> {

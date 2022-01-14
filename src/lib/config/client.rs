@@ -100,6 +100,7 @@ pub struct ClientConfig {
     /// The host / ip and port pair of the target socket
     pub srv_addr: SocketAddr,
 
+    #[serde(rename = "behaviors")]
     pub behavior_runners: Vec<BehaviorRunner>,
 
     /// If present, the given BPF filter is used when filtering packets. If not

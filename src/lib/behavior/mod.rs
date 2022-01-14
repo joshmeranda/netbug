@@ -98,7 +98,6 @@ pub struct Behavior {
 
     dst: Addr,
 
-    #[serde(rename = "protocol")]
     protocol: ProtocolNumber,
 
     #[serde(default = "std::default::Default::default")]

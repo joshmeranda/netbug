@@ -21,7 +21,7 @@ fn run(cfg: ServerConfig) {
     let listener = match TcpListener::bind(cfg.srv_addr) {
         Ok(listener) => listener,
         Err(err) => {
-            eprintln!("Error binding to socket '{}': {}", cfg.srv_addr, err.to_string());
+            eprintln!("Error binding to socket '{}': {}", cfg.srv_addr, err);
             return;
         },
     };
@@ -35,7 +35,7 @@ fn run(cfg: ServerConfig) {
             eprintln!(
                 "Unable to create report directory art '{}': {}",
                 cfg.report_dir.to_str().unwrap(),
-                err.to_string()
+                err
             );
         }
     }
@@ -46,7 +46,7 @@ fn run(cfg: ServerConfig) {
                 for path in paths {
                     println!("Received pcap -> {}", path.to_str().unwrap())
                 },
-            Err(err) => eprintln!("Error receiving pcap: {}", err.to_string()),
+            Err(err) => eprintln!("Error receiving pcap: {}", err),
         }
 
         match processor.process() {
@@ -71,17 +71,17 @@ fn run(cfg: ServerConfig) {
                             eprintln!(
                                 "error writing to file '{}': {}",
                                 path.to_str().unwrap(),
-                                err.to_string()
+                                err
                             );
                         },
                     Err(err) => println!(
                         "could not create report at '{}': {}",
                         path.to_str().unwrap(),
-                        err.to_string()
+                        err
                     ),
                 }
             },
-            Err(err) => eprintln!("Error processing pcaps: {}", err.to_string()),
+            Err(err) => eprintln!("Error processing pcaps: {}", err),
         }
     }
 
@@ -131,7 +131,7 @@ fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {
             eprintln!(
                 "An error occurred reading '{}': {}",
                 report_path.to_str().unwrap(),
-                err.to_string()
+                err
             );
             return;
         },
@@ -144,7 +144,7 @@ fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {
             eprintln!(
                 "An error occurred reading '{}': {}",
                 report_path.to_str().unwrap(),
-                err.to_string()
+                err
             );
             return;
         },
@@ -217,7 +217,7 @@ fn main() {
     let server_cfg = match ServerConfig::from_path("examples/config/server.toml") {
         Ok(cfg) => cfg,
         Err(err) => {
-            eprintln!("{}", err.to_string());
+            eprintln!("{}", err);
             return;
         },
     };

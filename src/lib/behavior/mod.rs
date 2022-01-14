@@ -604,7 +604,7 @@ impl BehaviorRunner {
                                 return Err(NbugError::Client(format!(
                                     "Error binding to socket at '{}': {}",
                                     addr.to_string(),
-                                    err.to_string()
+                                    err
                                 ))),
                         };
 

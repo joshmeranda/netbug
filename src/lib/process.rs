@@ -52,7 +52,7 @@ impl PcapProcessor<'_> {
                         Err(err) => eprintln!(
                             "Error processing pcap '{}': {}",
                             path.to_str().unwrap(),
-                            err.to_string()
+                            err
                         ),
                     }
                 }
@@ -71,9 +71,9 @@ impl PcapProcessor<'_> {
             match ProtocolPacket::try_from(packet.data) {
                 Ok(protocol_packet) =>
                     if let Err(err) = collector.insert_packet(protocol_packet) {
-                        eprintln!("{}", err.to_string())
+                        eprintln!("{}", err)
                     },
-                Err(err) => eprintln!("Error parsing packet: {}", err.to_string()),
+                Err(err) => eprintln!("Error parsing packet: {}", err),
             }
         }
 

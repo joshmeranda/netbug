@@ -61,7 +61,7 @@ impl<'de> Deserialize<'de> for CaptureInterval {
 
         match CaptureInterval::from_str(s) {
             Ok(interval) => Ok(interval),
-            Err(err) => Err(<D as Deserializer<'de>>::Error::custom(err.to_string())),
+            Err(err) => Err(<D as Deserializer<'de>>::Error::custom(err)),
         }
     }
 }

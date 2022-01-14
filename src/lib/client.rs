@@ -19,6 +19,11 @@ use crate::{BUFFER_SIZE, MESSAGE_VERSION};
 /// The main Netbug client to capture network and dump network traffic to pcap
 /// files.
 ///
+/// Note that the captured packets are not consumed and added to a save file
+/// until `stop_capture` is called. To avoid capturing more data than needed,
+/// set `delay` to be as small as possible, and minimize the amount of blocking
+/// code between calls to `start_capture` and `stop_capture`.
+///
 /// todo: move the `run_behaviors` and `run_behaviors_concurrent` method's
 ///       internal `runtime`s out so we don't waste resource building a new
 ///       runtime each time we need to capture network data
@@ -121,7 +126,7 @@ impl <'a> Client {
             for runner in &self.behavior_runners {
                 match runner.run() {
                     Ok(f) => behaviors.push(f),
-                    Err(err) => eprintln!("Error running behavior: {}, {:?}", err.to_string(), runner.behavior),
+                    Err(err) => eprintln!("Error running behavior: {}, {:?}", err, runner.behavior),
                 }
             }
 

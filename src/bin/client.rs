@@ -26,7 +26,7 @@ fn run_scheduled(mut client: Client, delay: Duration, interval: Interval) {
 
 fn run_once(client: &mut Client, delay: Duration) {
     if let Err(err) = client.start_capture() {
-        eprintln!("{}", err.to_string());
+        eprintln!("{}", err);
         return;
     }
 
@@ -37,18 +37,18 @@ fn run_once(client: &mut Client, delay: Duration) {
     };
 
     if let Err(err) = result {
-        eprintln!("{}", err.to_string());
+        eprintln!("{}", err);
         return;
     }
 
     std::thread::sleep(delay);
 
     if let Err(err) = client.stop_capture() {
-        eprintln!("Could not stop packet capture: {}", err.to_string());
+        eprintln!("Could not stop packet capture: {}", err);
     }
 
     if let Err(err) = client.transfer_all() {
-        eprintln!("Transfer error: {}", err.to_string());
+        eprintln!("Transfer error: {}", err);
     }
 }
 
@@ -66,7 +66,7 @@ fn main() {
     let client_cfg = match ClientConfig::from_path("examples/config/client.toml") {
         Ok(cfg) => cfg,
         Err(err) => {
-            eprintln!("{}", err.to_string());
+            eprintln!("{}", err);
             return;
         },
     };

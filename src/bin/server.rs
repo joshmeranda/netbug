@@ -3,15 +3,18 @@ extern crate clap;
 
 use std::fs;
 use std::fs::{DirEntry, File};
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport};
 use netbug::config::server::ServerConfig;
+use netbug::error::NbugError;
 use netbug::process::PcapProcessor;
 use netbug::receiver::Receiver;
 
@@ -25,6 +28,8 @@ fn run(cfg: ServerConfig) {
             return;
         },
     };
+
+    listener.set_nonblocking(true);
 
     let mut receiver = Receiver::new(listener, cfg.pcap_dir.clone());
 
@@ -40,13 +45,29 @@ fn run(cfg: ServerConfig) {
         }
     }
 
-    loop {
+    // todo: this would only stop if there is no active pcap transfer , otherwise it would hang until transfer is done (bad)
+    let is_signal_received = Arc::new(AtomicBool::new(false));
+    if let Err(err) = signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_signal_received)) {
+        eprintln!("Error establishing signal handler for server, may not shut down correctly: {}", err);
+    }
+
+    while ! is_signal_received.load(Ordering::Relaxed) {
         match receiver.receive() {
             Ok(paths) =>
                 for path in paths {
                     println!("Received pcap -> {}", path.to_str().unwrap())
-                },
-            Err(err) => eprintln!("Error receiving pcap: {}", err),
+                }
+
+            // todo: this repetition of the error message is very smelly, might
+            //       need to return IoError if possible from receiver
+            Err(err) => match err {
+                NbugError::Io(err) => if err.kind() == ErrorKind::WouldBlock {
+                    continue
+                } else {
+                    eprintln!("Error receiving pcap: {}", err)
+                }
+                _ => eprintln!("Error receiving pcap: {}", err)
+            },
         }
 
         match processor.process() {

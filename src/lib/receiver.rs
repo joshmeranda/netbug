@@ -17,7 +17,12 @@ pub struct Receiver {
 impl Receiver {
     /// Construct a new [Receiver] from a [TcpListener] and a [PathBuf] to the
     /// root pcap directory.
-    pub fn new(listener: TcpListener, pcap_dir: PathBuf) -> Receiver { Receiver { listener, pcap_dir } }
+    pub fn new(listener: TcpListener, pcap_dir: PathBuf) -> Receiver {
+        Receiver {
+            listener,
+            pcap_dir
+        }
+    }
 
     /// Receive a pcap from a client and return the file the data was dumped to.
     /// The receiver blocks until either a pcap is receiver from the client, or

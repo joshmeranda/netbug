@@ -5,7 +5,7 @@ pub mod config;
 pub mod error;
 pub mod process;
 pub mod protocols;
-pub mod receiver;
+pub mod receive;
 
 #[macro_use]
 extern crate serde_derive;

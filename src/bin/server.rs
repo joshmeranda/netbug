@@ -8,6 +8,7 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
@@ -15,10 +16,12 @@ use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport};
 use netbug::config::server::ServerConfig;
 use netbug::error::NbugError;
-use netbug::process::PcapProcessor;
-use netbug::receiver::Receiver;
 
-fn run(cfg: ServerConfig) {
+use netbug::receive;
+use netbug::process;
+
+#[tokio::main]
+async fn run(cfg: ServerConfig) {
     println!("Starting server...");
 
     let listener = match TcpListener::bind(cfg.srv_addr) {
@@ -31,10 +34,6 @@ fn run(cfg: ServerConfig) {
 
     listener.set_nonblocking(true);
 
-    let mut receiver = Receiver::new(listener, cfg.pcap_dir.clone());
-
-    let processor = PcapProcessor::new(&cfg.behaviors, cfg.pcap_dir.to_path_buf());
-
     if !cfg.report_dir.exists() {
         if let Err(err) = fs::create_dir_all(cfg.report_dir.clone()) {
             eprintln!(
@@ -45,66 +44,33 @@ fn run(cfg: ServerConfig) {
         }
     }
 
-    // todo: this would only stop if there is no active pcap transfer , otherwise it would hang until transfer is done (bad)
+    // todo: this would only stop if there is no active pcap transfer, otherwise it would hang until transfer is done (bad)
     let is_signal_received = Arc::new(AtomicBool::new(false));
     if let Err(err) = signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_signal_received)) {
         eprintln!("Error establishing signal handler for server, may not shut down correctly: {}", err);
     }
 
-    while ! is_signal_received.load(Ordering::Relaxed) {
-        match receiver.receive() {
-            Ok(paths) =>
-                for path in paths {
-                    println!("Received pcap -> {}", path.to_str().unwrap())
-                }
+    // todo: consider an abstraction struct here containing interface name and pcap destination so we don't have to
+    //       manually extract the interface name from the pcap path in process
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
 
-            // todo: this repetition of the error message is very smelly, might
-            //       need to return IoError if possible from receiver
-            Err(err) => match err {
-                NbugError::Io(err) => if err.kind() == ErrorKind::WouldBlock {
-                    continue
-                } else {
-                    eprintln!("Error receiving pcap: {}", err)
-                }
-                _ => eprintln!("Error receiving pcap: {}", err)
-            },
+    let receiver_task = tokio::spawn({
+        let pcap_dir = PathBuf::from(cfg.pcap_dir.as_path());
+
+        async move {
+            if let Err(err) = receive::receive(listener, pcap_dir, sender, Arc::clone(&is_signal_received)).await {
+                eprintln!("Error receiving pcap: {}", err)
+            }
         }
+    });
 
-        match processor.process() {
-            Ok(report) => {
-                let content = serde_json::to_string(&report).unwrap();
-
-                let mut path = cfg.report_dir.clone();
-
-                if cfg.overwrite_report {
-                    path.push("report.json");
-                } else {
-                    let now = SystemTime::now();
-                    let date: DateTime<Utc> = DateTime::from(now);
-                    let timestamp = date.to_rfc3339();
-
-                    path.push(format!("report_{}.json", timestamp));
-                }
-
-                match File::create(&path) {
-                    Ok(mut file) =>
-                        if let Err(err) = write!(file, "{}", content) {
-                            eprintln!(
-                                "error writing to file '{}': {}",
-                                path.to_str().unwrap(),
-                                err
-                            );
-                        },
-                    Err(err) => println!(
-                        "could not create report at '{}': {}",
-                        path.to_str().unwrap(),
-                        err
-                    ),
-                }
-            },
-            Err(err) => eprintln!("Error processing pcaps: {}", err),
+    let processor_task = tokio::spawn(async move {
+        if let Err(err) = process::process(&cfg.behaviors, receiver, cfg.report_dir.as_path()).await {
+            eprintln!("Error processing pcaps: {}", err);
         }
-    }
+    });
+
+    tokio::join!(receiver_task, processor_task);
 
     println!("Stopping server...");
 }

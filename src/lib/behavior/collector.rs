@@ -7,7 +7,9 @@ use crate::protocols::{ProtocolHeader, ProtocolPacket};
 
 /// A basic collector for [Behavior]s and their corresponding
 /// s[ProtocolPackets].
-#[derive(Default)]
+///
+/// todo: may want to rename this. Less a collector than a matchmaker
+#[derive(Clone, Default)]
 pub struct BehaviorCollector<'a> {
     behavior_map: HashMap<&'a Behavior, Vec<ProtocolPacket>>,
 }

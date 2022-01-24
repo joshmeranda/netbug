@@ -44,33 +44,31 @@ async fn run(cfg: ServerConfig) {
         }
     }
 
-    // todo: this would only stop if there is no active pcap transfer, otherwise it would hang until transfer is done (bad)
+    // todo: this would only stop if there is no active pcap transfer, otherwise it would hang until transfer is
+    //       completed (this is bad)
     let is_signal_received = Arc::new(AtomicBool::new(false));
     if let Err(err) = signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_signal_received)) {
         eprintln!("Error establishing signal handler for server, may not shut down correctly: {}", err);
     }
 
-    // todo: consider an abstraction struct here containing interface name and pcap destination so we don't have to
-    //       manually extract the interface name from the pcap path in process
     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
 
-    let receiver_task = tokio::spawn({
-        let pcap_dir = PathBuf::from(cfg.pcap_dir.as_path());
+    let processor_task = tokio::spawn({
+        let behaviors = cfg.behaviors;
+        let report_dir = PathBuf::from(cfg.report_dir.as_path());
 
         async move {
-            if let Err(err) = receive::receive(listener, pcap_dir, sender, Arc::clone(&is_signal_received)).await {
-                eprintln!("Error receiving pcap: {}", err)
+            if let Err(err) = process::process(&behaviors, receiver, report_dir.as_path()).await {
+                eprintln!("Error processing pcaps: {}", err);
             }
         }
     });
 
-    let processor_task = tokio::spawn(async move {
-        if let Err(err) = process::process(&cfg.behaviors, receiver, cfg.report_dir.as_path()).await {
-            eprintln!("Error processing pcaps: {}", err);
-        }
-    });
+    if let Err(err) = receive::receive(listener, cfg.pcap_dir, sender, Arc::clone(&is_signal_received)).await {
+        eprintln!("Error receiving pcap: {}", err)
+    }
 
-    tokio::join!(receiver_task, processor_task);
+    tokio::join!(processor_task);
 
     println!("Stopping server...");
 }

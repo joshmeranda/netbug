@@ -25,7 +25,7 @@ pub async fn receive(listener: TcpListener, pcap_dir: PathBuf, sender: Sender<Pa
 
                 let mut reader = BufReader::with_capacity(BUFFER_SIZE, stream);
 
-                while let Ok(path) = receive_pcap(&mut reader, dir.clone()) {
+                while let Ok(path) = receive_pcap(&mut reader, dir.clone(), interrupt_received.clone()) {
                     sender.send(path).await;
                     println!("=== [receive] 000 ===");
                 }
@@ -43,7 +43,7 @@ pub async fn receive(listener: TcpListener, pcap_dir: PathBuf, sender: Sender<Pa
 
 /// Receive a single pcap from the given [`TcpStream`] and return the
 /// [`PathBuf`] to the created pcap file.
-fn receive_pcap(stream: &mut BufReader<TcpStream>, dir: PathBuf) -> Result<PathBuf> {
+fn receive_pcap(stream: &mut BufReader<TcpStream>, dir: PathBuf, interrupt_received: Arc<AtomicBool>) -> Result<PathBuf> {
     let mut header_buffer = [0; HEADER_LENGTH];
 
     stream.read_exact(&mut header_buffer)?;
@@ -72,7 +72,7 @@ fn receive_pcap(stream: &mut BufReader<TcpStream>, dir: PathBuf) -> Result<PathB
     let mut remaining_bytes = data_len;
 
     // pull out the remaining data
-    while remaining_bytes > 0 {
+    while remaining_bytes > 0 && ! interrupt_received.load(Ordering::Relaxed) {
         let upper = if remaining_bytes >= BUFFER_SIZE {
             BUFFER_SIZE
         } else {

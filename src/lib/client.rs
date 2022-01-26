@@ -24,9 +24,6 @@ use crate::{BUFFER_SIZE, MESSAGE_VERSION};
 /// set `delay` to be as small as possible, and minimize the amount of blocking
 /// code between calls to `start_capture` and `stop_capture`.
 ///
-/// todo: move the `run_behaviors` and `run_behaviors_concurrent` method's
-///       internal `runtime`s out so we don't waste resource building a new
-///       runtime each time we need to capture network data
 /// todo: might make more sense to change `allow_concurrent` to a group of
 ///       sequential and a group of concurrent behaviors
 /// todo: we need an actual logging framework rather than just printing to stdout

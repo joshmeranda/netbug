@@ -2,6 +2,7 @@
 extern crate clap;
 extern crate netbug;
 
+use std::str::FromStr;
 use std::time::Duration;
 
 use clap::{App, Arg};
@@ -9,7 +10,7 @@ use clokwerk::{Interval, Scheduler};
 use signal_hook::consts::signal;
 use signal_hook::iterator::Signals;
 use netbug::client::Client;
-use netbug::config::client::ClientConfig;
+use netbug::config::client::{CaptureInterval, ClientConfig};
 
 fn run_scheduled(mut client: Client, delay: Duration, interval: Interval) {
     run_once(&mut client, delay);
@@ -25,6 +26,8 @@ fn run_scheduled(mut client: Client, delay: Duration, interval: Interval) {
     handle.stop();
 }
 
+// todo: we probably don't want to pass the delay in here since `stop_capture` will already delay for us
+//       we can probably just do away with  the delay field altogether
 fn run_once(client: &mut Client, delay: Duration) {
     if let Err(err) = client.start_capture() {
         eprintln!("{}", err);
@@ -45,6 +48,7 @@ fn run_once(client: &mut Client, delay: Duration) {
     std::thread::sleep(delay);
 
     if let Err(err) = client.stop_capture() {
+
         eprintln!("Could not stop packet capture: {}", err);
     }
 
@@ -58,10 +62,10 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Run one of the NetBug client tools")
-        .arg(Arg::with_name("scheduled").long("sched").short("s").help(
-            "run the client indefinitely taking captures at startup and then according to the configured schedule \
-             (not yet implemented)",
-        ))
+        .before_help("any argument here which overlaps with a configuration field ignore the configured value in favor for the explicitly passed value")
+        .arg(Arg::with_name("scheduled").long("scheduled").short("s").help(
+            "run the client indefinitely taking captures at startup and then according to the configured schedule",
+        ).takes_value(true))
         .get_matches();
 
     let client_cfg = match ClientConfig::from_path("examples/config/client.toml") {
@@ -73,7 +77,17 @@ fn main() {
     };
 
     let delay = Duration::from_secs(client_cfg.delay as u64);
-    let interval = client_cfg.interval;
+    let interval = if matches.is_present("scheduled") {
+        match CaptureInterval::from_str(matches.value_of("scheduled").unwrap()) {
+            Ok(i) => i,
+            Err(err) => {
+                eprintln!("invalid capture interval '{}': {}", matches.value_of("scheduled").unwrap(), err);
+                return
+            }
+        }
+    } else {
+        client_cfg.interval
+    };
 
     let mut client: Client = Client::from_config(client_cfg);
 

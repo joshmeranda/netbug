@@ -159,6 +159,7 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Start the nbug server to view ")
+        .before_help("any argument here which overlaps with a configuration field ignore the configured value in favor for the explicitly passed value")
         .settings(&[
             AppSettings::SubcommandRequiredElseHelp,
             AppSettings::UnifiedHelpMessage,

@@ -2,20 +2,15 @@
 extern crate clap;
 
 use std::fs;
-use std::fs::{DirEntry, File};
-use std::io::{ErrorKind, Write};
+use std::fs::DirEntry;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
-use std::time::SystemTime;
+use std::sync::atomic::AtomicBool;
 
-use chrono::{DateTime, Utc};
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport};
 use netbug::config::server::ServerConfig;
-use netbug::error::NbugError;
 
 use netbug::receive;
 use netbug::process;
@@ -32,7 +27,9 @@ async fn run(cfg: ServerConfig) {
         },
     };
 
-    listener.set_nonblocking(true);
+    if let Err(err) = listener.set_nonblocking(true) {
+        eprintln!("cannot establish non-blocking tcp listener: {}", err);
+    }
 
     if !cfg.report_dir.exists() {
         if let Err(err) = fs::create_dir_all(cfg.report_dir.clone()) {
@@ -49,7 +46,7 @@ async fn run(cfg: ServerConfig) {
         eprintln!("Error establishing signal handler for server, may not shut down correctly: {}", err);
     }
 
-    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let (sender, receiver) = tokio::sync::mpsc::channel(1);
 
     let processor_task = tokio::spawn({
         let behaviors = cfg.behaviors;
@@ -66,7 +63,11 @@ async fn run(cfg: ServerConfig) {
         eprintln!("Error receiving pcap: {}", err)
     }
 
-    tokio::join!(processor_task);
+    let (processor_join,) = tokio::join!(processor_task);
+
+    if let Err(err) = processor_join {
+        eprintln!("error waiting for processor thread to join: {}", err);
+    }
 
     println!("Stopping server...");
 }

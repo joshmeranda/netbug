@@ -3,7 +3,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc::Sender;
@@ -19,15 +19,16 @@ pub async fn receive(listener: TcpListener, pcap_dir: PathBuf, sender: Sender<Pa
         match listener.accept() {
             Ok((stream, peer)) => {
                 // ensure that a pcap directory for the peer exists
-                let mut dir = pcap_dir.join(peer.ip().to_string());
+                let dir = pcap_dir.join(peer.ip().to_string());
 
                 fs::create_dir_all(&dir)?;
 
                 let mut reader = BufReader::with_capacity(BUFFER_SIZE, stream);
 
                 while let Ok(path) = receive_pcap(&mut reader, dir.clone(), interrupt_received.clone()) {
-                    sender.send(path).await;
-                    println!("=== [receive] 000 ===");
+                    if let Err(err) = sender.send(path).await {
+                        eprintln!("error passing pcap over channel: {}", err);
+                    }
                 }
             },
             Err(err) => if err.kind() == ErrorKind::WouldBlock {

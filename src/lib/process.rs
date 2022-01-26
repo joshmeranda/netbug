@@ -1,5 +1,4 @@
 use std::convert::TryFrom;
-use std::fs;
 use std::fs::File;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -11,7 +10,6 @@ use pcap::Capture;
 use tokio::sync::mpsc::Receiver;
 
 use crate::behavior::collector::BehaviorCollector;
-use crate::behavior::evaluate::BehaviorReport;
 use crate::behavior::Behavior;
 use crate::error::Result;
 use crate::protocols::ProtocolPacket;
@@ -31,7 +29,6 @@ pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, re
     // todo: keep in memory report and merge the newly created report into it, right now we will be generating reports
     //       for each interface rather than tracking on overarching report
     while let Some(path) = receiver.recv().await {
-        println!("=== [process] {:?} ===", path);
         let mut new_collector = collector.clone();
 
         match process_pcap(path.as_path(), &mut new_collector) {

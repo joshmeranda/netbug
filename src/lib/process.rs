@@ -1,82 +1,77 @@
 use std::convert::TryFrom;
-use std::fs;
+use std::fs::File;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
+use std::io::Write;
+use chrono::{DateTime, Utc};
 
 use pcap::Capture;
+use tokio::sync::mpsc::Receiver;
 
 use crate::behavior::collector::BehaviorCollector;
-use crate::behavior::evaluate::BehaviorReport;
 use crate::behavior::Behavior;
 use crate::error::Result;
 use crate::protocols::ProtocolPacket;
 
-pub struct PcapProcessor<'a> {
-    behaviors: &'a [Behavior],
+/// Iterates over the given [`Receiver`] to process each new pcap as it is
+/// received.
+pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, report_dir: &Path) -> Result<()> {
+    // todo: we probably want to pass a clean collector (with only behaviors) to `process_pcap`
+    let mut collector = BehaviorCollector::new();
 
-    pcap_dir: PathBuf,
-}
+    for behavior in behaviors {
+        collector.insert_behavior(behavior);
+    }
 
-impl PcapProcessor<'_> {
-    pub fn new(behaviors: &[Behavior], pcap_dir: PathBuf) -> PcapProcessor { PcapProcessor { behaviors, pcap_dir } }
+    let collector = collector;
 
-    /// Iterate over server capture directory. This method will traverse only
-    /// the children of the root pcap directory, and so any non-directory files
-    /// in the root pcap directory will be ignored.
-    pub fn process(&self) -> Result<BehaviorReport> {
-        let mut collector = BehaviorCollector::new();
+    // todo: keep in memory report and merge the newly created report into it, right now we will be generating reports
+    //       for each interface rather than tracking on overarching report
+    while let Some(path) = receiver.recv().await {
+        let mut new_collector = collector.clone();
 
-        for behavior in self.behaviors {
-            collector.insert_behavior(behavior);
-        }
+        match process_pcap(path.as_path(), &mut new_collector) {
+            Ok(()) => {
+                let report = new_collector.evaluate();
+                let content = serde_json::to_string(&report).unwrap();
 
-        for entry in fs::read_dir(&self.pcap_dir)? {
-            let child = match entry {
-                Ok(entry) => entry,
-                Err(_) => continue,
-            };
+                let now = SystemTime::now();
+                let date: DateTime<Utc> = DateTime::from(now);
+                let timestamp = date.to_rfc3339();
 
-            let file_type = match child.file_type() {
-                Ok(file_type) => file_type,
-                Err(_) => continue,
-            };
+                let report_path = report_dir.join(format!("report_{}.json", timestamp));
 
-            if file_type.is_dir() {
-                for sub_entry in fs::read_dir(child.path())? {
-                    let path = match sub_entry {
-                        Ok(sub_entry) => sub_entry.path(),
-                        Err(_) => continue,
-                    };
-
-                    match self.process_pcap(&path, &mut collector) {
-                        Ok(_) => {},
-                        Err(err) => eprintln!(
-                            "Error processing pcap '{}': {}",
-                            path.to_str().unwrap(),
-                            err
-                        ),
+                match File::create(report_path) {
+                    Ok(mut f) => write!(f, "{}", content).unwrap(),
+                    Err(err) => match err.kind() {
+                        ErrorKind::PermissionDenied => eprintln!("incorrect permission for report file"),
+                        ErrorKind::NotFound => eprintln!("report directory or file could not be found"),
+                        _ => eprintln!("could not write to report file")
                     }
                 }
-            }
+            },
+            Err(err) => eprintln!("Error processing pcap '{}': {}", path.to_str().unwrap(), err),
         }
-
-        Ok(collector.evaluate())
     }
 
-    /// Process a single pcap file, by adding the found [ProtocolPacket]s
-    /// into the given [BehaviorCollector].
-    fn process_pcap(&self, path: &Path, collector: &mut BehaviorCollector) -> Result<()> {
-        let mut capture = Capture::from_file(path)?;
+    Ok(())
+}
 
-        while let Ok(packet) = capture.next() {
-            match ProtocolPacket::try_from(packet.data) {
-                Ok(protocol_packet) =>
-                    if let Err(err) = collector.insert_packet(protocol_packet) {
-                        eprintln!("{}", err)
-                    },
-                Err(err) => eprintln!("Error parsing packet: {}", err),
-            }
+/// Process a single pcap file, by adding the found [ProtocolPacket]s
+/// into the given [BehaviorCollector].
+fn process_pcap(path: &Path, collector: &mut BehaviorCollector) -> Result<()> {
+    let mut capture = Capture::from_file(path)?;
+
+    while let Ok(packet) = capture.next() {
+        match ProtocolPacket::try_from(packet.data) {
+            Ok(protocol_packet) =>
+                if let Err(err) = collector.insert_packet(protocol_packet) {
+                    eprintln!("{}", err)
+                },
+            Err(err) => eprintln!("Error parsing packet: {}", err),
         }
-
-        Ok(())
     }
+
+    Ok(())
 }

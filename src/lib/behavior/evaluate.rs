@@ -24,6 +24,8 @@ impl ToString for PacketStatus {
 
 /// A simple evaluation of single behavior, including a breakdown of any
 /// specific steps required by the behavior.
+///
+/// todo: add network id / netmask / CIDR
 #[derive(Debug, Deserialize, PartialEq, Serialize)]
 pub struct BehaviorEvaluation<'a> {
     src: IpAddr,

@@ -2,20 +2,21 @@
 extern crate clap;
 
 use std::fs;
-use std::fs::{DirEntry, File};
-use std::io::Write;
+use std::fs::DirEntry;
 use std::net::TcpListener;
 use std::path::PathBuf;
-use std::time::SystemTime;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
-use chrono::{DateTime, Utc};
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport};
 use netbug::config::server::ServerConfig;
-use netbug::process::PcapProcessor;
-use netbug::receiver::Receiver;
 
-fn run(cfg: ServerConfig) {
+use netbug::receive;
+use netbug::process;
+
+#[tokio::main]
+async fn run(cfg: ServerConfig) {
     println!("Starting server...");
 
     let listener = match TcpListener::bind(cfg.srv_addr) {
@@ -26,9 +27,9 @@ fn run(cfg: ServerConfig) {
         },
     };
 
-    let mut receiver = Receiver::new(listener, cfg.pcap_dir.clone());
-
-    let processor = PcapProcessor::new(&cfg.behaviors, cfg.pcap_dir.to_path_buf());
+    if let Err(err) = listener.set_nonblocking(true) {
+        eprintln!("cannot establish non-blocking tcp listener: {}", err);
+    }
 
     if !cfg.report_dir.exists() {
         if let Err(err) = fs::create_dir_all(cfg.report_dir.clone()) {
@@ -40,49 +41,32 @@ fn run(cfg: ServerConfig) {
         }
     }
 
-    loop {
-        match receiver.receive() {
-            Ok(paths) =>
-                for path in paths {
-                    println!("Received pcap -> {}", path.to_str().unwrap())
-                },
-            Err(err) => eprintln!("Error receiving pcap: {}", err),
+    let is_signal_received = Arc::new(AtomicBool::new(false));
+    if let Err(err) = signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_signal_received)) {
+        eprintln!("Error establishing signal handler for server, may not shut down correctly: {}", err);
+    }
+
+    let (sender, receiver) = tokio::sync::mpsc::channel(1);
+
+    let processor_task = tokio::spawn({
+        let behaviors = cfg.behaviors;
+        let report_dir = PathBuf::from(cfg.report_dir.as_path());
+
+        async move {
+            if let Err(err) = process::process(&behaviors, receiver, report_dir.as_path()).await {
+                eprintln!("Error processing pcaps: {}", err);
+            }
         }
+    });
 
-        match processor.process() {
-            Ok(report) => {
-                let content = serde_json::to_string(&report).unwrap();
+    if let Err(err) = receive::receive(listener, cfg.pcap_dir, sender, Arc::clone(&is_signal_received)).await {
+        eprintln!("Error receiving pcap: {}", err)
+    }
 
-                let mut path = cfg.report_dir.clone();
+    let (processor_join,) = tokio::join!(processor_task);
 
-                if cfg.overwrite_report {
-                    path.push("report.json");
-                } else {
-                    let now = SystemTime::now();
-                    let date: DateTime<Utc> = DateTime::from(now);
-                    let timestamp = date.to_rfc3339();
-
-                    path.push(format!("report_{}.json", timestamp));
-                }
-
-                match File::create(&path) {
-                    Ok(mut file) =>
-                        if let Err(err) = write!(file, "{}", content) {
-                            eprintln!(
-                                "error writing to file '{}': {}",
-                                path.to_str().unwrap(),
-                                err
-                            );
-                        },
-                    Err(err) => println!(
-                        "could not create report at '{}': {}",
-                        path.to_str().unwrap(),
-                        err
-                    ),
-                }
-            },
-            Err(err) => eprintln!("Error processing pcaps: {}", err),
-        }
+    if let Err(err) = processor_join {
+        eprintln!("error waiting for processor thread to join: {}", err);
     }
 
     println!("Stopping server...");

@@ -87,12 +87,6 @@ pub struct ClientConfig {
     #[serde(default = "defaults::client::default_concurrent_run")]
     pub allow_concurrent: bool,
 
-    /// The amount of delay between scripts and actions are completed and the
-    /// capture ends [0 - 255], giving pcap some more time to pull in any
-    /// lingering network packets.
-    #[serde(default = "defaults::client::default_delay")]
-    pub delay: u8,
-
     /// The list of network devices names upon which network packets should be
     /// captured.
     pub interfaces: Vec<String>,

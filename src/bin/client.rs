@@ -12,11 +12,11 @@ use signal_hook::iterator::Signals;
 use netbug::client::Client;
 use netbug::config::client::{CaptureInterval, ClientConfig};
 
-fn run_scheduled(mut client: Client, delay: Duration, interval: Interval) {
-    run_once(&mut client, delay);
+fn run_scheduled(mut client: Client, interval: Interval) {
+    run_once(&mut client);
 
     let mut scheduler = Scheduler::new();
-    scheduler.every(interval).run(move || run_once(&mut client, delay));
+    scheduler.every(interval).run(move || run_once(&mut client));
 
     let handle = scheduler.watch_thread(Duration::from_secs(1));
 
@@ -26,9 +26,7 @@ fn run_scheduled(mut client: Client, delay: Duration, interval: Interval) {
     handle.stop();
 }
 
-// todo: we probably don't want to pass the delay in here since `stop_capture` will already delay for us
-//       we can probably just do away with  the delay field altogether
-fn run_once(client: &mut Client, delay: Duration) {
+fn run_once(client: &mut Client) {
     if let Err(err) = client.start_capture() {
         eprintln!("{}", err);
         return;
@@ -44,8 +42,6 @@ fn run_once(client: &mut Client, delay: Duration) {
         eprintln!("{}", err);
         return;
     }
-
-    std::thread::sleep(delay);
 
     if let Err(err) = client.stop_capture() {
 
@@ -76,7 +72,6 @@ fn main() {
         },
     };
 
-    let delay = Duration::from_secs(client_cfg.delay as u64);
     let interval = if matches.is_present("scheduled") {
         match CaptureInterval::from_str(matches.value_of("scheduled").unwrap()) {
             Ok(i) => i,
@@ -92,8 +87,8 @@ fn main() {
     let mut client: Client = Client::from_config(client_cfg);
 
     if matches.is_present("scheduled") {
-        run_scheduled(client, delay, interval.0);
+        run_scheduled(client, interval.0);
     } else {
-        run_once(&mut client, delay);
+        run_once(&mut client);
     }
 }

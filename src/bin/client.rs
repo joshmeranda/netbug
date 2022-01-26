@@ -2,10 +2,14 @@
 extern crate clap;
 extern crate netbug;
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use clap::{App, Arg};
 use clokwerk::{Interval, Scheduler};
+use signal_hook::consts::signal;
+use signal_hook::iterator::Signals;
 use netbug::client::Client;
 use netbug::config::client::ClientConfig;
 
@@ -13,15 +17,14 @@ fn run_scheduled(mut client: Client, delay: Duration, interval: Interval) {
     run_once(&mut client, delay);
 
     let mut scheduler = Scheduler::new();
-
     scheduler.every(interval).run(move || run_once(&mut client, delay));
 
-    let _handle = scheduler.watch_thread(Duration::from_secs(1));
+    let handle = scheduler.watch_thread(Duration::from_secs(1));
 
-    // todo: handle interrupts
-    loop { /* keep blocking for scheduled stuff */ }
+    let mut signals = Signals::new(&[signal::SIGINT]).unwrap();
 
-    _handle.stop();
+    signals.wait();
+    handle.stop();
 }
 
 fn run_once(client: &mut Client, delay: Duration) {

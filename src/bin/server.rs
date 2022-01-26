@@ -44,8 +44,6 @@ async fn run(cfg: ServerConfig) {
         }
     }
 
-    // todo: this would only stop if there is no active pcap transfer, otherwise it would hang until transfer is
-    //       completed (this is bad)
     let is_signal_received = Arc::new(AtomicBool::new(false));
     if let Err(err) = signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_signal_received)) {
         eprintln!("Error establishing signal handler for server, may not shut down correctly: {}", err);

@@ -34,7 +34,6 @@ rather than udp while also ensuring that ALL aspects of the 3-way handshake is c
 | filter           | a custom Berkley Packet Filter to apply when recording traffic, the client will make a best effort attempt to filter out any extraneous data. omit to use the client generated filter, or provide an empty string to allow ALL traffic through |                      |
 | behaviors        | a list of the behaviors to generate traffic for the client to generate, while you can specify a src address it will be ignored.                                                                                                                |                      |
 | allow_concurrent | allow the client to generate all network traffic in parallel or sequentially                                                                                                                                                                   | False                |
-| delay            | the amount of seconds to wait until stopping the capture                                                                                                                                                                                       | 1                    |
 
 ### Server
 The server is responsible for receiving recorded network traffic from clients while also producing reports on the

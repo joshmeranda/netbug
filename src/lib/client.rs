@@ -3,8 +3,10 @@ use std::default::Default;
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
+use std::ops::Add;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 
 use pcap::{Active, Capture, Device};
 use tokio::runtime::Runtime;
@@ -21,12 +23,9 @@ use crate::{BUFFER_SIZE, MESSAGE_VERSION};
 ///
 /// Note that the captured packets are not consumed and added to a save file
 /// until `stop_capture` is called. To avoid capturing more data than needed,
-/// set `delay` to be as small as possible, and minimize the amount of blocking
-/// code between calls to `start_capture` and `stop_capture`.
+/// minimize the amount of blocking code between calls to `start_capture` and
+/// `stop_capture`.
 ///
-/// todo: move the `run_behaviors` and `run_behaviors_concurrent` method's
-///       internal `runtime`s out so we don't waste resource building a new
-///       runtime each time we need to capture network data
 /// todo: might make more sense to change `allow_concurrent` to a group of
 ///       sequential and a group of concurrent behaviors
 /// todo: we need an actual logging framework rather than just printing to stdout
@@ -48,8 +47,6 @@ pub struct Client {
     behavior_runners: Vec<BehaviorRunner>,
 
     filter: FilterExpression,
-
-    delay: u8,
 }
 
 impl Default for Client {
@@ -62,7 +59,6 @@ impl Default for Client {
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
             behavior_runners:        vec![],
             filter:           FilterExpression::empty(),
-            delay:            1,
         }
     }
 }
@@ -96,7 +92,6 @@ impl <'a> Client {
             devices,
             captures: HashMap::new(),
             filter,
-            delay: cfg.delay,
         }
     }
 
@@ -184,25 +179,34 @@ impl <'a> Client {
         Ok(())
     }
 
-    /// Signal the client to stop capturing network packets, after the
-    /// configured delay period. Note that this simply signals the capturing
-    /// thread loops to discontinue iteration rather than immediately
-    /// stopping them. Therefore, it is possible for extra packets to be
-    /// captured and written to the resulting pcap between the time this
-    /// function is called and the signal is received.
+    /// Stop capturing network packets and dump them to an appropriately named
+    /// .pcap file according tto the target interface. Note that this method
+    /// does not guarantee that all captures will stop capturing immediately.
+    ///
+    /// While this method does make a best effort to filter out any packets
+    /// which arrive after it was called, it can only measure to the micro
+    /// second so it is possible for extra paket9s) to be included in the final
+    /// pcap.
     pub fn stop_capture(&mut self) -> Result<()> {
-        std::thread::sleep(Duration::from_secs(self.delay as u64));
+        let now = SystemTime::now();
+        let date: DateTime<Utc> = DateTime::from(now);
+        let max_timestamp = date.timestamp_nanos() as u128;
 
-        self.stop_capture_now()
-    }
-
-    fn stop_capture_now(&mut self) -> Result<()> {
         // each save file should be dropped and flushed since they will go out
         // of scope after their use in this loops
         for (save_file_path, mut capture) in self.captures.drain() {
             let mut save_file = capture.savefile(save_file_path).unwrap(); // todo: we need to handle this error eventually
 
             while let Ok(packet) = capture.next() {
+
+                let timestamp = std::time::Duration::from_secs(packet.header.ts.tv_sec as u64)
+                    .add(std::time::Duration::from_micros(packet.header.ts.tv_usec as u64))
+                    .as_nanos();
+
+                if timestamp > max_timestamp {
+                    break
+                }
+
                 save_file.write(&packet);
             }
         }

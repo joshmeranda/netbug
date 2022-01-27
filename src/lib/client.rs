@@ -7,6 +7,7 @@ use std::ops::Add;
 use std::path::PathBuf;
 use std::time::SystemTime;
 use chrono::{DateTime, Utc};
+use log;
 
 use pcap::{Active, Capture, Device};
 use tokio::runtime::Runtime;
@@ -110,6 +111,8 @@ impl <'a> Client {
 
     /// Run all client behaviors concurrently. Note that this function blocks
     /// until all behaviors have finished.
+    ///
+    /// todo: we should probably still show output iteratively for ease of debugging
     pub fn run_behaviors_concurrent(&self) -> Result<()> {
         if !self.allow_concurrent {
             Err(NbugError::Client(String::from(
@@ -121,7 +124,7 @@ impl <'a> Client {
             for runner in &self.behavior_runners {
                 match runner.run() {
                     Ok(f) => behaviors.push(f),
-                    Err(err) => eprintln!("Error running behavior: {}, {:?}", err, runner.behavior),
+                    Err(err) => log::error!("Error running behavior: {}, {:?}", err, runner.behavior),
                 }
             }
 
@@ -173,7 +176,7 @@ impl <'a> Client {
 
             self.captures.insert(save_file_path, capture);
 
-            println!("Started capture for device '{}'", device.name.as_str());
+            log::info!("Started capture for device '{}'", device.name.as_str());
         }
 
         Ok(())
@@ -279,7 +282,7 @@ impl <'a> Client {
         for filter in iter {
             match filter {
                 Some(f) => builder.or_filter(f),
-                None => eprintln!("Could not build a BPF filter "),
+                None => log::error!("Could not build a BPF filter "),
             }
         }
 

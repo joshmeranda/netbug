@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::io::Write;
 use chrono::{DateTime, Utc};
+use log;
 
 use pcap::Capture;
 use tokio::sync::mpsc::Receiver;
@@ -45,13 +46,13 @@ pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, re
                 match File::create(report_path) {
                     Ok(mut f) => write!(f, "{}", content).unwrap(),
                     Err(err) => match err.kind() {
-                        ErrorKind::PermissionDenied => eprintln!("incorrect permission for report file"),
-                        ErrorKind::NotFound => eprintln!("report directory or file could not be found"),
-                        _ => eprintln!("could not write to report file")
+                        ErrorKind::PermissionDenied => log::error!("incorrect permission for report file"),
+                        ErrorKind::NotFound => log::error!("report directory or file could not be found"),
+                        _ => log::error!("could not write to report file")
                     }
                 }
             },
-            Err(err) => eprintln!("Error processing pcap '{}': {}", path.to_str().unwrap(), err),
+            Err(err) => log::warn!("Error processing pcap '{}': {}", path.to_str().unwrap(), err),
         }
     }
 
@@ -67,9 +68,9 @@ fn process_pcap(path: &Path, collector: &mut BehaviorCollector) -> Result<()> {
         match ProtocolPacket::try_from(packet.data) {
             Ok(protocol_packet) =>
                 if let Err(err) = collector.insert_packet(protocol_packet) {
-                    eprintln!("{}", err)
+                    log::debug!("{}", err)
                 },
-            Err(err) => eprintln!("Error parsing packet: {}", err),
+            Err(err) => log::warn!("Error parsing packet: {}", err),
         }
     }
 

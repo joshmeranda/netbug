@@ -27,14 +27,14 @@ pub async fn receive(listener: TcpListener, pcap_dir: PathBuf, sender: Sender<Pa
 
                 while let Ok(path) = receive_pcap(&mut reader, dir.clone(), interrupt_received.clone()) {
                     if let Err(err) = sender.send(path).await {
-                        eprintln!("error passing pcap over channel: {}", err);
+                        log::error!("error passing pcap over channel: {}", err);
                     }
                 }
             },
             Err(err) => if err.kind() == ErrorKind::WouldBlock {
                 /* do nothing */
             } else {
-                eprintln!("error establishing a new peer connection: {}", err);
+                log::error!("error establishing a new peer connection: {}", err);
             }
         }
     }

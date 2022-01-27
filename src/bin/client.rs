@@ -2,13 +2,16 @@
 extern crate clap;
 extern crate netbug;
 
+use std::fs::File;
 use std::str::FromStr;
 use std::time::Duration;
 
 use clap::{App, Arg};
 use clokwerk::{Interval, Scheduler};
+use log::LevelFilter;
 use signal_hook::consts::signal;
 use signal_hook::iterator::Signals;
+use simplelog::{Config, WriteLogger};
 use netbug::client::Client;
 use netbug::config::client::{CaptureInterval, ClientConfig};
 
@@ -28,7 +31,7 @@ fn run_scheduled(mut client: Client, interval: Interval) {
 
 fn run_once(client: &mut Client) {
     if let Err(err) = client.start_capture() {
-        eprintln!("{}", err);
+        log::error!("{}", err);
         return;
     }
 
@@ -39,17 +42,16 @@ fn run_once(client: &mut Client) {
     };
 
     if let Err(err) = result {
-        eprintln!("{}", err);
+        log::error!("{}", err);
         return;
     }
 
     if let Err(err) = client.stop_capture() {
-
-        eprintln!("Could not stop packet capture: {}", err);
+        log::warn!("Could not stop packet capture: {}", err);
     }
 
     if let Err(err) = client.transfer_all() {
-        eprintln!("Transfer error: {}", err);
+        log::warn!("Transfer error: {}", err);
     }
 }
 
@@ -62,6 +64,7 @@ fn main() {
         .arg(Arg::with_name("scheduled").long("scheduled").short("s").help(
             "run the client indefinitely taking captures at startup and then according to the configured schedule",
         ).takes_value(true))
+        .arg(Arg::with_name("log_file").short("f").long("log-file").takes_value(true))
         .get_matches();
 
     let client_cfg = match ClientConfig::from_path("examples/config/client.toml") {
@@ -85,6 +88,21 @@ fn main() {
     };
 
     let mut client: Client = Client::from_config(client_cfg);
+
+    let log_init_result = match matches.value_of("log-file") {
+        Some(p) => match File::create(p) {
+            Ok(f) => WriteLogger::init(LevelFilter::Info, Config::default(), f),
+            Err(err) => {
+                eprintln!("could not create log file at '{}': {}", p, err);
+                return
+            }
+        },
+        None => WriteLogger::init(LevelFilter::Info, Config::default(), std::io::stdout()),
+    };
+
+    if let Err(err) = log_init_result {
+        eprintln!("could not establish global logger: {}", err)
+    }
 
     if matches.is_present("scheduled") {
         run_scheduled(client, interval.0);

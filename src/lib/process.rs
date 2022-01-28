@@ -32,6 +32,8 @@ pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, re
     while let Some(path) = receiver.recv().await {
         let mut new_collector = collector.clone();
 
+        log::info!("processing pcap '{}'", path.to_string_lossy());
+
         match process_pcap(path.as_path(), &mut new_collector) {
             Ok(()) => {
                 let report = new_collector.evaluate();

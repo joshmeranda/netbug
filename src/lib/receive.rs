@@ -26,6 +26,8 @@ pub async fn receive(listener: TcpListener, pcap_dir: PathBuf, sender: Sender<Pa
                 let mut reader = BufReader::with_capacity(BUFFER_SIZE, stream);
 
                 while let Ok(path) = receive_pcap(&mut reader, dir.clone(), interrupt_received.clone()) {
+                    log::info!("received pcap '{}'", path.to_string_lossy());
+
                     if let Err(err) = sender.send(path).await {
                         log::error!("error passing pcap over channel: {}", err);
                     }

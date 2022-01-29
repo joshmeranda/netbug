@@ -6,8 +6,8 @@ use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpStream};
 use std::ops::Add;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use chrono::{DateTime, Utc};
 
+use chrono::{DateTime, Utc};
 use pcap::{Active, Capture, Device};
 use tokio::runtime::Runtime;
 
@@ -28,7 +28,8 @@ use crate::{BUFFER_SIZE, MESSAGE_VERSION};
 ///
 /// todo: might make more sense to change `allow_concurrent` to a group of
 ///       sequential and a group of concurrent behaviors
-/// todo: we need an actual logging framework rather than just printing to stdout
+/// todo: we need an actual logging framework rather than just printing to
+/// stdout
 pub struct Client {
     pcap_dir: PathBuf,
 
@@ -55,22 +56,22 @@ impl Default for Client {
             pcap_dir:         defaults::default_pcap_dir(),
             allow_concurrent: defaults::client::default_concurrent_run(),
             devices:          vec![],
-            captures: HashMap::new(),
+            captures:         HashMap::new(),
             srv_addr:         SocketAddr::new(IpAddr::from(Ipv4Addr::LOCALHOST), defaults::default_server_port()),
-            behavior_runners:        vec![],
+            behavior_runners: vec![],
             filter:           FilterExpression::empty(),
         }
     }
 }
 
-impl <'a> Client {
+impl<'a> Client {
     pub fn new() -> Client { Client::default() }
 
     /// Construct a client from a [ClientConfig] which is consumed.
     pub fn from_config(cfg: ClientConfig) -> Client {
         // find the list of valid devices on which to start a packet capture
         let devices = Device::list().unwrap();
-        let devices:Vec<Device> = devices
+        let devices: Vec<Device> = devices
             .into_iter()
             .filter(|device| cfg.interfaces.contains(&device.name))
             .collect();
@@ -110,6 +111,9 @@ impl <'a> Client {
 
     /// Run all client behaviors concurrently. Note that this function blocks
     /// until all behaviors have finished.
+    ///
+    /// todo: we should probably still show output iteratively for ease of
+    /// debugging
     pub fn run_behaviors_concurrent(&self) -> Result<()> {
         if !self.allow_concurrent {
             Err(NbugError::Client(String::from(
@@ -121,7 +125,7 @@ impl <'a> Client {
             for runner in &self.behavior_runners {
                 match runner.run() {
                     Ok(f) => behaviors.push(f),
-                    Err(err) => eprintln!("Error running behavior: {}, {:?}", err, runner.behavior),
+                    Err(err) => log::error!("Error running behavior: {}, {:?}", err, runner.behavior),
                 }
             }
 
@@ -130,9 +134,13 @@ impl <'a> Client {
             runtime.block_on(async {
                 let parent_future = futures::future::join_all(behaviors);
 
-                // todo: this needs a much bette error message (ideally it would show why the behavior failed)
+                // todo: this needs a much bette error message (ideally it would show why the
+                // behavior failed)
                 match parent_future.await.iter().find(|r| r.is_err()) {
-                    Some(Err(err)) => Err(NbugError::Client(format!("An error occurred running behaviors: {:?}", err))),
+                    Some(Err(err)) => Err(NbugError::Client(format!(
+                        "An error occurred running behaviors: {:?}",
+                        err
+                    ))),
                     None => Ok(()),
                     _ => unreachable!(),
                 }
@@ -165,15 +173,12 @@ impl <'a> Client {
             let mut capture = Capture::from_device(device.clone())?.timeout(1).open()?.setnonblock()?;
 
             if let Err(err) = capture.filter(self.filter.to_string().as_str()) {
-                return Err(NbugError::Client(format!(
-                    "Error adding filter to capture: {}",
-                    err
-                )))
+                return Err(NbugError::Client(format!("Error adding filter to capture: {}", err)));
             }
 
             self.captures.insert(save_file_path, capture);
 
-            println!("Started capture for device '{}'", device.name.as_str());
+            log::info!("Started capture for device '{}'", device.name.as_str());
         }
 
         Ok(())
@@ -198,13 +203,12 @@ impl <'a> Client {
             let mut save_file = capture.savefile(save_file_path).unwrap(); // todo: we need to handle this error eventually
 
             while let Ok(packet) = capture.next() {
-
                 let timestamp = std::time::Duration::from_secs(packet.header.ts.tv_sec as u64)
                     .add(std::time::Duration::from_micros(packet.header.ts.tv_usec as u64))
                     .as_nanos();
 
                 if timestamp > max_timestamp {
-                    break
+                    break;
                 }
 
                 save_file.write(&packet);
@@ -215,9 +219,7 @@ impl <'a> Client {
     }
 
     /// Determine if the client is capturing network traffic.
-    pub fn is_capturing(&self) -> bool {
-        ! self.captures.is_empty()
-    }
+    pub fn is_capturing(&self) -> bool { !self.captures.is_empty() }
 
     /// Transfer all pcaps to the server.
     pub fn transfer_all(&self) -> Result<()> {
@@ -264,8 +266,8 @@ impl <'a> Client {
     /// Generate the bpf filter to use to minimize the data captured by the
     /// client.
     fn bpf_filter<I>(behaviors: I) -> FilterExpression
-        where I: Iterator<Item = &'a Behavior> + ExactSizeIterator
-    {
+    where
+        I: Iterator<Item = &'a Behavior> + ExactSizeIterator, {
         // using len here since `ExactSizeIterator::is_empty` is unstable
         if behaviors.len() == 0 {
             return FilterExpression::empty();
@@ -279,7 +281,7 @@ impl <'a> Client {
         for filter in iter {
             match filter {
                 Some(f) => builder.or_filter(f),
-                None => eprintln!("Could not build a BPF filter "),
+                None => log::error!("Could not build a BPF filter "),
             }
         }
 

@@ -22,6 +22,9 @@ chrono = "0.4"
 futures = "0.3"
 tokio = { version = "1.15", features = ["full"] }
 signal-hook = "0.3"
+simplelog = "0.11"
+log = "0.4"
+subprocess = "0.2"
 
 [lib]
 name = "netbug"

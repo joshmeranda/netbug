@@ -4,8 +4,9 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use tokio::sync::mpsc::Sender;
 
 use crate::error::{NbugError, Result};
@@ -14,8 +15,13 @@ use crate::{BUFFER_SIZE, HEADER_LENGTH};
 /// Listen for new connections and receive pcaps from those connections. The
 /// resulting pcap [`Path`] is sent through the `sender` channel, and should be
 /// consumed by another task or by the caller.
-pub async fn receive(listener: TcpListener, pcap_dir: PathBuf, sender: Sender<PathBuf>, interrupt_received: Arc<AtomicBool>) -> Result<()> {
-    while ! interrupt_received.load(Ordering::Relaxed) {
+pub async fn receive(
+    listener: TcpListener,
+    pcap_dir: PathBuf,
+    sender: Sender<PathBuf>,
+    interrupt_received: Arc<AtomicBool>,
+) -> Result<()> {
+    while !interrupt_received.load(Ordering::Relaxed) {
         match listener.accept() {
             Ok((stream, peer)) => {
                 // ensure that a pcap directory for the peer exists
@@ -26,16 +32,19 @@ pub async fn receive(listener: TcpListener, pcap_dir: PathBuf, sender: Sender<Pa
                 let mut reader = BufReader::with_capacity(BUFFER_SIZE, stream);
 
                 while let Ok(path) = receive_pcap(&mut reader, dir.clone(), interrupt_received.clone()) {
+                    log::info!("received pcap '{}'", path.to_string_lossy());
+
                     if let Err(err) = sender.send(path).await {
-                        eprintln!("error passing pcap over channel: {}", err);
+                        log::error!("error passing pcap over channel: {}", err);
                     }
                 }
             },
-            Err(err) => if err.kind() == ErrorKind::WouldBlock {
-                /* do nothing */
-            } else {
-                eprintln!("error establishing a new peer connection: {}", err);
-            }
+            Err(err) =>
+                if err.kind() == ErrorKind::WouldBlock {
+                    /* do nothing */
+                } else {
+                    log::error!("error establishing a new peer connection: {}", err);
+                },
         }
     }
 
@@ -44,7 +53,11 @@ pub async fn receive(listener: TcpListener, pcap_dir: PathBuf, sender: Sender<Pa
 
 /// Receive a single pcap from the given [`TcpStream`] and return the
 /// [`PathBuf`] to the created pcap file.
-fn receive_pcap(stream: &mut BufReader<TcpStream>, dir: PathBuf, interrupt_received: Arc<AtomicBool>) -> Result<PathBuf> {
+fn receive_pcap(
+    stream: &mut BufReader<TcpStream>,
+    dir: PathBuf,
+    interrupt_received: Arc<AtomicBool>,
+) -> Result<PathBuf> {
     let mut header_buffer = [0; HEADER_LENGTH];
 
     stream.read_exact(&mut header_buffer)?;
@@ -73,7 +86,7 @@ fn receive_pcap(stream: &mut BufReader<TcpStream>, dir: PathBuf, interrupt_recei
     let mut remaining_bytes = data_len;
 
     // pull out the remaining data
-    while remaining_bytes > 0 && ! interrupt_received.load(Ordering::Relaxed) {
+    while remaining_bytes > 0 && !interrupt_received.load(Ordering::Relaxed) {
         let upper = if remaining_bytes >= BUFFER_SIZE {
             BUFFER_SIZE
         } else {

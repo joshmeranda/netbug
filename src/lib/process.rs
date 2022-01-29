@@ -1,11 +1,10 @@
 use std::convert::TryFrom;
 use std::fs::File;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use std::io::Write;
-use chrono::{DateTime, Utc};
 
+use chrono::{DateTime, Utc};
 use pcap::Capture;
 use tokio::sync::mpsc::Receiver;
 
@@ -17,7 +16,8 @@ use crate::protocols::ProtocolPacket;
 /// Iterates over the given [`Receiver`] to process each new pcap as it is
 /// received.
 pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, report_dir: &Path) -> Result<()> {
-    // todo: we probably want to pass a clean collector (with only behaviors) to `process_pcap`
+    // todo: we probably want to pass a clean collector (with only behaviors) to
+    // `process_pcap`
     let mut collector = BehaviorCollector::new();
 
     for behavior in behaviors {
@@ -26,10 +26,13 @@ pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, re
 
     let collector = collector;
 
-    // todo: keep in memory report and merge the newly created report into it, right now we will be generating reports
-    //       for each interface rather than tracking on overarching report
+    // todo: keep in memory report and merge the newly created report into it, right
+    // now we will be generating reports for each interface rather than
+    // tracking on overarching report
     while let Some(path) = receiver.recv().await {
         let mut new_collector = collector.clone();
+
+        log::info!("processing pcap '{}'", path.to_string_lossy());
 
         match process_pcap(path.as_path(), &mut new_collector) {
             Ok(()) => {
@@ -45,13 +48,13 @@ pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, re
                 match File::create(report_path) {
                     Ok(mut f) => write!(f, "{}", content).unwrap(),
                     Err(err) => match err.kind() {
-                        ErrorKind::PermissionDenied => eprintln!("incorrect permission for report file"),
-                        ErrorKind::NotFound => eprintln!("report directory or file could not be found"),
-                        _ => eprintln!("could not write to report file")
-                    }
+                        ErrorKind::PermissionDenied => log::error!("incorrect permission for report file"),
+                        ErrorKind::NotFound => log::error!("report directory or file could not be found"),
+                        _ => log::error!("could not write to report file"),
+                    },
                 }
             },
-            Err(err) => eprintln!("Error processing pcap '{}': {}", path.to_str().unwrap(), err),
+            Err(err) => log::warn!("Error processing pcap '{}': {}", path.to_str().unwrap(), err),
         }
     }
 
@@ -67,9 +70,9 @@ fn process_pcap(path: &Path, collector: &mut BehaviorCollector) -> Result<()> {
         match ProtocolPacket::try_from(packet.data) {
             Ok(protocol_packet) =>
                 if let Err(err) = collector.insert_packet(protocol_packet) {
-                    eprintln!("{}", err)
+                    log::debug!("{}", err)
                 },
-            Err(err) => eprintln!("Error parsing packet: {}", err),
+            Err(err) => log::warn!("Error parsing packet: {}", err),
         }
     }
 

@@ -2,38 +2,38 @@
 extern crate clap;
 
 use std::fs;
-use std::fs::DirEntry;
+use std::fs::{DirEntry, File};
 use std::net::TcpListener;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
+use log::LevelFilter;
 use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport};
 use netbug::config::server::ServerConfig;
-
-use netbug::receive;
-use netbug::process;
+use netbug::{process, receive};
+use simplelog::{Config, WriteLogger};
 
 #[tokio::main]
 async fn run(cfg: ServerConfig) {
-    println!("Starting server...");
+    log::info!("Starting server...");
 
     let listener = match TcpListener::bind(cfg.srv_addr) {
         Ok(listener) => listener,
         Err(err) => {
-            eprintln!("Error binding to socket '{}': {}", cfg.srv_addr, err);
+            log::error!("Error binding to socket '{}': {}", cfg.srv_addr, err);
             return;
         },
     };
 
     if let Err(err) = listener.set_nonblocking(true) {
-        eprintln!("cannot establish non-blocking tcp listener: {}", err);
+        log::warn!("cannot establish non-blocking tcp listener: {}", err);
     }
 
     if !cfg.report_dir.exists() {
         if let Err(err) = fs::create_dir_all(cfg.report_dir.clone()) {
-            eprintln!(
+            log::warn!(
                 "Unable to create report directory art '{}': {}",
                 cfg.report_dir.to_str().unwrap(),
                 err
@@ -43,7 +43,10 @@ async fn run(cfg: ServerConfig) {
 
     let is_signal_received = Arc::new(AtomicBool::new(false));
     if let Err(err) = signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_signal_received)) {
-        eprintln!("Error establishing signal handler for server, may not shut down correctly: {}", err);
+        log::warn!(
+            "Error establishing signal handler for server, may not shut down correctly: {}",
+            err
+        );
     }
 
     let (sender, receiver) = tokio::sync::mpsc::channel(1);
@@ -54,22 +57,22 @@ async fn run(cfg: ServerConfig) {
 
         async move {
             if let Err(err) = process::process(&behaviors, receiver, report_dir.as_path()).await {
-                eprintln!("Error processing pcaps: {}", err);
+                log::warn!("Error processing pcaps: {}", err);
             }
         }
     });
 
     if let Err(err) = receive::receive(listener, cfg.pcap_dir, sender, Arc::clone(&is_signal_received)).await {
-        eprintln!("Error receiving pcap: {}", err)
+        log::warn!("Error receiving pcap: {}", err)
     }
 
     let (processor_join,) = tokio::join!(processor_task);
 
     if let Err(err) = processor_join {
-        eprintln!("error waiting for processor thread to join: {}", err);
+        log::warn!("error waiting for processor thread to join: {}", err);
     }
 
-    println!("Stopping server...");
+    log::info!("Stopping server...");
 }
 
 enum ReportFilter {
@@ -112,11 +115,7 @@ fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {
     let content = match fs::read_to_string(report_path.clone()) {
         Ok(content) => content,
         Err(err) => {
-            eprintln!(
-                "An error occurred reading '{}': {}",
-                report_path.to_str().unwrap(),
-                err
-            );
+            eprintln!("An error occurred reading '{}': {}", report_path.to_str().unwrap(), err);
             return;
         },
     };
@@ -125,11 +124,7 @@ fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {
     let report: BehaviorReport = match serde_json::from_str(content.as_str()) {
         Ok(report) => report,
         Err(err) => {
-            eprintln!(
-                "An error occurred reading '{}': {}",
-                report_path.to_str().unwrap(),
-                err
-            );
+            eprintln!("An error occurred reading '{}': {}", report_path.to_str().unwrap(), err);
             return;
         },
     };
@@ -159,13 +154,20 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Start the nbug server to view ")
-        .before_help("any argument here which overlaps with a configuration field ignore the configured value in favor for the explicitly passed value")
+        .before_help(
+            "any argument here which overlaps with a configuration field ignore the configured value in favor for the \
+             explicitly passed value",
+        )
         .settings(&[
             AppSettings::SubcommandRequiredElseHelp,
             AppSettings::UnifiedHelpMessage,
             AppSettings::VersionlessSubcommands,
         ])
-        .subcommand(SubCommand::with_name("run").about("run the nbug server"))
+        .subcommand(
+            SubCommand::with_name("run")
+                .about("run the nbug server")
+                .arg(Arg::with_name("log_file").short("f").long("log-file").takes_value(true)),
+        )
         .subcommand(
             SubCommand::with_name("report")
                 .about("show a human readable report of the recevied pcaps")
@@ -206,6 +208,21 @@ fn main() {
             return;
         },
     };
+
+    let log_init_result = match matches.value_of("log-file") {
+        Some(p) => match File::create(p) {
+            Ok(f) => WriteLogger::init(LevelFilter::Info, Config::default(), f),
+            Err(err) => {
+                eprintln!("could not create log file at '{}': {}", p, err);
+                return;
+            },
+        },
+        None => WriteLogger::init(LevelFilter::Info, Config::default(), std::io::stdout()),
+    };
+
+    if let Err(err) = log_init_result {
+        eprintln!("could not establish global logger: {}", err)
+    }
 
     if let Some(sub_matches) = matches.subcommand_matches("report") {
         let filter = if sub_matches.is_present("failed") {

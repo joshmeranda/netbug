@@ -1,12 +1,10 @@
 use std::convert::TryFrom;
 use std::fs::File;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use std::io::Write;
-use chrono::{DateTime, Utc};
-use log;
 
+use chrono::{DateTime, Utc};
 use pcap::Capture;
 use tokio::sync::mpsc::Receiver;
 
@@ -18,7 +16,8 @@ use crate::protocols::ProtocolPacket;
 /// Iterates over the given [`Receiver`] to process each new pcap as it is
 /// received.
 pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, report_dir: &Path) -> Result<()> {
-    // todo: we probably want to pass a clean collector (with only behaviors) to `process_pcap`
+    // todo: we probably want to pass a clean collector (with only behaviors) to
+    // `process_pcap`
     let mut collector = BehaviorCollector::new();
 
     for behavior in behaviors {
@@ -27,8 +26,9 @@ pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, re
 
     let collector = collector;
 
-    // todo: keep in memory report and merge the newly created report into it, right now we will be generating reports
-    //       for each interface rather than tracking on overarching report
+    // todo: keep in memory report and merge the newly created report into it, right
+    // now we will be generating reports for each interface rather than
+    // tracking on overarching report
     while let Some(path) = receiver.recv().await {
         let mut new_collector = collector.clone();
 
@@ -50,8 +50,8 @@ pub async fn process(behaviors: &[Behavior], mut receiver: Receiver<PathBuf>, re
                     Err(err) => match err.kind() {
                         ErrorKind::PermissionDenied => log::error!("incorrect permission for report file"),
                         ErrorKind::NotFound => log::error!("report directory or file could not be found"),
-                        _ => log::error!("could not write to report file")
-                    }
+                        _ => log::error!("could not write to report file"),
+                    },
                 }
             },
             Err(err) => log::warn!("Error processing pcap '{}': {}", path.to_str().unwrap(), err),

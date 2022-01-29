@@ -5,17 +5,15 @@ use std::fs;
 use std::fs::{DirEntry, File};
 use std::net::TcpListener;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use log::LevelFilter;
-use simplelog::{Config, WriteLogger};
 use netbug::behavior::evaluate::{BehaviorEvaluation, BehaviorReport};
 use netbug::config::server::ServerConfig;
-
-use netbug::receive;
-use netbug::process;
+use netbug::{process, receive};
+use simplelog::{Config, WriteLogger};
 
 #[tokio::main]
 async fn run(cfg: ServerConfig) {
@@ -45,7 +43,10 @@ async fn run(cfg: ServerConfig) {
 
     let is_signal_received = Arc::new(AtomicBool::new(false));
     if let Err(err) = signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&is_signal_received)) {
-        log::warn!("Error establishing signal handler for server, may not shut down correctly: {}", err);
+        log::warn!(
+            "Error establishing signal handler for server, may not shut down correctly: {}",
+            err
+        );
     }
 
     let (sender, receiver) = tokio::sync::mpsc::channel(1);
@@ -114,11 +115,7 @@ fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {
     let content = match fs::read_to_string(report_path.clone()) {
         Ok(content) => content,
         Err(err) => {
-            eprintln!(
-                "An error occurred reading '{}': {}",
-                report_path.to_str().unwrap(),
-                err
-            );
+            eprintln!("An error occurred reading '{}': {}", report_path.to_str().unwrap(), err);
             return;
         },
     };
@@ -127,11 +124,7 @@ fn report(cfg: ServerConfig, filter: ReportFilter, offset: usize) {
     let report: BehaviorReport = match serde_json::from_str(content.as_str()) {
         Ok(report) => report,
         Err(err) => {
-            eprintln!(
-                "An error occurred reading '{}': {}",
-                report_path.to_str().unwrap(),
-                err
-            );
+            eprintln!("An error occurred reading '{}': {}", report_path.to_str().unwrap(), err);
             return;
         },
     };
@@ -161,7 +154,10 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Start the nbug server to view ")
-        .before_help("any argument here which overlaps with a configuration field ignore the configured value in favor for the explicitly passed value")
+        .before_help(
+            "any argument here which overlaps with a configuration field ignore the configured value in favor for the \
+             explicitly passed value",
+        )
         .settings(&[
             AppSettings::SubcommandRequiredElseHelp,
             AppSettings::UnifiedHelpMessage,
@@ -170,8 +166,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("run")
                 .about("run the nbug server")
-                .arg(Arg::with_name("log_file").short("f").long("log-file").takes_value(true))
-
+                .arg(Arg::with_name("log_file").short("f").long("log-file").takes_value(true)),
         )
         .subcommand(
             SubCommand::with_name("report")
@@ -219,8 +214,8 @@ fn main() {
             Ok(f) => WriteLogger::init(LevelFilter::Info, Config::default(), f),
             Err(err) => {
                 eprintln!("could not create log file at '{}': {}", p, err);
-                return
-            }
+                return;
+            },
         },
         None => WriteLogger::init(LevelFilter::Info, Config::default(), std::io::stdout()),
     };

@@ -24,13 +24,20 @@ impl FromStr for CaptureInterval {
 
         match re.captures(s) {
             Some(captures) => {
-
                 let size: u32 = match captures.get(1) {
                     Some(value) => match value.as_str().parse() {
                         Ok(size) => size,
-                        Err(err) => return Err(ConfigError::Toml(Error::custom(format!("could not parse duration from '{}': {}", s, err)))),
+                        Err(err) =>
+                            return Err(ConfigError::Toml(Error::custom(format!(
+                                "could not parse duration from '{}': {}",
+                                s, err
+                            )))),
                     },
-                    None => return Err(ConfigError::Toml(Error::invalid_value(Unexpected::Str(s), &"missing quantity for unit")))
+                    None =>
+                        return Err(ConfigError::Toml(Error::invalid_value(
+                            Unexpected::Str(s),
+                            &"missing quantity for unit",
+                        ))),
                 };
 
                 let unit = match captures.get(2) {

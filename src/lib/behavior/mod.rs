@@ -1,7 +1,9 @@
 use std::hash::Hash;
+use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4, TcpStream, UdpSocket};
-use std::process::Command;
 use std::time::Duration;
+
+use subprocess::{Exec, Redirection};
 
 use crate::behavior::evaluate::BehaviorEvaluation;
 use crate::config::defaults;
@@ -102,7 +104,6 @@ pub struct Behavior {
 
     #[serde(default = "std::default::Default::default")]
     direction: Direction,
-
     /*timeout: Option<Duration>,
 
     /// The optional user specified command to cause the specific behavior
@@ -532,11 +533,16 @@ impl BehaviorRunner {
                 let command = command.clone();
 
                 async move {
-                    let mut handle = Command::new(command[0].as_str())
-                        .args(&command.as_slice()[1..])
-                        .spawn()?;
+                    let mut out = String::new();
 
-                    handle.wait()?;
+                    Exec::cmd(&command[0])
+                        .args(&command.as_slice()[1..])
+                        .stderr(Redirection::Merge)
+                        .stream_stdout()
+                        .unwrap()
+                        .read_to_string(&mut out)?;
+
+                    log::info!("behavior output\n{}", out);
 
                     Ok(())
                 }
@@ -547,8 +553,16 @@ impl BehaviorRunner {
                     let addr = self.behavior.dst.to_string();
 
                     async move {
-                        let mut handle = Command::new("ping").args(&["-c", "1", addr.as_str()]).spawn()?;
-                        handle.wait()?;
+                        let mut out = String::new();
+
+                        Exec::cmd("ping")
+                            .args(&["-c", "1", addr.as_str()])
+                            .stderr(Redirection::Merge)
+                            .stream_stdout()
+                            .unwrap()
+                            .read_to_string(&mut out)?;
+
+                        log::info!("behavior output\n{}", out);
 
                         Ok(())
                     }
@@ -558,8 +572,16 @@ impl BehaviorRunner {
                     let addr = self.behavior.dst.to_string();
 
                     async move {
-                        let mut handle = Command::new("ping").args(&["-6", "-c", "1", addr.as_str()]).spawn()?;
-                        handle.wait()?;
+                        let mut out = String::new();
+
+                        Exec::cmd("ping")
+                            .args(&["-6", "-c", "1", addr.as_str()])
+                            .stderr(Redirection::Merge)
+                            .stream_stdout()
+                            .unwrap()
+                            .read_to_string(&mut out)?;
+
+                        log::info!("behavior output\n{}", out);
 
                         Ok(())
                     }

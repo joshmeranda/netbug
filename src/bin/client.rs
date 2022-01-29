@@ -9,11 +9,11 @@ use std::time::Duration;
 use clap::{App, Arg};
 use clokwerk::{Interval, Scheduler};
 use log::LevelFilter;
+use netbug::client::Client;
+use netbug::config::client::{CaptureInterval, ClientConfig};
 use signal_hook::consts::signal;
 use signal_hook::iterator::Signals;
 use simplelog::{Config, WriteLogger};
-use netbug::client::Client;
-use netbug::config::client::{CaptureInterval, ClientConfig};
 
 fn run_scheduled(mut client: Client, interval: Interval) {
     run_once(&mut client);
@@ -60,10 +60,20 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Run one of the NetBug client tools")
-        .before_help("any argument here which overlaps with a configuration field ignore the configured value in favor for the explicitly passed value")
-        .arg(Arg::with_name("scheduled").long("scheduled").short("s").help(
-            "run the client indefinitely taking captures at startup and then according to the configured schedule",
-        ).takes_value(true))
+        .before_help(
+            "any argument here which overlaps with a configuration field ignore the configured value in favor for the \
+             explicitly passed value",
+        )
+        .arg(
+            Arg::with_name("scheduled")
+                .long("scheduled")
+                .short("s")
+                .help(
+                    "run the client indefinitely taking captures at startup and then according to the configured \
+                     schedule",
+                )
+                .takes_value(true),
+        )
         .arg(Arg::with_name("log_file").short("f").long("log-file").takes_value(true))
         .get_matches();
 
@@ -79,9 +89,13 @@ fn main() {
         match CaptureInterval::from_str(matches.value_of("scheduled").unwrap()) {
             Ok(i) => i,
             Err(err) => {
-                eprintln!("invalid capture interval '{}': {}", matches.value_of("scheduled").unwrap(), err);
-                return
-            }
+                eprintln!(
+                    "invalid capture interval '{}': {}",
+                    matches.value_of("scheduled").unwrap(),
+                    err
+                );
+                return;
+            },
         }
     } else {
         client_cfg.interval
@@ -94,8 +108,8 @@ fn main() {
             Ok(f) => WriteLogger::init(LevelFilter::Info, Config::default(), f),
             Err(err) => {
                 eprintln!("could not create log file at '{}': {}", p, err);
-                return
-            }
+                return;
+            },
         },
         None => WriteLogger::init(LevelFilter::Info, Config::default(), std::io::stdout()),
     };
